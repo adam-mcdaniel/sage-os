@@ -1,0 +1,13 @@
+deps/*.d
+objs/*.o
+*.elf
+*.a
+sbi/*.elf
+sbi/deps/*.d
+sbi/objs/*.o
+*.blk
+*.hdd
+*.dsk
+.vscode/*
+cosc562.dbg
+cosc562.sym
