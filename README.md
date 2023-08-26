@@ -1,3 +1,5 @@
+**#NetID : DPATE139**
+
 # 4's Journal
 
 Every week, you will need to write entries in this journal. Include brief information about:
@@ -7,9 +9,6 @@ Every week, you will need to write entries in this journal. Include brief inform
 * any complications that you've fixed and how you did it.
 
 Sort your entries in descending order (newest entries at the top).
-
-## 26-August-2023
-ttahmid (Tokey Tahmid)
 
 ## 11-May-2022
 
