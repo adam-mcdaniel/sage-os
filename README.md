@@ -1,6 +1,7 @@
 **#NetID : ttahmid**
 **#NetID : DPATE139**
 **#NetID : amcdan23**
+**#NetID : gmorale1**
 
 # 4's Journal
 
