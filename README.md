@@ -2,6 +2,7 @@
 **#NetID : DPATE139**
 **#NetID : amcdan23**
 **#NetID : gmorale1**
+**#NetID : jpark78**
 
 # 4's Journal
 
