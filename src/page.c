@@ -45,7 +45,7 @@ void *page_znalloc(int n)
     if (n <= 0 || (mem = page_nalloc(n)) == NULL) {
         return NULL;
     }
-    return memset(page_nalloc(n), 0, n * PAGE_SIZE);
+    return memset(mem, 0, n * PAGE_SIZE);
 }
 
 void page_free(void *p)
