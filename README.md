@@ -16,7 +16,8 @@ Every week, you will need to write entries in this journal. Include brief inform
 Sort your entries in descending order (newest entries at the top).
 
 ## 02-September-2023
-ttahmid: updated page.c with bookkeeping calculations, page init, page nalloc, page zalloc
+- `amcdan23`: changed the macros to static functions (I think the fact that they use the variable name "index" messed with other bits of code). Fixed that the OS in the master branch wouldn't boot. Rewrote `page_init` and some of `page_nalloc` to be much more readable and to work properly. Implemented `page_free`, `page_count_free`, `page_count_taken`, and created some constant macros for the bookkeeping area's size (with names including memory units like bytes vs. pages).
+- `ttahmid`: updated page.c with bookkeeping calculations, page init, page nalloc, page zalloc
 
 ## 11-May-2022
 
