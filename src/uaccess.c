@@ -18,19 +18,19 @@ unsigned long copy_from(void *dst,
 
     unsigned long bytes_copied = 0;
 
-    if(size > 0){   //do nothing if copy is 0 bytes
-        //for each page amount of bytes...
-        for(int i = 0; i <= size/PAGE_SIZE_4K; i++){
-            unsigned long from_addr = mmu_translate(from_table,from+i); //get page addr from mmu for copying
-            if (from_addr == MMU_TRANSLATE_PAGE_FAULT) {
-                break;
-            }
-            else{
-                memcpy(dst+i,from_addr,PAGE_SIZE_4K); //copy page contents into destination
-                bytes_copied+=PAGE_SIZE_4K;
-            }
+    //for each page amount of bytes or less...
+    for(int i = 0; i <= size/PAGE_SIZE_4K; i++){
+        unsigned long from_addr = mmu_translate(from_table,from+i); //get page addr from mmu for copying
+        if (from_addr == MMU_TRANSLATE_PAGE_FAULT) {
+            break;
+        }
+        else{
+            int cpy_size = size < PAGE_SIZE_4K ? size : PAGE_SIZE_4K;   //limit copy operation to size
+            memcpy(dst+i,from_addr,cpy_size); //copy page contents into destination
+            bytes_copied+=cpy_size;
         }
     }
+    
 
     return bytes_copied;
 }
@@ -51,17 +51,17 @@ unsigned long copy_to(void *to,
 
     unsigned long bytes_copied = 0;
 
-    if(size>0){ //do nothing if copy is 0 bytes
-        //for each page amount of bytes...
-        for(int i = 0; i <= size/PAGE_SIZE_4K; i++){
-            unsigned long to_addr = mmu_translate(to_table,to+i); //get page addr from mmu for copying
-            if (to_addr == MMU_TRANSLATE_PAGE_FAULT) {
-                break;
-            }
-            else{
-                memcpy(to_addr,src+i,PAGE_SIZE_4K); //copy page contents into destination
-                bytes_copied+=PAGE_SIZE_4K;
-            }
+
+    //for each page amount of bytes...
+    for(int i = 0; i <= size/PAGE_SIZE_4K; i++){
+        unsigned long to_addr = mmu_translate(to_table,to+i); //get page addr from mmu for copying
+        if (to_addr == MMU_TRANSLATE_PAGE_FAULT) {
+            break;
+        }
+        else{
+            int cpy_size = size < PAGE_SIZE_4K ? size : PAGE_SIZE_4K;   //limit copy operation to size
+            memcpy(to_addr,src+i,cpy_size); //copy page contents into destination
+            bytes_copied+=cpy_size;
         }
     }
 
