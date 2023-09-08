@@ -6,7 +6,7 @@
 dst: copy destination
 from: copy source
 from_table: page table to translate with
-size: size in pages(or is it bytes?)
+size: size in bytes
 
 copies <size/PAGE_SIZE_4K> pages from the src address into the <dst> address
 */
@@ -18,7 +18,7 @@ unsigned long copy_from(void *dst,
 
     unsigned long bytes_copied = 0;
 
-    if(size > 0){
+    if(size > 0){   //do nothing if copy is 0 bytes
         //for each page amount of bytes...
         for(int i = 0; i <= size/PAGE_SIZE_4K; i++){
             unsigned long from_addr = mmu_translate(from_table,from+i); //get page addr from mmu for copying
