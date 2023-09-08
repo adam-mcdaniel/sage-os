@@ -8,7 +8,7 @@ from: copy source
 from_table: page table to translate with
 size: size in bytes
 
-copies <size/PAGE_SIZE_4K> pages from the src address into the <dst> address
+copies <size> bytes from the src address into the <dst> address
 */
 unsigned long copy_from(void *dst, 
                         const struct page_table *from_table, 
@@ -41,7 +41,7 @@ src: copy source
 from_table: page table to translate with
 size: size in bytes
 
-copies <size/PAGE_SIZE_4K> pages from the src address into the <to> address
+copies <size> bytes from the src address into the <to> address
 */
 unsigned long copy_to(void *to, 
                       const struct page_table *to_table, 
@@ -52,7 +52,7 @@ unsigned long copy_to(void *to,
     unsigned long bytes_copied = 0;
 
 
-    //for each page amount of bytes...
+    //for each page amount of bytes or less...
     for(int i = 0; i <= size/PAGE_SIZE_4K; i++){
         unsigned long to_addr = mmu_translate(to_table,to+i); //get page addr from mmu for copying
         if (to_addr == MMU_TRANSLATE_PAGE_FAULT) {
