@@ -51,6 +51,10 @@ bool mmu_map(struct page_table *tab, uint64_t vaddr, uint64_t paddr, uint8_t lvl
         if (!is_valid(pte)) {
             debugf("mmu_map: entry %d in page table at 0x%08lx is invalid\n", vpn[i], pt);
             struct page_table *pt = mmu_table_create();
+            if (pt == NULL) {
+                debugf("mmu_map: mmu_table_create returned null");
+                return false;
+            }
             pt->entries[vpn[i]] = (unsigned long) pt >> 2 | PB_VALID;
             debugf("mmu_map: create a new page table at 0x%08lx\n", pt);
             debugf("mmu_map: set entry %d as lvl %d branch in new page table", vpn[i], i);
