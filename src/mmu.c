@@ -50,7 +50,7 @@ bool mmu_map(struct page_table *tab, uint64_t vaddr, uint64_t paddr, uint8_t lvl
 
         if (!is_valid(pte)) {
             debugf("mmu_map: entry %d in page table at 0x%08lx is invalid\n", vpn[i], pt);
-            struct page_table *pt = mmu_table_create();
+            pt = mmu_table_create();
             if (pt == NULL) {
                 debugf("mmu_map: mmu_table_create returned null");
                 return false;
@@ -60,7 +60,7 @@ bool mmu_map(struct page_table *tab, uint64_t vaddr, uint64_t paddr, uint8_t lvl
             debugf("mmu_map: set entry %d as lvl %d branch in new page table", vpn[i], i);
         }
         
-        pt = (pt->entries[vpn[i]] & 0x3FF) << 2;
+        pt = (struct page_table *)((pt->entries[vpn[i]] & 0x3FF) << 2);
         debugf("mmu_map: lvl %d page table is at 0x%08lx\n", i - 1, pt);
     }
 
@@ -75,27 +75,50 @@ bool mmu_map(struct page_table *tab, uint64_t vaddr, uint64_t paddr, uint8_t lvl
     return true;
 }
 
-void mmu_free(struct page_table *tab)
-{
-    if (tab == NULL) {
-        return;
-    }
-    // Unmap all pages and free pages.
+void mmu_free(struct page_table *tab) 
+{ 
+    uint64_t entry; 
+    int i; 
+
+    if (tab == NULL) { 
+        return; 
+    } 
+
+    for (i = 0; i < (PAGE_SIZE / 8); i += 1) { 
+        entry = tab->entries[i]; 
+        if (entry & PB_VALID) {
+            mmu_free((struct page_table *)(entry & ~0xFFF)); // Recurse into the next level
+        }
+        tab->entries[i] = 0; 
+    } 
+
+    page_free(tab); 
 }
 
-uint64_t mmu_translate(const struct page_table *tab, uint64_t vaddr)
-{
-    uint64_t vpn[] = {(vaddr >> ADDR_0_BIT) & 0x1FF, (vaddr >> ADDR_1_BIT) & 0x1FF,
+uint64_t mmu_translate(const struct page_table *tab, uint64_t vaddr) 
+{ 
+    int i; 
+
+    if (tab == NULL) { 
+        return MMU_TRANSLATE_PAGE_FAULT; 
+    } 
+
+    // Extract the virtual page numbers
+    uint64_t vpn[] = {(vaddr >> ADDR_0_BIT) & 0x1FF, 
+                      (vaddr >> ADDR_1_BIT) & 0x1FF, 
                       (vaddr >> ADDR_2_BIT) & 0x1FF};
 
-
-    // Delete the following line. This is to get rid of the "unused" warning.
-    (void)vpn;
-    // Can't translate without a table.
-    if (tab == NULL) {
-        return MMU_TRANSLATE_PAGE_FAULT;
+    // Traverse the page table hierarchy using the virtual page numbers
+    for (i = MMU_LEVEL_1G; i >= MMU_LEVEL_4K; i--) {
+        if (!(tab->entries[vpn[i]] & PB_VALID)) {
+            return MMU_TRANSLATE_PAGE_FAULT; // Entry is not valid
+        }
+        tab = (struct page_table *)(tab->entries[vpn[i]] & ~0xFFF);
     }
-    return MMU_TRANSLATE_PAGE_FAULT;
+
+    // Extract the physical address from the final page table entry
+    uint64_t paddr = tab->entries[vpn[MMU_LEVEL_4K]] & ~0xFFF;
+    return paddr | (vaddr & (PAGE_SIZE - 1)); // Combine with the offset within the page
 }
 
 uint64_t mmu_map_range(struct page_table *tab, 
@@ -119,3 +142,4 @@ uint64_t mmu_map_range(struct page_table *tab,
     }
     return pages_mapped;
 }
+
