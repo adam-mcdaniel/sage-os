@@ -15,6 +15,9 @@ Every week, you will need to write entries in this journal. Include brief inform
 
 Sort your entries in descending order (newest entries at the top).
 
+## 11-September-2023
+- `ttahmid`: fixed the warnings in `mmu_map` function in `mmu.c`. Implemented `mmu_free` and `mmu_translate` functions.
+
 ## 09-September-2023
 - `amcdan23`: fixed bugs in uaccess.c from gaddi's copy_to and copy_from functions that had some bugs in which address indexes they fed to `mmu_translate`, and how it handled the offsets for the data copied from/to the first and last physical pages.
 
