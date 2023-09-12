@@ -14,6 +14,8 @@ Every week, you will need to write entries in this journal. Include brief inform
 * any complications that you've fixed and how you did it.
 
 Sort your entries in descending order (newest entries at the top).
+## 12-September-2023
+- `ttahmid`: Right now with the current mmu implementation, when I uncomment Use_MMU in `config.h` and `make run`, I get this output `Invalid read at addr 0x0, size 8, region '(null)', reason: rejected` in infinite loop. Trying to figure it out.
 
 ## 11-September-2023
 - `ttahmid`: fixed the warnings in `mmu_map` function in `mmu.c`. Implemented `mmu_free` and `mmu_translate` functions.

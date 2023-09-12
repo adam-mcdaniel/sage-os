@@ -15,7 +15,7 @@
 #define DEFAULT_LOG_LEVEL 3
 
 #define RUN_INTERNAL_CONSOLE
-// #define USE_MMU
+#define USE_MMU
 // #define USE_HEAP
 // #define USE_PCI
 // #define USE_VIRTIO
