@@ -14,6 +14,7 @@
 #define ADDR_1_BIT   21
 #define ADDR_2_BIT   30
 
+
 struct page_table *mmu_table_create(void)
 {
     return page_zalloc();
@@ -119,7 +120,7 @@ uint64_t mmu_translate(const struct page_table *tab, uint64_t vaddr)
     // Extract the physical address from the final page table entry
     uint64_t paddr = tab->entries[vpn[MMU_LEVEL_4K]] & ~0xFFF;
     return paddr | (vaddr & (PAGE_SIZE - 1)); // Combine with the offset within the page
-}
+} 
 
 uint64_t mmu_map_range(struct page_table *tab, 
                        uint64_t start_virt, 
@@ -141,5 +142,5 @@ uint64_t mmu_map_range(struct page_table *tab,
         pages_mapped += 1;
     }
     return pages_mapped;
-}
+} 
 
