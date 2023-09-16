@@ -41,6 +41,9 @@ bool mmu_map(struct page_table *tab, uint64_t vaddr, uint64_t paddr, uint8_t lvl
         return false;
     }
 
+    debugf("mmu_map: vaddr == 0x%08lx\n", vaddr);
+    debugf("mmu_map: paddr == 0x%08lx\n", paddr);
+
     const uint64_t vpn[] = {(vaddr >> ADDR_0_BIT) & 0x1FF, (vaddr >> ADDR_1_BIT) & 0x1FF,
                             (vaddr >> ADDR_2_BIT) & 0x1FF};
     const uint64_t ppn[] = {(paddr >> ADDR_0_BIT) & 0x1FF, (paddr >> ADDR_1_BIT) & 0x1FF,
@@ -66,14 +69,13 @@ bool mmu_map(struct page_table *tab, uint64_t vaddr, uint64_t paddr, uint8_t lvl
         pt = (struct page_table*)((pt->entries[vpn[i]] & ~0x3FF) << 2);
     }
 
-    pt->entries[vpn[i]] = ppn[2] << PTE_PPN2_BIT |
-                          ppn[1] << PTE_PPN1_BIT |
-                          ppn[0] << PTE_PPN0_BIT |
-                          bits |
-                          PB_VALID;
+    unsigned long ppn_leaf = ppn[2] << PTE_PPN2_BIT |
+                             ppn[1] << PTE_PPN1_BIT |
+                             ppn[0] << PTE_PPN0_BIT;
     
-    debugf("mmu_map: set entry %d as lvl %d leaf in page table at 0x%08lx\n", vpn[i], i, pt);
-    
+    debugf("mmu_map: ppn_leaf == 0x%x\n", (ppn_leaf << 2));
+    pt->entries[vpn[i]] = ppn_leaf | bits | PB_VALID;
+    debugf("mmu_map: set entry %d in page table at 0x%08lx as lvl %d leaf to 0x%08lx\n", vpn[i], pt, i, ppn_leaf << 2);
     return true;
 }
 
