@@ -1,5 +1,4 @@
 **#NetID : ttahmid**
-**#NetID : DPATE139**
 **#NetID : amcdan23**
 **#NetID : gmorale1**
 **#NetID : jpark78**
@@ -14,6 +13,10 @@ Every week, you will need to write entries in this journal. Include brief inform
 * any complications that you've fixed and how you did it.
 
 Sort your entries in descending order (newest entries at the top).
+
+## 15-September-2023
+- `jpark78`: Move kernel page table creation and mapping to happen after `page_init()` in `main.c`. Fixed bugs in mmu_map. Fixed a missing conditional in `page_znalloc`. With this update, uncommeing USE_MMU causes a freeze at `CSR_WRITE and SFENCE_ALL`.
+
 ## 12-September-2023
 - `ttahmid`: Right now with the current mmu implementation, when I uncomment Use_MMU in `config.h` and `make run`, I get this output `Invalid read at addr 0x0, size 8, region '(null)', reason: rejected` in infinite loop. Trying to figure it out.
 
@@ -22,6 +25,9 @@ Sort your entries in descending order (newest entries at the top).
 
 ## 09-September-2023
 - `amcdan23`: fixed bugs in uaccess.c from gaddi's copy_to and copy_from functions that had some bugs in which address indexes they fed to `mmu_translate`, and how it handled the offsets for the data copied from/to the first and last physical pages.
+
+## 08-September-2023
+- `jpark78`: implemented mmu_map.
 
 ## 02-September-2023
 - `amcdan23`: changed the macros to static functions (I think the fact that they use the variable name "index" messed with other bits of code). Fixed that the OS in the master branch wouldn't boot. Rewrote `page_init` and some of `page_nalloc` to be much more readable and to work properly. Implemented `page_free`, `page_count_free`, `page_count_taken`, and created some constant macros for the bookkeeping area's size (with names including memory units like bytes vs. pages).

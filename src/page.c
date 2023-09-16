@@ -1,6 +1,7 @@
 #include <page.h>
 #include <lock.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <util.h>
 #include <symbols.h>
 #include <debug.h>
@@ -67,9 +68,9 @@ void page_init(void)
     }
     set_last(BK_SIZE_IN_PAGES - 1);
 
-    // Print out the bookkeeping area's contents
     mutex_unlock(&page_lock);
 
+    // Print out the bookkeeping area's contents
     logf(LOG_INFO, "Page Init: 0x%08lx -> 0x%08lx\n", bookkeeping, bookkeeping + BK_SIZE_IN_BYTES);
     logf(LOG_INFO, "  Heap size: 0x%lx bytes, %lu pages\n", HEAP_SIZE_IN_BYTES, HEAP_SIZE_IN_PAGES);
     logf(LOG_INFO, "  Bookkeeping size: 0x%lx bytes, %lu pages\n", BK_SIZE_IN_BYTES, BK_SIZE_IN_PAGES);
@@ -171,7 +172,10 @@ void *page_nalloc(int n)
 
 void *page_znalloc(int n)
 {
-    return NULL;
+    if (n <= 0) {
+        return NULL;
+    }
+    
     void *mem = page_nalloc(n);
     if (mem) {
         memset(mem, 0, n * PAGE_SIZE);
