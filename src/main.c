@@ -22,6 +22,25 @@ static void init_systems(void)
     plic_init();
     void page_init(void);
     page_init();
+
+#ifdef USE_MMU
+    struct page_table *pt = mmu_table_create();
+    kernel_mmu_table = pt;
+    // Map memory segments for our kernel
+    mmu_map_range(pt, sym_start(text), sym_end(heap), sym_start(text), MMU_LEVEL_1G,
+                  PB_READ | PB_WRITE | PB_EXECUTE);
+    // PLIC
+    mmu_map_range(pt, 0x0C000000, 0x0C2FFFFF, 0x0C000000, MMU_LEVEL_2M, PB_READ | PB_WRITE);
+    // PCIe ECAM
+    mmu_map_range(pt, 0x30000000, 0x30FFFFFF, 0x30000000, MMU_LEVEL_2M, PB_READ | PB_WRITE);
+    // PCIe MMIO
+    mmu_map_range(pt, 0x40000000, 0x4FFFFFFF, 0x40000000, MMU_LEVEL_2M, PB_READ | PB_WRITE);
+
+    // TODO: turn on the MMU when you've written the src/mmu.c functions
+    CSR_WRITE("satp", SATP_KERNEL); 
+    SFENCE_ALL();
+#endif
+
 #ifdef USE_HEAP
     void heap_init(void);
     void sched_init(void);
@@ -69,26 +88,6 @@ void main(unsigned int hart)
             logf(LOG_INFO, "  [HART#%d]: %s.\n", i, hart_status_values[sbi_hart_get_status(i)]);
         }
     }
-
-    struct page_table *pt    = mmu_table_create();
-    kernel_mmu_table = pt;
-    // Map memory segments for our kernel
-    mmu_map_range(pt, sym_start(text), sym_end(heap), sym_start(text), MMU_LEVEL_1G,
-                  PB_READ | PB_WRITE | PB_EXECUTE);
-    // PLIC
-    mmu_map_range(pt, 0x0C000000, 0x0C2FFFFF, 0x0C000000, MMU_LEVEL_2M, PB_READ | PB_WRITE);
-    // PCIe ECAM
-    mmu_map_range(pt, 0x30000000, 0x30FFFFFF, 0x30000000, MMU_LEVEL_2M, PB_READ | PB_WRITE);
-    // PCIe MMIO
-    mmu_map_range(pt, 0x40000000, 0x4FFFFFFF, 0x40000000, MMU_LEVEL_2M, PB_READ | PB_WRITE);
-
-#ifdef USE_MMU
-    // TODO: turn on the MMU when you've written the src/mmu.c functions
-    CSR_WRITE("satp", SATP_KERNEL); 
-    SFENCE_ALL();
-#endif
-
-    // MMU is turned on here.
 
     // Initialize all submodules here, including PCI, VirtIO, Heap, etc.
     // Many will require the MMU, so write those functions first.

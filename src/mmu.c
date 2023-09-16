@@ -1,6 +1,8 @@
 #include <compiler.h>
 #include <config.h>
 #include <debug.h>
+#include <stdint.h>
+#include <stddef.h>
 #include <lock.h>
 #include <mmu.h>
 #include <page.h>
@@ -35,6 +37,7 @@ static inline bool is_leaf(unsigned long pte)
 bool mmu_map(struct page_table *tab, uint64_t vaddr, uint64_t paddr, uint8_t lvl, uint64_t bits)
 {
     if (tab == NULL || lvl > MMU_LEVEL_1G || (bits & 0xE) == 0) {
+        debugf("mmu_map: invalid argument");
         return false;
     }
 
@@ -51,18 +54,16 @@ bool mmu_map(struct page_table *tab, uint64_t vaddr, uint64_t paddr, uint8_t lvl
 
         if (!is_valid(pte)) {
             debugf("mmu_map: entry %d in page table at 0x%08lx is invalid\n", vpn[i], pt);
-            pt = mmu_table_create();
-            if (pt == NULL) {
+            struct page_table *new_pt = mmu_table_create();
+            if (new_pt == NULL) {
                 debugf("mmu_map: mmu_table_create returned null");
                 return false;
             }
-            pt->entries[vpn[i]] = (unsigned long) pt >> 2 | PB_VALID;
-            debugf("mmu_map: create a new page table at 0x%08lx\n", pt);
-            debugf("mmu_map: set entry %d as lvl %d branch in new page table", vpn[i], i);
+            debugf("mmu_map: create a new page table at 0x%08lx\n", new_pt);
+            pt->entries[vpn[i]] = (unsigned long)new_pt >> 2 | PB_VALID;
+            debugf("mmu_map: set entry %d in page table at 0x%08lx as lvl %d branch to 0x%08lx\n", vpn[i], pt, i, new_pt);
         }
-        
-        pt = (struct page_table *)((pt->entries[vpn[i]] & 0x3FF) << 2);
-        debugf("mmu_map: lvl %d page table is at 0x%08lx\n", i - 1, pt);
+        pt = (struct page_table*)((pt->entries[vpn[i]] & ~0x3FF) << 2);
     }
 
     pt->entries[vpn[i]] = ppn[2] << PTE_PPN2_BIT |
@@ -70,9 +71,9 @@ bool mmu_map(struct page_table *tab, uint64_t vaddr, uint64_t paddr, uint8_t lvl
                           ppn[0] << PTE_PPN0_BIT |
                           bits |
                           PB_VALID;
-
+    
     debugf("mmu_map: set entry %d as lvl %d leaf in page table at 0x%08lx\n", vpn[i], i, pt);
-
+    
     return true;
 }
 
@@ -132,6 +133,7 @@ uint64_t mmu_map_range(struct page_table *tab,
     start_virt            = ALIGN_DOWN_POT(start_virt, PAGE_SIZE_AT_LVL(lvl));
     end_virt              = ALIGN_UP_POT(end_virt, PAGE_SIZE_AT_LVL(lvl));
     uint64_t num_bytes    = end_virt - start_virt;
+    debugf("mmu_map_range: mapping = %d bytes\n", num_bytes);
     uint64_t pages_mapped = 0;
 
     uint64_t i;
@@ -141,6 +143,7 @@ uint64_t mmu_map_range(struct page_table *tab,
         }
         pages_mapped += 1;
     }
+    debugf("mmu_map_range: mapped %d pages\n", pages_mapped);
     return pages_mapped;
 } 
 
