@@ -210,7 +210,7 @@ void debug_page_table(struct page_table *tab, uint8_t lvl) {
         bool is_branch = is_valid && !is_leaf;
 
         uint64_t paddr = ((tab->entries[i] & ~0x3FF) << 2) & ~page_mask;
-        if (paddr == tab) {
+        if (paddr == (uint64_t)tab) {
             continue;
         }
 
