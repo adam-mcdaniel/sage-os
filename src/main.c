@@ -33,24 +33,28 @@ static void init_systems(void)
     mmu_map_range(pt, sym_start(text), sym_end(heap), sym_start(text), MMU_LEVEL_1G,
                   PB_READ | PB_WRITE | PB_EXECUTE);
     // PLIC
-    debugf("Mapping PLIC\n");
-    mmu_map_range(pt, 0x0C000000, 0x0C2FFFFF, 0x0C000000, MMU_LEVEL_2M, PB_READ | PB_WRITE);
-    // PCIe ECAM
-    debugf("Mapping PCIe ECAM\n");
-    mmu_map_range(pt, 0x30000000, 0x30FFFFFF, 0x30000000, MMU_LEVEL_2M, PB_READ | PB_WRITE);
-    // PCIe MMIO
+    // debugf("Mapping PLIC\n");
+    // mmu_map_range(pt, 0x0C000000, 0x0C2FFFFF, 0x0C000000, MMU_LEVEL_2M, PB_READ | PB_WRITE);
+    // // PCIe ECAM
+    // debugf("Mapping PCIe ECAM\n");
+    // mmu_map_range(pt, 0x30000000, 0x30FFFFFF, 0x30000000, MMU_LEVEL_2M, PB_READ | PB_WRITE);
+    // // PCIe MMIO
     debugf("Mapping PCIe MMIO\n");
     mmu_map_range(pt, 0x40000000, 0x40FFFFFF, 0x40000000, MMU_LEVEL_2M, PB_READ | PB_WRITE);
     debugf("Testing MMU translation\n");
-    debugf("0x%08lx -> 0x%08lx\n", 0x0C000000, mmu_translate(pt, 0x0C000000));
-    debugf("0x%08lx -> 0x%08lx\n", 0x30000000, mmu_translate(pt, 0x30000000));
-    debugf("0x%08lx -> 0x%08lx\n", 0x40000000, mmu_translate(pt, 0x40000000));
+    // debugf("0x%08lx -> 0x%08lx\n", 0x0C000000, mmu_translate(pt, 0x0C000000));
+    // debugf("0x%08lx -> 0x%08lx\n", 0x30000000, mmu_translate(pt, 0x30000000));
+    // debugf("0x%08lx -> 0x%08lx\n", 0x40000000, mmu_translate(pt, 0x40000000));
+    // void debug_page_table(struct page_table *tab, 
+    //                    uint64_t start_virt, 
+    //                    uint64_t end_virt, 
+    //                    uint64_t start_phys)
+    debug_page_table(pt, MMU_LEVEL_1G);
 
-    debugf("About to enable MMU\n");
+    debugf("About to set SATP to %016lx\n", SATP_KERNEL);
     // TODO: turn on the MMU when you've written the src/mmu.c functions
     CSR_WRITE("satp", SATP_KERNEL); 
     SFENCE_ALL();
-
     debugf("MMU enabled\n");
 #endif
 
@@ -66,6 +70,13 @@ static void init_systems(void)
     util_connect_galloc(kmalloc, kcalloc, kfree);
     heap_init();
     debugf("heap_init() done\n");
+
+    // Call kmalloc() here to ensure it works.
+    void *ptr = kmalloc(1024);
+    strcpy(ptr, "Hello, world!");
+    debugf("kmalloc(1024) = %p\n", ptr);
+    debugf("kmalloc(1024) = %s\n", ptr);
+    kfree(ptr);
 #endif
 #ifdef USE_PCI
     pci_init();
