@@ -42,8 +42,8 @@ bool mmu_map(struct page_table *tab, uint64_t vaddr, uint64_t paddr, uint8_t lvl
     }
 
     debugf("mmu_map: page table at 0x%08lx\n", tab);
-    // debugf("mmu_map: vaddr == 0x%08lx\n", vaddr);
-    // debugf("mmu_map: paddr == 0x%08lx\n", paddr);
+    debugf("mmu_map: vaddr == 0x%08lx\n", vaddr);
+    debugf("mmu_map: paddr == 0x%08lx\n", paddr);
 
     const uint64_t vpn[] = {(vaddr >> ADDR_0_BIT) & 0x1FF, (vaddr >> ADDR_1_BIT) & 0x1FF,
                             (vaddr >> ADDR_2_BIT) & 0x1FF};
@@ -80,7 +80,7 @@ bool mmu_map(struct page_table *tab, uint64_t vaddr, uint64_t paddr, uint8_t lvl
     debugf("mmu_map: ppn_leaf == 0x%x\n", (ppn_leaf << 2));
     pt->entries[vpn[i]] = ppn_leaf | bits | PB_VALID;
 
-    debugf("mmu_map: Set bits of address 0x%08lx to 0x%08lx\n", &pt->entries[vpn[i]], ppn_leaf | bits | PB_VALID);
+    debugf("mmu_map: set bits of address 0x%08lx to 0x%08lx\n", &pt->entries[vpn[i]], ppn_leaf | bits | PB_VALID);
 
     debugf("mmu_map: set entry %d in page table at 0x%08lx as lvl %d leaf to 0x%08lx\n", vpn[i], pt, i, ppn_leaf << 2);
     return true;
@@ -110,8 +110,8 @@ uint64_t mmu_translate(const struct page_table *tab, uint64_t vaddr)
 { 
     int i; 
 
-    debugf("mmu_translate: page table at 0x%08lx\n", tab);
-    debugf("mmu_translate: vaddr == 0x%08lx\n", vaddr);
+    debugf("mmu_translate: page table at 0x%016lx\n", tab);
+    debugf("mmu_translate: vaddr == 0x%016lx\n", vaddr);
 
     if (tab == NULL) { 
         debugf("mmu_translate: tab == NULL\n");
@@ -150,12 +150,16 @@ uint64_t mmu_translate(const struct page_table *tab, uint64_t vaddr)
         }
     }
 
-    // Extract the physical address from the final page table entry
-    uint64_t paddr = (tab->entries[vpn[lvl]] & ~0x3FF) << 2;
-
-    uint64_t result = paddr | (vaddr & (PAGE_SIZE_AT_LVL(lvl) - 1));
-
     debugf("mmu_translate: vaddr == 0x%08lx\n", vaddr);
+
+    uint64_t page_mask = PAGE_SIZE_AT_LVL(lvl) - 1;
+    
+    // Extract the physical address from the final page table entry
+    uint64_t paddr = ((tab->entries[vpn[lvl]] & ~0x3FF) << 2) & ~page_mask;
+
+    uint64_t result = paddr | (vaddr & page_mask);
+    debugf("mmu_translate: paddr == 0x%08lx\n", result);
+
     return result; // Combine with the offset within the page
 } 
 
@@ -168,9 +172,11 @@ uint64_t mmu_map_range(struct page_table *tab,
 {
     debugf("mmu_map_range: page table at 0x%08lx\n", tab);
     start_virt            = ALIGN_DOWN_POT(start_virt, PAGE_SIZE_AT_LVL(lvl));
+    start_phys            = ALIGN_DOWN_POT(start_phys, PAGE_SIZE_AT_LVL(lvl));
     end_virt              = ALIGN_UP_POT(end_virt, PAGE_SIZE_AT_LVL(lvl));
     uint64_t num_bytes    = end_virt - start_virt;
     debugf("mmu_map_range: start_virt = 0x%08lx\n", start_virt);
+    debugf("mmu_map_range: start_phys = 0x%08lx\n", start_phys);
     debugf("mmu_map_range: mapping = %d bytes\n", num_bytes);
     uint64_t pages_mapped = 0;
 
@@ -187,3 +193,51 @@ uint64_t mmu_map_range(struct page_table *tab,
     return pages_mapped;
 } 
 
+// This function performs some basic sanity checks on the page table.
+// For each level of the page table, it prints out the entries that are valid.
+void debug_page_table(struct page_table *tab, uint8_t lvl) {
+    debugf("debug_page_table: debugging page table at 0x%016lx\n", tab);
+    uint64_t page_mask = PAGE_SIZE_AT_LVL(lvl) - 1;
+
+    for (uint64_t i=0; i < 512; i++) {
+        // Is the entry a leaf?
+        bool is_leaf = (tab->entries[i] & 0xE) != 0;
+
+        // Is the entry valid?
+        bool is_valid = tab->entries[i] & PB_VALID;
+
+        // Is the entry a branch?
+        bool is_branch = is_valid && !is_leaf;
+
+        uint64_t paddr = ((tab->entries[i] & ~0x3FF) << 2) & ~page_mask;
+        if (paddr == tab) {
+            continue;
+        }
+
+        uint64_t vaddr = paddr;
+        if (is_valid && is_leaf) {
+            // Confirm that we can translate the address
+            uint64_t translated = mmu_translate(tab, vaddr);
+            if (translated != paddr) {
+                debugf("debug_page_table: page table at 0x%08lx is invalid\n", tab);
+                debugf("debug_page_table: expected 0x%08lx, got 0x%08lx\n", paddr, translated);
+                fatalf("debug_page_table: entry 0x%x in page table at 0x%08lx is invalid\n", i, tab);
+            } else {
+                debugf("debug_page_table: page table at 0x%08lx is valid\n", tab);
+            }
+        } else if (is_branch && lvl > MMU_LEVEL_4K) {
+            // Recurse into the next level
+            debugf("debug_page_table: entry %d in page table at 0x%08lx is a branch to 0x%08lx\n", i, tab, (tab->entries[i] & ~0x3FF) << 2);
+            debug_page_table((struct page_table *)((tab->entries[i] & ~0x3FF) << 2), lvl - 1);
+        } else {
+            // Invalid entry, confirm that it's all zeroes
+            if (tab->entries[i] != 0) {
+                debugf("debug_page_table: page table at 0x%08lx is invalid\n", tab);
+                debugf("debug_page_table: expected all zeroes, got 0x%08lx\n", tab->entries[i]);
+                fatalf("debug_page_table: entry 0x%x in page table at 0x%08lx is invalid\n", i, tab);
+            }
+        }
+    }
+
+    debugf("debug_page_table: page table at 0x%08lx is valid\n", tab);
+}

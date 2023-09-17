@@ -68,6 +68,9 @@ void page_init(void)
     }
     set_last(BK_SIZE_IN_PAGES - 1);
 
+    debugf("page_init: bookkeeping area initialized\n");
+    debugf("page_init: bookkeeping area starts at 0x%08lx\n", bookkeeping);
+    debugf("page_init: bookkeeping area ends at 0x%08lx\n", bookkeeping + BK_SIZE_IN_BYTES);
     mutex_unlock(&page_lock);
 
     // Print out the bookkeeping area's contents
@@ -159,7 +162,7 @@ void *page_nalloc(int n)
                 return (void *)(bookkeeping + start * PAGE_SIZE);
             }
         } else {
-            debugf("page_nalloc: page 0x%08lx is taken\n", i);
+            // debugf("page_nalloc: page 0x%08lx is taken\n", i);
             consecutive = 0;
         }
     }
