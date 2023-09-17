@@ -55,7 +55,7 @@ static int is_last(uint64_t index)
 void page_init(void)
 {
     /* Initialize the page system. */
-    bookkeeping = sym_start(heap);
+    bookkeeping = (uint8_t*)sym_start(heap);
     
     // Print bookkeeping area
     mutex_spinlock(&page_lock);
@@ -68,65 +68,66 @@ void page_init(void)
     }
     set_last(BK_SIZE_IN_PAGES - 1);
 
+    debugf("page_init: bookkeeping area initialized\n");
+    debugf("page_init: bookkeeping area starts at 0x%08lx\n", bookkeeping);
+    debugf("page_init: bookkeeping area ends at 0x%08lx\n", bookkeeping + BK_SIZE_IN_BYTES);
     mutex_unlock(&page_lock);
 
     // Print out the bookkeeping area's contents
-    logf(LOG_INFO, "Page Init: 0x%08lx -> 0x%08lx\n", bookkeeping, bookkeeping + BK_SIZE_IN_BYTES);
-    logf(LOG_INFO, "  Heap size: 0x%lx bytes, %lu pages\n", HEAP_SIZE_IN_BYTES, HEAP_SIZE_IN_PAGES);
-    logf(LOG_INFO, "  Bookkeeping size: 0x%lx bytes, %lu pages\n", BK_SIZE_IN_BYTES, BK_SIZE_IN_PAGES);
-    logf(LOG_INFO, "  Taken pages: %lu\n", page_count_taken());
-    logf(LOG_INFO, "  Free pages: %lu\n", page_count_free());
+    // logf(LOG_INFO, "Page Init: 0x%08lx -> 0x%08lx\n", bookkeeping, bookkeeping + BK_SIZE_IN_BYTES);
+    // logf(LOG_INFO, "  Heap size: 0x%lx bytes, %lu pages\n", HEAP_SIZE_IN_BYTES, HEAP_SIZE_IN_PAGES);
+    // logf(LOG_INFO, "  Bookkeeping size: 0x%lx bytes, %lu pages\n", BK_SIZE_IN_BYTES, BK_SIZE_IN_PAGES);
+    // logf(LOG_INFO, "  Taken pages: %lu\n", page_count_taken());
+    // logf(LOG_INFO, "  Free pages: %lu\n", page_count_free());
     
-    /*
     // This code tests the page allocator
-    void *a = page_nalloc(1);
+    // void *a = page_nalloc(1);
 
-    logf(LOG_INFO, "Page Init: 0x%08lx -> 0x%08lx\n", bookkeeping, bookkeeping + BK_SIZE_IN_BYTES);
-    logf(LOG_INFO, "  Heap size: 0x%lx bytes, %lu pages\n", HEAP_SIZE_IN_BYTES, HEAP_SIZE_IN_PAGES);
-    logf(LOG_INFO, "  Bookkeeping size: 0x%lx bytes, %lu pages\n", BK_SIZE_IN_BYTES, BK_SIZE_IN_PAGES);
-    logf(LOG_INFO, "  Taken pages: %lu\n", page_count_taken());
-    logf(LOG_INFO, "  Free pages: %lu\n", page_count_free());
+    // logf(LOG_INFO, "Page Init: 0x%08lx -> 0x%08lx\n", bookkeeping, bookkeeping + BK_SIZE_IN_BYTES);
+    // logf(LOG_INFO, "  Heap size: 0x%lx bytes, %lu pages\n", HEAP_SIZE_IN_BYTES, HEAP_SIZE_IN_PAGES);
+    // logf(LOG_INFO, "  Bookkeeping size: 0x%lx bytes, %lu pages\n", BK_SIZE_IN_BYTES, BK_SIZE_IN_PAGES);
+    // logf(LOG_INFO, "  Taken pages: %lu\n", page_count_taken());
+    // logf(LOG_INFO, "  Free pages: %lu\n", page_count_free());
 
-    void *b = page_nalloc(2);
+    // void *b = page_nalloc(2);
 
-    logf(LOG_INFO, "Page Init: 0x%08lx -> 0x%08lx\n", bookkeeping, bookkeeping + BK_SIZE_IN_BYTES);
-    logf(LOG_INFO, "  Heap size: 0x%lx bytes, %lu pages\n", HEAP_SIZE_IN_BYTES, HEAP_SIZE_IN_PAGES);
-    logf(LOG_INFO, "  Bookkeeping size: 0x%lx bytes, %lu pages\n", BK_SIZE_IN_BYTES, BK_SIZE_IN_PAGES);
-    logf(LOG_INFO, "  Taken pages: %lu\n", page_count_taken());
-    logf(LOG_INFO, "  Free pages: %lu\n", page_count_free());
+    // logf(LOG_INFO, "Page Init: 0x%08lx -> 0x%08lx\n", bookkeeping, bookkeeping + BK_SIZE_IN_BYTES);
+    // logf(LOG_INFO, "  Heap size: 0x%lx bytes, %lu pages\n", HEAP_SIZE_IN_BYTES, HEAP_SIZE_IN_PAGES);
+    // logf(LOG_INFO, "  Bookkeeping size: 0x%lx bytes, %lu pages\n", BK_SIZE_IN_BYTES, BK_SIZE_IN_PAGES);
+    // logf(LOG_INFO, "  Taken pages: %lu\n", page_count_taken());
+    // logf(LOG_INFO, "  Free pages: %lu\n", page_count_free());
 
-    void *c = page_nalloc(4);
+    // void *c = page_nalloc(4);
 
-    logf(LOG_INFO, "Page Init: 0x%08lx -> 0x%08lx\n", bookkeeping, bookkeeping + BK_SIZE_IN_BYTES);
-    logf(LOG_INFO, "  Heap size: 0x%lx bytes, %lu pages\n", HEAP_SIZE_IN_BYTES, HEAP_SIZE_IN_PAGES);
-    logf(LOG_INFO, "  Bookkeeping size: 0x%lx bytes, %lu pages\n", BK_SIZE_IN_BYTES, BK_SIZE_IN_PAGES);
-    logf(LOG_INFO, "  Taken pages: %lu\n", page_count_taken());
-    logf(LOG_INFO, "  Free pages: %lu\n", page_count_free());
+    // logf(LOG_INFO, "Page Init: 0x%08lx -> 0x%08lx\n", bookkeeping, bookkeeping + BK_SIZE_IN_BYTES);
+    // logf(LOG_INFO, "  Heap size: 0x%lx bytes, %lu pages\n", HEAP_SIZE_IN_BYTES, HEAP_SIZE_IN_PAGES);
+    // logf(LOG_INFO, "  Bookkeeping size: 0x%lx bytes, %lu pages\n", BK_SIZE_IN_BYTES, BK_SIZE_IN_PAGES);
+    // logf(LOG_INFO, "  Taken pages: %lu\n", page_count_taken());
+    // logf(LOG_INFO, "  Free pages: %lu\n", page_count_free());
 
-    page_free(a);
+    // page_free(a);
 
-    logf(LOG_INFO, "Page Init: 0x%08lx -> 0x%08lx\n", bookkeeping, bookkeeping + BK_SIZE_IN_BYTES);
-    logf(LOG_INFO, "  Heap size: 0x%lx bytes, %lu pages\n", HEAP_SIZE_IN_BYTES, HEAP_SIZE_IN_PAGES);
-    logf(LOG_INFO, "  Bookkeeping size: 0x%lx bytes, %lu pages\n", BK_SIZE_IN_BYTES, BK_SIZE_IN_PAGES);
-    logf(LOG_INFO, "  Taken pages: %lu\n", page_count_taken());
-    logf(LOG_INFO, "  Free pages: %lu\n", page_count_free());
+    // logf(LOG_INFO, "Page Init: 0x%08lx -> 0x%08lx\n", bookkeeping, bookkeeping + BK_SIZE_IN_BYTES);
+    // logf(LOG_INFO, "  Heap size: 0x%lx bytes, %lu pages\n", HEAP_SIZE_IN_BYTES, HEAP_SIZE_IN_PAGES);
+    // logf(LOG_INFO, "  Bookkeeping size: 0x%lx bytes, %lu pages\n", BK_SIZE_IN_BYTES, BK_SIZE_IN_PAGES);
+    // logf(LOG_INFO, "  Taken pages: %lu\n", page_count_taken());
+    // logf(LOG_INFO, "  Free pages: %lu\n", page_count_free());
 
-    page_free(b);
+    // page_free(b);
 
-    logf(LOG_INFO, "Page Init: 0x%08lx -> 0x%08lx\n", bookkeeping, bookkeeping + BK_SIZE_IN_BYTES);
-    logf(LOG_INFO, "  Heap size: 0x%lx bytes, %lu pages\n", HEAP_SIZE_IN_BYTES, HEAP_SIZE_IN_PAGES);
-    logf(LOG_INFO, "  Bookkeeping size: 0x%lx bytes, %lu pages\n", BK_SIZE_IN_BYTES, BK_SIZE_IN_PAGES);
-    logf(LOG_INFO, "  Taken pages: %lu\n", page_count_taken());
-    logf(LOG_INFO, "  Free pages: %lu\n", page_count_free());
+    // logf(LOG_INFO, "Page Init: 0x%08lx -> 0x%08lx\n", bookkeeping, bookkeeping + BK_SIZE_IN_BYTES);
+    // logf(LOG_INFO, "  Heap size: 0x%lx bytes, %lu pages\n", HEAP_SIZE_IN_BYTES, HEAP_SIZE_IN_PAGES);
+    // logf(LOG_INFO, "  Bookkeeping size: 0x%lx bytes, %lu pages\n", BK_SIZE_IN_BYTES, BK_SIZE_IN_PAGES);
+    // logf(LOG_INFO, "  Taken pages: %lu\n", page_count_taken());
+    // logf(LOG_INFO, "  Free pages: %lu\n", page_count_free());
 
-    page_free(c);
+    // page_free(c);
 
-    logf(LOG_INFO, "Page Init: 0x%08lx -> 0x%08lx\n", bookkeeping, bookkeeping + BK_SIZE_IN_BYTES);
-    logf(LOG_INFO, "  Heap size: 0x%lx bytes, %lu pages\n", HEAP_SIZE_IN_BYTES, HEAP_SIZE_IN_PAGES);
-    logf(LOG_INFO, "  Bookkeeping size: 0x%lx bytes, %lu pages\n", BK_SIZE_IN_BYTES, BK_SIZE_IN_PAGES);
-    logf(LOG_INFO, "  Taken pages: %lu\n", page_count_taken());
-    logf(LOG_INFO, "  Free pages: %lu\n", page_count_free());
-    */
+    // logf(LOG_INFO, "Page Init: 0x%08lx -> 0x%08lx\n", bookkeeping, bookkeeping + BK_SIZE_IN_BYTES);
+    // logf(LOG_INFO, "  Heap size: 0x%lx bytes, %lu pages\n", HEAP_SIZE_IN_BYTES, HEAP_SIZE_IN_PAGES);
+    // logf(LOG_INFO, "  Bookkeeping size: 0x%lx bytes, %lu pages\n", BK_SIZE_IN_BYTES, BK_SIZE_IN_PAGES);
+    // logf(LOG_INFO, "  Taken pages: %lu\n", page_count_taken());
+    // logf(LOG_INFO, "  Free pages: %lu\n", page_count_free());
 }
 
 void *page_nalloc(int n)
@@ -161,7 +162,7 @@ void *page_nalloc(int n)
                 return (void *)(bookkeeping + start * PAGE_SIZE);
             }
         } else {
-            debugf("page_nalloc: page 0x%08lx is taken\n", i);
+            // debugf("page_nalloc: page 0x%08lx is taken\n", i);
             consecutive = 0;
         }
     }
@@ -178,6 +179,7 @@ void *page_znalloc(int n)
     
     void *mem = page_nalloc(n);
     if (mem) {
+        debugf("page_znalloc: zeroing out %d pages starting at 0x%08lx\n", n, mem);
         memset(mem, 0, n * PAGE_SIZE);
     }
     return mem;
@@ -190,7 +192,7 @@ void page_free(void *p)
     }
     /* Free the page */
     uint64_t x = ((uint64_t)p - (uint64_t)bookkeeping) / PAGE_SIZE;
-    logf(LOG_INFO, "page_free: freeing page %lu at address 0x%p\n", x, p);
+    debugf("page_free: freeing page %lu at address 0x%p\n", x, p);
 
     mutex_spinlock(&page_lock);
 
