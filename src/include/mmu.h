@@ -71,3 +71,5 @@ bool mmu_map(struct page_table *tab,
              unsigned char lvl, 
              unsigned long bits);
 void mmu_free(struct page_table *tab);
+
+void debug_page_table(struct page_table *tab, uint8_t lvl);
