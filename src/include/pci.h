@@ -14,6 +14,11 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define ECAM_ADDR_START 0x30000000
+#define ECAM_ADDR_END   0x30FFFFFF
+#define MAX_BUSES 256
+#define MAX_DEVICES 32
+#define MAX_FUNCTIONS 8
 // PciEcam follows the structure of the PCI ECAM in the
 // PCIe manual.
 struct pci_ecam {
@@ -84,6 +89,8 @@ struct pci_ecam {
         } common;
     };
 };
+
+static volatile struct pci_ecam* pci_get_ecam(uint8_t bus, uint8_t device, uint8_t function, uint16_t reg);
 
 struct pci_cape {
     uint8_t id;
