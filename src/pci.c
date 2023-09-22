@@ -40,24 +40,27 @@ void pci_init(void)
 {
     // Initialize and enumerate all PCI bridges and devices.
     debugf("ECAM_START = 0x%lx \n",ECAM_START);
+    debugf("ecam struct size: %d\n", sizeof(struct pci_ecam));
     uint32_t bus;
     uint32_t device;
     for(bus = 0; bus < 255; bus++){
         for(device = 0; device < 32; device++){
-            struct pci_ecam *ecam = ECAM_START + (bus + device) * sizeof(struct pci_ecam);
+            unsigned long cur_addr = ECAM_START + ((bus + device) * sizeof(struct pci_ecam));
+            struct pci_ecam *ecam = cur_addr;
             if(ecam->vendor_id != 0xFFFF){  //something is connected
-                long cur_addr = ECAM_START + (bus + device);
+                
                 // debugf("checking addr 0x%d\n",cur_addr);
                 //initialize based on device type
                 if(ecam->header_type == 0){ 
                     pci_init_bridge(ecam,bus);
-                    debugf("Found bridge at %p \n",ecam);
+                    debugf("Found bridge at 0x%lx (calculated addr)\n",cur_addr);
+                    debugf("Found bridge at 0x%p (pointer addr)\n",ecam);
                     debugf("secondary bus no. %d\n" , ecam->type1.secondary_bus_no);
                     
                 }
                 if(ecam->header_type == 1){
                     pci_init_device(ecam,bus);
-                    debugf("Found device at %p \n",ecam);
+                    debugf("Found device at 0x%lx\n",cur_addr);
                 }
             }
         }
