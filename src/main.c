@@ -49,7 +49,7 @@ static void init_systems(void)
     //                    uint64_t start_virt, 
     //                    uint64_t end_virt, 
     //                    uint64_t start_phys)
-    debug_page_table(pt, MMU_LEVEL_1G);
+    //debug_page_table(pt, MMU_LEVEL_1G);
 
     debugf("About to set SATP to %016lx\n", SATP_KERNEL);
     // TODO: turn on the MMU when you've written the src/mmu.c functions
