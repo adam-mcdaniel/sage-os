@@ -38,25 +38,30 @@ static void pci_init_bridge(struct pci_ecam *ecam, int bus){
 void pci_init(void)
 {
     // Initialize and enumerate all PCI bridges and devices.
-
+    debugf("ECAM_START = 0x%lx",ECAM_START);
     uint32_t bus;
     uint32_t device;
     for(bus = 0; bus < 255; bus++){
         for(device = 0; device < 32; device++){
-            struct pci_ecam *ecam = ECAM_START + bus + device;
+            struct pci_ecam *ecam = ECAM_START + (bus + device) * sizeof(struct pci_ecam);
             if(ecam->vendor_id != 0xFFFF){  //something is connected
+                long cur_addr = ECAM_START + (bus + device);
+                // debugf("checking addr 0x%d\n",cur_addr);
                 //initialize based on device type
                 if(ecam->header_type == 0){ 
                     pci_init_bridge(ecam,bus);
+                    debugf("Found bridge at %p \n",ecam);
                 }
                 if(ecam->header_type == 1){
                     pci_init_device(ecam,bus);
+                    debugf("Found deviceat %p \n",ecam);
                 }
             }
         }
     }
-
+    debugf("Busses enumerated!\n");
     // This should forward all virtio devices to the virtio drivers.
+
 }
 
 void pci_dispatch_irq(int irq)
