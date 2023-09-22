@@ -31,6 +31,7 @@ static void pci_init_bridge(struct pci_ecam *ecam, int bus){
     ecam->type1.secondary_bus_no = sbn;
     ecam->type1.subordinate_bus_no = sbn;
 
+    
     sbn += 1;
     // ecam->type1.memory_base = ;
 }
@@ -38,7 +39,7 @@ static void pci_init_bridge(struct pci_ecam *ecam, int bus){
 void pci_init(void)
 {
     // Initialize and enumerate all PCI bridges and devices.
-    debugf("ECAM_START = 0x%lx",ECAM_START);
+    debugf("ECAM_START = 0x%lx \n",ECAM_START);
     uint32_t bus;
     uint32_t device;
     for(bus = 0; bus < 255; bus++){
@@ -51,10 +52,12 @@ void pci_init(void)
                 if(ecam->header_type == 0){ 
                     pci_init_bridge(ecam,bus);
                     debugf("Found bridge at %p \n",ecam);
+                    debugf("secondary bus no. %d\n" , ecam->type1.secondary_bus_no);
+                    
                 }
                 if(ecam->header_type == 1){
                     pci_init_device(ecam,bus);
-                    debugf("Found deviceat %p \n",ecam);
+                    debugf("Found device at %p \n",ecam);
                 }
             }
         }
