@@ -14,8 +14,12 @@ Every week, you will need to write entries in this journal. Include brief inform
 
 Sort your entries in descending order (newest entries at the top).
 
+
 ## 21-September-2023
 - `ttahmid`: Implemented PCI BUS Enumerating in the `pci-ttahmid` branch. Right now it hangs when trying to read the memory at the `ECAM_ADDR_START` which is set to `0x30000000`. Might need to check if MMU maps that address correctly or not. But right now stuck here.
+- `ttahmid`: Figured out the previous problem with `ECAM_ADDR_START`: the `mmu_map_range` for PCIe ECAM in `main.c` was commented out. Now after uncommenting this line, that address (`0x30000000`) is being used but running into another problem: `[DEBUG]: debug_page_table: expected 0x30000000, got 0xffffffffffffffff` 
+`[FATAL]: debug_page_table: entry 0x180 in page table at 0x80028000 is invalid`
+Implemented `pci_enumerate_bus`, `pci_configure_bridge`, `pci_configure_device` in `pci-ttahmid` branch. Need to solve the page_table issue now.
 
 ## 17-September-2023
 - `amcdan23`: We can now use the MMU and `kmalloc` + `kfree`! Fixed some bugs on how `mmu_map`, `mmu_translate`, `mmu_free` navigate page table entries. It didn't perform the 2 bit shift before using it as a physical pointer. Added many more debug prints. Additionally added some debugging functions for recursively printing the page table entries for all the mapped memory. Eliminated bug that caused physical memory to not map 1:1 with virtual memory in `mmu_map_range`. Fixed physical address offset calculation; previously it was always assuming the page size was 4K in this calculation.
