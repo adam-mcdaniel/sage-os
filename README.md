@@ -14,6 +14,9 @@ Every week, you will need to write entries in this journal. Include brief inform
 
 Sort your entries in descending order (newest entries at the top).
 
+## 22-September-2023
+
+- `amcdan23`: Fixed the aforementioned `FATAL` debug_page_table error and got the ECAM memory allocated.
 
 ## 21-September-2023
 - `ttahmid`: Implemented PCI BUS Enumerating in the `pci-ttahmid` branch. Right now it hangs when trying to read the memory at the `ECAM_ADDR_START` which is set to `0x30000000`. Might need to check if MMU maps that address correctly or not. But right now stuck here.
