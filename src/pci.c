@@ -8,10 +8,10 @@
 static void pci_configure_device(struct pci_ecam *device);
 static void pci_configure_bridge(struct pci_ecam *bridge);
 
-// Global counter for next available bus number
+
 static uint8_t next_bus_number = 1;
 
-// Global tracker for next available MMIO address
+
 static uint32_t next_mmio_address = 0x40000000;
 
 static inline uint32_t pci_get_config_address(uint8_t bus, uint8_t device, uint8_t function, uint8_t offset) {
@@ -57,7 +57,7 @@ static void pci_enumerate_bus(uint8_t bus) {
             } else if ((header->header_type & 0x7F) == 0) {
                 //debugf("Handle type 0 device\n");
                 pci_configure_device(header);
-                print_vendor_specific_capabilities(header);
+                //print_vendor_specific_capabilities(header);
             }
 
         }
@@ -84,7 +84,7 @@ static void pci_configure_bridge(struct pci_ecam *bridge) {
 
 static void pci_configure_device(struct pci_ecam *device) {
     for (int i = 0; i < 6; i++) {
-        debugf("configuring device\n");
+        //debugf("configuring device\n");
         
         
         device->type0.bar[i] = 0xFFFFFFFF;
@@ -116,7 +116,7 @@ static void pci_configure_device(struct pci_ecam *device) {
 }
 
 
-void print_vendor_specific_capabilities(struct pci_ecam* header) {
+/*void print_vendor_specific_capabilities(struct pci_ecam* header) {
     if (header->vendor_id != 0x1AF4) return;  
 
     uint8_t cap_pointer = header->type0.capes_pointer;  
@@ -130,7 +130,7 @@ void print_vendor_specific_capabilities(struct pci_ecam* header) {
 
         cap_pointer = cape->next;  
     }
-}
+}*/
 
 
 void pci_init(void) {
