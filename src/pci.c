@@ -20,7 +20,7 @@ static inline uint32_t pci_get_config_address(uint8_t bus, uint8_t device, uint8
         return addr;
     } else {
         debugf("Warning: PCI address out of bounds!\n");
-        return 0; // or handle this situation differently if needed
+        return 0; 
     }
 }
 
@@ -86,49 +86,49 @@ static void pci_configure_device(struct pci_ecam *device) {
     for (int i = 0; i < 6; i++) {
         debugf("configuring device\n");
         
-        // Write all ones to determine the BAR size/type.
+        
         device->type0.bar[i] = 0xFFFFFFFF;
         
-        // Read back the value.
+       
         uint32_t bar_value = device->type0.bar[i];
 
         if (bar_value == 0) {
             continue;
         }
 
-        // Determine the size from the BAR value.
+        
         uint32_t size = ~(bar_value & ~0xF) + 1;
 
-        // Ensure the next MMIO address is aligned to the size of the BAR.
+        
         next_mmio_address = (next_mmio_address + size - 1) & ~(size - 1);
 
-        // Assign the MMIO address to the BAR and increase the global MMIO pointer.
+        
         device->type0.bar[i] = next_mmio_address;  
         next_mmio_address += size;
 
-        // If the BAR is 64-bit, handle the next DWORD.
+        
         if ((bar_value & 0x6) == 0x4) {
             i++;
-            device->type0.bar[i] = next_mmio_address >> 32; // Upper 32-bits of the MMIO address.
-            next_mmio_address += 4;  // Increase by 4 bytes for the next DWORD.
+            device->type0.bar[i] = next_mmio_address >> 32; 
+            next_mmio_address += 4;  
         }
     }
 }
 
 
 void print_vendor_specific_capabilities(struct pci_ecam* header) {
-    if (header->vendor_id != 0x1AF4) return;  // Check for Virtio vendor ID.
+    if (header->vendor_id != 0x1AF4) return;  
 
-    uint8_t cap_pointer = header->type0.capes_pointer;  // Start of the capabilities list.
+    uint8_t cap_pointer = header->type0.capes_pointer;  
 
     while (cap_pointer) {
         struct pci_cape* cape = (struct pci_cape*)((uintptr_t)header + cap_pointer);
 
-        if (cape->id == 0x09) {  // Vendor-specific capability.
+        if (cape->id == 0x09) {  
             debugf("Found vendor-specific capability at offset: 0x%02x\n", cap_pointer);
         }
 
-        cap_pointer = cape->next;  // Move to the next capability in the list.
+        cap_pointer = cape->next;  
     }
 }
 
