@@ -4,6 +4,7 @@
 
 #define ECAM_ADDR_START 0x30000000
 #define ECAM_ADDR_END   0x30FFFFFF
+#define MEMORY_BARRIER() __asm__ volatile("" ::: "memory")
 
 static void pci_configure_device(struct pci_ecam *device);
 static void pci_configure_bridge(struct pci_ecam *bridge);
@@ -84,27 +85,30 @@ static void pci_configure_bridge(struct pci_ecam *bridge) {
 
 static void pci_configure_device(struct pci_ecam *device) {
     for (int i = 0; i < 6; i++) {
-        //debugf("configuring device\n");
-        
-        
+        // Disable the device before modifying the BAR
+        device->command_reg &= ~(1 << 1);  // Clear Memory Space bit
+        MEMORY_BARRIER();
+
         device->type0.bar[i] = 0xFFFFFFFF;
+        MEMORY_BARRIER();
         
-       
         uint32_t bar_value = device->type0.bar[i];
 
         if (bar_value == 0) {
             continue;
         }
-
         
         uint32_t size = ~(bar_value & ~0xF) + 1;
-
+        
         
         next_mmio_address = (next_mmio_address + size - 1) & ~(size - 1);
-
         
         device->type0.bar[i] = next_mmio_address;  
         next_mmio_address += size;
+        
+        // Re-enable the device after modifying the BAR
+        device->command_reg |= (1 << 1);
+        MEMORY_BARRIER();
 
         
         if ((bar_value & 0x6) == 0x4) {
