@@ -14,8 +14,10 @@ Every week, you will need to write entries in this journal. Include brief inform
 
 Sort your entries in descending order (newest entries at the top).
 
-## 22-September-2023
+# 24-September-2023
+- `amcdan23`: Added setting up type1 config for pci_init_bridge, also added a function for getting the PCI ecam for a given bus and device, also added to `pci_dispatch_irq`.
 
+## 22-September-2023
 - `gmorale1`: I've put in the loop and logic for the first steps of enumerating devices. As of writing, when I run `info pci` in the emulator I see 4 bridges and 2 devices, the tablet and keyboard. However, all of the subordinate bus numbers show as zero to qemu. Yet when I use debugf on the structure from the loop, it returns the number I wrote into it. Also, the loop thinks everything (when the header is not 0xFFFF) is a bus. 
 
 ## 17-September-2023
