@@ -85,6 +85,7 @@ struct pci_ecam {
     };
 };
 
+
 struct pci_cape {
     uint8_t id;
     uint8_t next;

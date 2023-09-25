@@ -15,6 +15,8 @@ Every week, you will need to write entries in this journal. Include brief inform
 Sort your entries in descending order (newest entries at the top).
 
 # 24-September-2023
+- `jpark78`: Fixed a bug with 64b BAR allocation and removed unneeded looping of the function bits in `pci_enumerate_bus`.
+
 - `amcdan23`: Added setting up type1 config for pci_init_bridge, also added a function for getting the PCI ecam for a given bus and device, also added to `pci_dispatch_irq`. Merged PCI into master.
 
 - `ttahmid`: `pci-ttahmid` branch - After the last issue was resolved, we were having problem with the BARs for devices being `0xffffffffffffffff`. The issue was, after querying the BAR size by writing 0xFFFFFFFF, we were immediately writing the allocated address to the BAR which resulted in incorrect BAR configurations. Solved the issue by placing a `MEMORY_BARRIER` after writing 0xFFFFFFFF to the BAR and before reading it back, which ensured that the write operation fully completed (and the device had a chance to update the BAR) before the subsequent read operation.
