@@ -80,7 +80,7 @@ void pci_init(void)
             if(ecam->vendor_id != 0xFFFF){  //something is connected
                 //initialize based on device type
                 if(ecam->header_type == 0){ 
-                    // pci_init_bridge(ecam,bus);
+                    pci_init_bridge(ecam,bus);
                     debugf("Bus loop idx is %d and device idx is %d\n",bus,device);
                     debugf("Found bridge at 0x%lx (calculated addr)\n",cur_addr);
                     debugf("Found bridge at 0x%p (pointer addr)\n",ecam);
@@ -88,7 +88,7 @@ void pci_init(void)
                     
                 }
                 if(ecam->header_type == 1){
-                    // pci_init_device(ecam,bus);
+                    pci_init_device(ecam,bus);
                     debugf("Found device at 0x%lx\n",cur_addr);
                 }
             }
