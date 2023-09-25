@@ -35,7 +35,7 @@ static void init_systems(void)
     // PLIC
     debugf("Mapping PLIC\n");
     mmu_map_range(pt, 0x0C000000, 0x0C2FFFFF, 0x0C000000, MMU_LEVEL_2M, PB_READ | PB_WRITE);
-    // // PCIe ECAM
+    // PCIe ECAM
     debugf("Mapping PCIe ECAM\n");
     mmu_map_range(pt, 0x30000000, 0x30FFFFFF, 0x30000000, MMU_LEVEL_2M, PB_READ | PB_WRITE);
     // PCIe MMIO
