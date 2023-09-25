@@ -38,8 +38,8 @@ void pci_init_device(struct pci_ecam *ecam, int bus){
             uint64_t address_space = *bar & ~0xF;
             address_space = ~address_space;
 
-            *bar =  VIRTIO_START + address_space;
-            VIRTIO_START += address_space;
+            *bar =  VIRTIO_LAST_BAR + address_space;
+            VIRTIO_LAST_BAR += address_space;
 
         }
     }
@@ -63,7 +63,6 @@ static void pci_init_bridge(struct pci_ecam *ecam, int bus){
     ecam->type1.subordinate_bus_no = sbn;
 
     sbn += 1;
-    // ecam->type1.memory_base = ;
 }
 
 void pci_init(void)
@@ -73,23 +72,23 @@ void pci_init(void)
     debugf("ecam struct size: %d\n", sizeof(struct pci_ecam));
     uint32_t bus;
     uint32_t device;
-    for(bus = 0; bus < 255; bus++){
+    for(bus = 0; bus < 256; bus++){
         for(device = 0; device < 32; device++){
-            unsigned long cur_addr = ECAM_START + ((bus + device) * sizeof(struct pci_ecam));
+            unsigned long cur_addr = ECAM_START + (((bus * 32) + device) * sizeof(struct pci_ecam));
             struct pci_ecam *ecam = cur_addr;
+            // debugf("checking addr 0x%lx\n",cur_addr);
             if(ecam->vendor_id != 0xFFFF){  //something is connected
-                
-                // debugf("checking addr 0x%d\n",cur_addr);
                 //initialize based on device type
                 if(ecam->header_type == 0){ 
-                    pci_init_bridge(ecam,bus);
+                    // pci_init_bridge(ecam,bus);
+                    debugf("Bus loop idx is %d and device idx is %d\n",bus,device);
                     debugf("Found bridge at 0x%lx (calculated addr)\n",cur_addr);
                     debugf("Found bridge at 0x%p (pointer addr)\n",ecam);
                     debugf("secondary bus no. %d\n" , ecam->type1.secondary_bus_no);
                     
                 }
                 if(ecam->header_type == 1){
-                    pci_init_device(ecam,bus);
+                    // pci_init_device(ecam,bus);
                     debugf("Found device at 0x%lx\n",cur_addr);
                 }
             }
@@ -123,7 +122,7 @@ void pci_dispatch_irq(int irq)
     for (bus = 0;bus < 256;bus++) {
         for (device = 0;device < 32;device++) {
             // EcamHeader is defined below
-            unsigned long cur_addr = ECAM_START + ((bus + device) * sizeof(struct pci_ecam));
+            unsigned long cur_addr = ECAM_START + (((bus * 32) + device) * sizeof(struct pci_ecam));
             struct pci_ecam *ecam = cur_addr;
             // Vendor ID 0xffff means "invalid"
             if (ecam->vendor_id == 0xffff) continue;
