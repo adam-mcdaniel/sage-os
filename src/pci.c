@@ -13,7 +13,7 @@ static void pci_configure_bridge(struct pci_ecam *bridge);
 static uint8_t next_bus_number = 1;
 
 
-static uint32_t next_mmio_address = 0x40000000;
+static uint32_t next_mmio_address = 0x41000000;
 
 static inline uint32_t pci_get_config_address(uint8_t bus, uint8_t device, uint8_t function, uint8_t offset) {
     uint32_t addr = ECAM_ADDR_START | (bus << 20) | (device << 15) | (function << 12) | (offset & 0xFC);
@@ -66,20 +66,20 @@ static void pci_enumerate_bus(uint8_t bus) {
 }
 
 static void pci_configure_bridge(struct pci_ecam *bridge) {
-    //debugf("configuring bridge\n");
     bridge->type1.primary_bus_no = next_bus_number;
     bridge->type1.secondary_bus_no = ++next_bus_number;  
     bridge->type1.subordinate_bus_no = next_bus_number;  
 
-    debugf("Set the memory address range\n"); 
-    uint16_t base_address = (next_mmio_address & 0xFFFF0000) >> 16;
-    bridge->type1.memory_base = base_address;
-    bridge->type1.memory_limit = base_address + (0x01000000 >> 16);
+    uint32_t base_address = next_mmio_address;
+    uint32_t end_address = base_address + 0x01000000 - 1;  // Adjust for 16MB
 
-    next_mmio_address += 0x01000000; 
+    bridge->type1.memory_base = base_address >> 16;
+    bridge->type1.memory_limit = end_address >> 16;
+    bridge->type1.prefetch_memory_base = base_address >> 16;
+    bridge->type1.prefetch_memory_limit = end_address >> 16;
 
-    debugf("checking next_mmio_address value : 0x%08lx\n", next_mmio_address);
     pci_enumerate_bus(bridge->type1.secondary_bus_no);  
+    next_mmio_address += 0x01000000;
 }
 
 
@@ -99,13 +99,11 @@ static void pci_configure_device(struct pci_ecam *device) {
         }
         
         uint32_t size = ~(bar_value & ~0xF) + 1;
-        
-        
         next_mmio_address = (next_mmio_address + size - 1) & ~(size - 1);
-        
+    
         device->type0.bar[i] = next_mmio_address;  
         next_mmio_address += size;
-        
+
         // Re-enable the device after modifying the BAR
         device->command_reg |= (1 << 1);
         MEMORY_BARRIER();
@@ -120,7 +118,8 @@ static void pci_configure_device(struct pci_ecam *device) {
 }
 
 
-/*void print_vendor_specific_capabilities(struct pci_ecam* header) {
+
+void print_vendor_specific_capabilities(struct pci_ecam* header) {
     if (header->vendor_id != 0x1AF4) return;  
 
     uint8_t cap_pointer = header->type0.capes_pointer;  
@@ -134,12 +133,12 @@ static void pci_configure_device(struct pci_ecam *device) {
 
         cap_pointer = cape->next;  
     }
-}*/
+}
 
 
 void pci_init(void) {
     next_bus_number = 0;
-    next_mmio_address = 0x40000000;  
+    next_mmio_address = 0x41000000;  
 
     pci_enumerate_bus(0);  
 }
