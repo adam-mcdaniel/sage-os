@@ -144,9 +144,9 @@ void pci_dispatch_irq(int irq)
             // Vendor ID 0xffff means "invalid"
             if (ecam->vendor_id == 0xffff) continue;
             // If we get here, we have a device.
-            printf("Device at bus %d, device %d (MMIO @ 0x%08lx), class: 0x%04x\n",
+            debugf("Device at bus %d, device %d (MMIO @ 0x%08lx), class: 0x%04x\n",
                     bus, device, ecam, ecam->class_code);
-            printf("   Device ID    : 0x%04x, Vendor ID    : 0x%04x\n",
+            debugf("   Device ID    : 0x%04x, Vendor ID    : 0x%04x\n",
                     ecam->device_id, ecam->vendor_id);
 
 
