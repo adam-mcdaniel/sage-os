@@ -1,11 +1,22 @@
+#include <debug.h>
+#include <mmu.h>
 #include <pci.h>
 #include <virtio.h>
 
 #define MMIO_ECAM_BASE 0x30000000
-static volatile struct pci_ecam *pcie_get_ecam(uint8_t bus,
-                                                 uint8_t device,
-                                                 uint8_t function,
-                                                 uint16_t reg) 
+#define MMIO_ECAM_END   0x30FFFFFF
+#define MEMORY_BARRIER() __asm__ volatile("" ::: "memory")
+
+static uint8_t next_bus_number = 1;
+static uint64_t next_mmio_address = 0x41000000;
+
+static void pci_configure_device(struct pci_ecam *device);
+static void pci_configure_bridge(struct pci_ecam *bridge);
+
+static volatile struct pci_ecam *pci_get_ecam(uint8_t bus,
+                                               uint8_t device,
+                                               uint8_t function,
+                                               uint16_t reg) 
 {
     // Since we're shifting, we need to make sure we
     // have enough space to shift into.
@@ -22,97 +33,130 @@ static volatile struct pci_ecam *pcie_get_ecam(uint8_t bus,
                  (reg64 << 2));        // register number A[11:2]
 }
 
-void pci_init_device(struct pci_ecam *ecam, int bus){
-    uint32_t i;
-    for (i = 0; i < 6;i++){
-        if((ecam->type0.bar[i] >> 1 ) & 3){
-            //not 00
-            uint64_t *bar = ecam->type0.bar + i;
-            i += 1;
-
-            //write -1
-            *bar = -1UL;
-            if (*bar = 0){
-                continue;
-            }
-            
-            //check space
-            uint64_t address_space = *bar & ~0xF;
-            address_space = ~address_space;
-
-            //reserve space
-            *bar =  VIRTIO_LAST_BAR + address_space;
-            VIRTIO_LAST_BAR += address_space;
-
-        }
+static inline uint32_t pci_get_config_address(uint8_t bus, uint8_t device, uint8_t offset)
+{
+    uint32_t addr = MMIO_ECAM_BASE | (bus << 20) | (device << 15) | (offset & 0xFC);
+    if (addr >= MMIO_ECAM_BASE && addr <= MMIO_ECAM_END) {
+        return addr;
+    } else {
+        debugf("Warning: PCI address out of bounds!\n");
+        return 0; 
     }
-
-    ecam->command_reg |= 1 << 1;
 }
 
-static void pci_init_bridge(struct pci_ecam *ecam, int bus){
-    static uint8_t sbn = 1;
+static inline bool pci_device_exists(uint16_t vendor_id)
+{
+    return vendor_id != 0xFFFF;
+}
 
-    uint64_t addr_start = 0x40000000 | ((uint64_t)sbn << 20);
-    uint64_t addr_end = addr_start + ((1 << 20) - 1);
-    // debugf("INIT\n");
-    
-    
-    ecam->command_reg = COMMAND_REG_MMIO;
-    ecam->type1.memory_base = addr_start >> 16;
-    ecam->type1.memory_limit = addr_end >> 16;
-    ecam->type1.prefetch_memory_base = addr_start >> 16;
-    ecam->type1.prefetch_memory_limit = addr_end >> 16;
-    ecam->type1.primary_bus_no = bus;
-    ecam->type1.secondary_bus_no = sbn;
-    ecam->type1.subordinate_bus_no = sbn;
+static void pci_enumerate_bus(uint8_t bus) {
+    for (uint8_t device = 0; device < 32; device++) {
+        //debugf("Checking device at bus %d, device %d, function %d\n", bus, device, function);
+            
+        uint32_t config_addr = pci_get_config_address(bus, device, 0);
+        //debugf("Memory content at config address 0x%08lx: 0x%08lx\n", config_addr, *(volatile uint32_t*)(uintptr_t)config_addr);
+        volatile struct pci_ecam *header = (volatile struct pci_ecam *)(uintptr_t)config_addr;
+        //debugf("Vendor ID read from config address 0x%08lx: 0x%04x\n", config_addr, header->vendor_id);
 
-    // debugf("vendor id %d\n" , ecam->vendor_id);
-    // debugf("device id %d\n" , ecam->device_id);
-    // debugf("bus no. %d\n" , ecam->type1.primary_bus_no);
-    // debugf("secondary bus no. %d\n" , ecam->type1.secondary_bus_no);
-    // debugf("subordinate bus no. %d\n", ecam->type1.subordinate_bus_no);
-    sbn += 1;
-    // debugf("END INIT\n");
+        //debugf("Config address: 0x%08lx\n", config_addr);
+        //debugf("Vendor ID: 0x%04x\n", header->vendor_id);
+
+        if (!pci_device_exists(header->vendor_id)) {
+            // debugf("No device found at bus %d, device %d, function %d\n", bus, device, function);
+            continue;
+        }
+
+        //debugf("Device found with vendor ID: 0x%04x, header type: 0x%02x\n", header->vendor_id, header->header_type);
+
+
+        if ((header->header_type & 0x7F) == 1) {
+            // debugf("Handle type 1 bridge\n");
+            pci_configure_bridge(header);
+        } else if ((header->header_type & 0x7F) == 0) {
+            //debugf("Handle type 0 device\n");
+            pci_configure_device(header);
+            //print_vendor_specific_capabilities(header);
+        }
+    }
+}
+
+static void pci_configure_bridge(struct pci_ecam *bridge)
+{
+    bridge->type1.primary_bus_no = next_bus_number;
+    bridge->type1.secondary_bus_no = ++next_bus_number;  
+    bridge->type1.subordinate_bus_no = next_bus_number;  
+
+    uint32_t base_address = next_mmio_address;
+    uint32_t end_address = base_address + 0x01000000 - 1;  // Adjust for 16MB
+
+    bridge->type1.memory_base = base_address >> 16;
+    bridge->type1.memory_limit = end_address >> 16;
+    bridge->type1.prefetch_memory_base = base_address >> 16;
+    bridge->type1.prefetch_memory_limit = end_address >> 16;
+
+    pci_enumerate_bus(bridge->type1.secondary_bus_no);  
+    next_mmio_address += 0x01000000;
+}
+
+static void pci_configure_device(struct pci_ecam *device)
+{
+    for (int i = 0; i < 6; i++) {
+        // Disable the device before modifying the BAR
+        device->command_reg &= ~(1 << 1);  // Clear Memory Space bit
+        MEMORY_BARRIER();
+
+        device->type0.bar[i] = 0xFFFFFFFF;
+        MEMORY_BARRIER();
+        
+        uint32_t bar_value = device->type0.bar[i];
+
+        // BAR not writable
+        if (bar_value == 0) {
+            continue;
+        }
+        
+        uint32_t size = ~(bar_value & ~0xF) + 1;
+        next_mmio_address = (next_mmio_address + size - 1) & ~(size - 1);
+    
+        device->type0.bar[i] = next_mmio_address;  
+        next_mmio_address += size;
+
+        // 64-bit BAR
+        if ((bar_value & 0x6) == 0x4) {
+            i++;
+            device->type0.bar[i] = next_mmio_address >> 32; 
+            next_mmio_address += 4;  
+        }
+
+        // Re-enable the device after modifying the BAR
+        device->command_reg |= (1 << 1);
+        MEMORY_BARRIER();
+    }
+}
+
+void print_vendor_specific_capabilities(struct pci_ecam* header)
+{
+    if (header->vendor_id != 0x1AF4) return;  
+
+    uint8_t cap_pointer = header->type0.capes_pointer;  
+
+    while (cap_pointer) {
+        struct pci_cape* cape = (struct pci_cape*)((uintptr_t)header + cap_pointer);
+
+        if (cape->id == 0x09) {  
+            debugf("Found vendor-specific capability at offset: 0x%02x\n", cap_pointer);
+        }
+
+        cap_pointer = cape->next;  
+    }
 }
 
 void pci_init(void)
 {
-    // Initialize and enumerate all PCI bridges and devices.
-    debugf("ECAM_START = 0x%lx \n",ECAM_START);
-    debugf("ecam struct size: %d\n", sizeof(struct pci_ecam));
-    uint32_t bus;
-    uint32_t device;
-    for(bus = 0; bus < 16; bus++){
-        for(device = 0; device < 32; device++){
-            struct pci_ecam *ecam = pcie_get_ecam(bus, device, 0, 0);
-            
-            // unsigned long cur_addr = ECAM_START + (((bus * 32) + device) * sizeof(struct pci_ecam));
-            // struct pci_ecam *ecam = cur_addr;
-            // debugf("Bus loop idx is %d and device idx is %d\n",bus,device);
-            // debugf("ecam located at 0x%p (pointer addr)\n",ecam);
+    next_bus_number = 0;
+    next_mmio_address = 0x41000000;  
 
-            // debugf("checking addr 0x%lx\n",cur_addr);
-            if(ecam->vendor_id != 0xFFFF){  //something is connected
-                //initialize based on device type
-                if(ecam->header_type == 1){ 
-                    pci_init_bridge(ecam,bus);
-                    // debugf("Found bridge at 0x%lx (calculated addr)\n",cur_addr);
-                    debugf("Found bridge at 0x%p (pointer addr)\n",ecam);
-                    debugf("bus no. %d\n" , ecam->type1.primary_bus_no);
-                    debugf("secondary bus no. %d\n" , ecam->type1.secondary_bus_no);
-                    
-                }
-                if(ecam->header_type == 0){
-                    // debugf("Found device at 0x%lx\n",cur_addr);
-                    debugf("Found device at 0x%p (pointer addr)\n",ecam);
-                    pci_init_device(ecam,bus);
-                }
-            }
-        }
-    }
-    debugf("Busses enumerated!\n");
-    // This should forward all virtio devices to the virtio drivers.
+    pci_enumerate_bus(0);  
 }
 
 /**
@@ -155,7 +199,7 @@ void pci_dispatch_irq(int irq)
             if (0 != (ecam->status_reg & (1 << 4))) {
                 unsigned char capes_next = ecam->common.capes_pointer;
                 while (capes_next != 0) {
-                    unsigned long cap_addr = (unsigned long)pcie_get_ecam(bus, device, 0, 0) + capes_next;
+                    unsigned long cap_addr = (unsigned long)pci_get_ecam(bus, device, 0, 0) + capes_next;
                     struct VirtioCapability *cap = (struct VirtioCapability *)cap_addr;
                     switch (cap->id) {
                         case 0x09: /* Vendor Specific */
@@ -168,7 +212,7 @@ void pci_dispatch_irq(int irq)
                         }
                         break;
                         default:
-                            logf("Unknown capability ID 0x%02x (next: 0x%02x)\n", cap->id, cap->next);
+                            logf(LOG_INFO, "Unknown capability ID 0x%02x (next: 0x%02x)\n", cap->id, cap->next);
                         break;
                     }
                     capes_next = cap->next;
@@ -176,6 +220,4 @@ void pci_dispatch_irq(int irq)
             }
         }
     }
-
-
 }

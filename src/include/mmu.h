@@ -10,6 +10,7 @@
  */
 #pragma once
 #include <stdbool.h>
+#include <stdint.h>
 
 #define MMU_LEVEL_1G        2
 #define MMU_LEVEL_2M        1
