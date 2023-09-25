@@ -14,8 +14,10 @@ Every week, you will need to write entries in this journal. Include brief inform
 
 Sort your entries in descending order (newest entries at the top).
 
-## 22-September-2023
+# 24-September-2023
+- `amcdan23`: Added setting up type1 config for pci_init_bridge, also added a function for getting the PCI ecam for a given bus and device, also added to `pci_dispatch_irq`. Merged PCI into master.
 
+## 22-September-2023
 - `amcdan23`: Fixed the aforementioned `FATAL` debug_page_table error and got the ECAM memory allocated.
 
 ## 21-September-2023
@@ -23,6 +25,8 @@ Sort your entries in descending order (newest entries at the top).
 - `ttahmid`: Figured out the previous problem with `ECAM_ADDR_START`: the `mmu_map_range` for PCIe ECAM in `main.c` was commented out. Now after uncommenting this line, that address (`0x30000000`) is being used but running into another problem: `[DEBUG]: debug_page_table: expected 0x30000000, got 0xffffffffffffffff` 
 `[FATAL]: debug_page_table: entry 0x180 in page table at 0x80028000 is invalid`
 Implemented `pci_enumerate_bus`, `pci_configure_bridge`, `pci_configure_device` in `pci-ttahmid` branch. Need to solve the page_table issue now.
+## 22-September-2023
+- `gmorale1`: I've put in the loop and logic for the first steps of enumerating devices. As of writing, when I run `info pci` in the emulator I see 4 bridges and 2 devices, the tablet and keyboard. However, all of the subordinate bus numbers show as zero to qemu. Yet when I use debugf on the structure from the loop, it returns the number I wrote into it. Also, the loop thinks everything (when the header is not 0xFFFF) is a bus. 
 
 ## 17-September-2023
 - `amcdan23`: We can now use the MMU and `kmalloc` + `kfree`! Fixed some bugs on how `mmu_map`, `mmu_translate`, `mmu_free` navigate page table entries. It didn't perform the 2 bit shift before using it as a physical pointer. Added many more debug prints. Additionally added some debugging functions for recursively printing the page table entries for all the mapped memory. Eliminated bug that caused physical memory to not map 1:1 with virtual memory in `mmu_map_range`. Fixed physical address offset calculation; previously it was always assuming the page size was 4K in this calculation.

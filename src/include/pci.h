@@ -95,6 +95,9 @@ struct pci_cape {
 #define STATUS_REG_CAP                (1 << 4)
 #define COMMAND_REG_MMIO              (1 << 1)
 #define COMMAND_REG_BUSMASTER         (1 << 2)
+static const uint64_t ECAM_START   = 0x30000000;
+static const uint64_t VIRTIO_START = 0x40000000;
+static uint64_t VIRTIO_LAST_BAR = 0x40000000;
 
 /**
  * @brief Initialize the PCI subsystem

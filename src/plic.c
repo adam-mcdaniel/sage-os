@@ -74,6 +74,7 @@ void plic_handle_irq(int hart)
         case PLIC_PCI_INTC: [[fallthrough]]
         case PLIC_PCI_INTD:
 #ifdef USE_PCI
+            debugf("PLIC: IRQ %d\n", irq);
             pci_dispatch_irq(irq);
 #endif
             break;
