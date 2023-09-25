@@ -30,14 +30,17 @@ void pci_init_device(struct pci_ecam *ecam, int bus){
             uint64_t *bar = ecam->type0.bar + i;
             i += 1;
 
+            //write -1
             *bar = -1UL;
             if (*bar = 0){
                 continue;
             }
-
+            
+            //check space
             uint64_t address_space = *bar & ~0xF;
             address_space = ~address_space;
 
+            //reserve space
             *bar =  VIRTIO_LAST_BAR + address_space;
             VIRTIO_LAST_BAR += address_space;
 
@@ -52,6 +55,8 @@ static void pci_init_bridge(struct pci_ecam *ecam, int bus){
 
     uint64_t addr_start = 0x40000000 | ((uint64_t)sbn << 20);
     uint64_t addr_end = addr_start + ((1 << 20) - 1);
+    // debugf("INIT\n");
+    
     
     ecam->command_reg = COMMAND_REG_MMIO;
     ecam->type1.memory_base = addr_start >> 16;
@@ -62,7 +67,13 @@ static void pci_init_bridge(struct pci_ecam *ecam, int bus){
     ecam->type1.secondary_bus_no = sbn;
     ecam->type1.subordinate_bus_no = sbn;
 
+    // debugf("vendor id %d\n" , ecam->vendor_id);
+    // debugf("device id %d\n" , ecam->device_id);
+    // debugf("bus no. %d\n" , ecam->type1.primary_bus_no);
+    // debugf("secondary bus no. %d\n" , ecam->type1.secondary_bus_no);
+    // debugf("subordinate bus no. %d\n", ecam->type1.subordinate_bus_no);
     sbn += 1;
+    // debugf("END INIT\n");
 }
 
 void pci_init(void)
@@ -72,24 +83,30 @@ void pci_init(void)
     debugf("ecam struct size: %d\n", sizeof(struct pci_ecam));
     uint32_t bus;
     uint32_t device;
-    for(bus = 0; bus < 256; bus++){
+    for(bus = 0; bus < 16; bus++){
         for(device = 0; device < 32; device++){
-            unsigned long cur_addr = ECAM_START + (((bus * 32) + device) * sizeof(struct pci_ecam));
-            struct pci_ecam *ecam = cur_addr;
+            struct pci_ecam *ecam = pcie_get_ecam(bus, device, 0, 0);
+            
+            // unsigned long cur_addr = ECAM_START + (((bus * 32) + device) * sizeof(struct pci_ecam));
+            // struct pci_ecam *ecam = cur_addr;
+            // debugf("Bus loop idx is %d and device idx is %d\n",bus,device);
+            // debugf("ecam located at 0x%p (pointer addr)\n",ecam);
+
             // debugf("checking addr 0x%lx\n",cur_addr);
             if(ecam->vendor_id != 0xFFFF){  //something is connected
                 //initialize based on device type
-                if(ecam->header_type == 0){ 
+                if(ecam->header_type == 1){ 
                     pci_init_bridge(ecam,bus);
-                    debugf("Bus loop idx is %d and device idx is %d\n",bus,device);
-                    debugf("Found bridge at 0x%lx (calculated addr)\n",cur_addr);
+                    // debugf("Found bridge at 0x%lx (calculated addr)\n",cur_addr);
                     debugf("Found bridge at 0x%p (pointer addr)\n",ecam);
+                    debugf("bus no. %d\n" , ecam->type1.primary_bus_no);
                     debugf("secondary bus no. %d\n" , ecam->type1.secondary_bus_no);
                     
                 }
-                if(ecam->header_type == 1){
+                if(ecam->header_type == 0){
+                    // debugf("Found device at 0x%lx\n",cur_addr);
+                    debugf("Found device at 0x%p (pointer addr)\n",ecam);
                     pci_init_device(ecam,bus);
-                    debugf("Found device at 0x%lx\n",cur_addr);
                 }
             }
         }
