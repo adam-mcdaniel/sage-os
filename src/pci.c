@@ -11,7 +11,11 @@
 static uint8_t next_bus_number = 1;
 static uint64_t next_mmio_address = 0x41000000;
 
-struct Vector *all_pci_devices, *irq_pci_devices[4];
+// These contain pointers to the common configurations for each device.
+// The `all_pci_devices` vector contains all devices, while the
+// `irq_pci_devices` vector contains devices that share an IRQ number (32, 33, 34, and 35).
+// These vectors contain the pointers to the devices in the ECAM address space.
+static struct Vector *all_pci_devices, *irq_pci_devices[4];
 
 static void pci_configure_device(struct pci_ecam *device);
 static void pci_configure_bridge(struct pci_ecam *bridge);
@@ -218,22 +222,14 @@ void pci_dispatch_irq(int irq)
     // IRQ#=32+(bus+slot)mod4
     uint32_t vector_idx = irq - 32;
 
-    
-
     // Check all devices in the vector
     for (int i=0; i<vector_size(irq_pci_devices[vector_idx]); i++) {
         struct pci_ecam *device;
         vector_get_ptr(irq_pci_devices[vector_idx], i, device);
-        // Check if the device is a virtio device
         
         if (!pci_device_exists(device->vendor_id)) {
-            // debugf("No device found at bus %d, device %d, function %d\n", bus, device, function);
             continue;
         }
-
-        //debugf("Device found with vendor ID: 0x%04x, header type: 0x%02x\n", header->vendor_id, header->header_type);
-
-        // if (device->vendor_id != 0x1AF4) return;  
 
         uint8_t cap_pointer = device->type0.capes_pointer;  
         debugf("Vendor specific capabilities pointer: 0x%02x\n", cap_pointer);
