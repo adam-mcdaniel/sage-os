@@ -107,7 +107,7 @@ static uint64_t VIRTIO_LAST_BAR = 0x40000000;
 void pci_init(void);
 
 /**
- * @brief Dispatch an interrup to the PCI subsystem
+ * @brief Dispatch an interrupt to the PCI subsystem
  * @param irq - the IRQ number that interrupted
  */
 void pci_dispatch_irq(int irq);
