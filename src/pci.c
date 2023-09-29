@@ -70,12 +70,10 @@ static void pci_enumerate_bus(uint8_t bus) {
 
 
         if ((header->header_type & 0x7F) == 1) {
-            // debugf("Handle type 1 bridge\n");
             pci_configure_bridge(header);
         } else if ((header->header_type & 0x7F) == 0) {
-            //debugf("Handle type 0 device\n");
             pci_configure_device(header);
-            //print_vendor_specific_capabilities(header);
+            print_vendor_specific_capabilities(header);
         }
     }
 }
@@ -139,12 +137,33 @@ void print_vendor_specific_capabilities(struct pci_ecam* header)
     if (header->vendor_id != 0x1AF4) return;  
 
     uint8_t cap_pointer = header->type0.capes_pointer;  
-
+    debugf("Vendor specific capabilities pointer: 0x%02x\n", cap_pointer);
     while (cap_pointer) {
         struct pci_cape* cape = (struct pci_cape*)((uintptr_t)header + cap_pointer);
 
         if (cape->id == 0x09) {  
-            debugf("Found vendor-specific capability at offset: 0x%02x\n", cap_pointer);
+
+            struct VirtioCapability* virtio_cap = (struct VirtioCapability*)cape;
+            switch (virtio_cap->type) {
+            case VIRTIO_PCI_CAP_COMMON_CFG: /* 1 */
+                debugf("  Common configuration capability at offset: 0x%02x\n", cap_pointer);
+                break;
+            case VIRTIO_PCI_CAP_NOTIFY_CFG: /* 2 */
+                debugf("  Notify configuration capability at offset: 0x%02x\n", cap_pointer);
+                break;
+            case VIRTIO_PCI_CAP_ISR_CFG:    /* 3 */
+                debugf("  ISR configuration capability at offset: 0x%02x\n", cap_pointer);
+                break;
+            case VIRTIO_PCI_CAP_DEVICE_CFG: /* 4 */
+                debugf("  Device configuration capability at offset: 0x%02x\n", cap_pointer);
+                break;
+            case VIRTIO_PCI_CAP_PCI_CFG:    /* 5 */
+                debugf("  PCI configuration access capability at offset: 0x%02x\n", cap_pointer);
+                break;
+            default:
+                fatalf("Unknown virtio capability %d at offset: 0x%02x\n", virtio_cap->type, cap_pointer);
+                break;
+            }
         }
 
         cap_pointer = cape->next;  
