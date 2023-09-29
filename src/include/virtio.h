@@ -26,21 +26,34 @@
 
 #define VIRTIO_CAP_VENDOR         9
 
+// Vendor specific capability for a Virtio device
 typedef struct VirtioCapability {
+    // Generic PCI field: PCI_CAP_ID_VNDR
     uint8_t id;
+    // Generic PCI field: next ptr
     uint8_t next;
+    // Generic PCI field: capability length
     uint8_t len;
+    // What type of capability is this? (identifies the structure)
+    // This will be one of 1, 2, 3, 4, or 5, but we only care about 1, 2, or 3
     uint8_t type;
+    // Which BAR is this for?
     uint8_t bar;
+    // Padding to fill the next 3 bytes
     uint8_t pad[3];
+    // The offset within the BAR
     uint32_t offset;
+    // The length of the capability in bytes
     uint32_t length;
 } VirtioCapability;
 
 #define VIRTIO_CAP(x)             ((VirtioCapability *)(x))
 
-// Type 1 configuration
+// Common Configuration: Type 1 configuration
 #define VIRTIO_PCI_CAP_COMMON_CFG 1
+// The type 1 configuration is located in the BAR address space
+// specified in the capability plus the offset.
+// There, this structure is located.
 typedef struct VirtioPciCommonCfg {
     uint32_t device_feature_select; /* read-write */
     uint32_t device_feature;        /* read-only for driver */
@@ -51,34 +64,60 @@ typedef struct VirtioPciCommonCfg {
     uint8_t device_status;          /* read-write */
     uint8_t config_generation;      /* read-only for driver */
     /* About a specific virtqueue. */
+    // Set this to select the queue to work with.
+    // The rest of the fields *will update to reflect the selected queue*.
+    // This must be less than num_queues.
     uint16_t queue_select;      /* read-write */
+    // The negotiated queue size.
     uint16_t queue_size;        /* read-write */
     uint16_t queue_msix_vector; /* read-write */
     uint16_t queue_enable;      /* read-write */
     uint16_t queue_notify_off;  /* read-only for driver */
+    // A physical memory address which points to the top
+    // of the descriptor table allocated for this selected queue.
     uint64_t queue_desc;        /* read-write */
+    // A physical memory address which points to the top
+    // of the driver ring allocated for this selected queue.
     uint64_t queue_driver;      /* read-write */
+    // A physical memory address which points to the top
+    // of the device ring allocated for this selected queue.
     uint64_t queue_device;      /* read-write */
 } VirtioPciCommonCfg;
 
-// Type 2 configuration
+// Notify Configuration: Type 2 configuration
 #define VIRTIO_PCI_CAP_NOTIFY_CFG 2
+// A notify register is how we tell the device to "go and do"
+// what we asked it to do.
 typedef struct VirtioPciNotifyCap {
+    // The actual memory address we write to notify a queue
+    // is given by the **cap** portion of this structure. In there,
+    // we retrieve the BAR + the offset.
     VirtioCapability cap;
+    // Then, we multiply the `queue_notify_off` by the `notify_off_multiplier`.
     uint32_t notify_off_multiplier; /* Multiplier for queue_notify_off. */
 } VirtioPciNotifyCap;
 #define BAR_NOTIFY_CAP(offset, queue_notify_off, notify_off_multiplier) \
     ((offset) + (queue_notify_off) * (notify_off_multiplier))
 
-// Type 3 configuration
+// Interrupt Service Routine: Type 3 configuration
 #define VIRTIO_PCI_CAP_ISR_CFG 3
+// The ISR notifies us that this particular device caused an interrupt.
+// The ISR has this layout.
 typedef struct VirtioPciIsrCap {
     union {
         struct {
+            // If we read `queue_interrupt` and it is 1, then
+            // we know that the interrupt was caused by the device.
             unsigned queue_interrupt : 1;
+            // If we read `device_cfg_interrupt` and it is 1, then
+            // we know that the device has changed its configuration,
+            // and we should reinitialize the device.
             unsigned device_cfg_interrupt : 1;
+            // The rest of the bits are reserved.
             unsigned reserved : 30;
         };
+        // We can also read the entire register as a 32-bit unsigned
+        // integer.
         unsigned int isr_cap;
     };
 } VirtioPciIsrCap;
