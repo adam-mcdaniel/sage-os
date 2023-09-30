@@ -37,7 +37,7 @@ typedef struct VirtioCapability {
     // What type of capability is this? (identifies the structure)
     // This will be one of 1, 2, 3, 4, or 5, but we only care about 1, 2, or 3
     uint8_t type;
-    // Which BAR is this for?
+    // Which BAR is this for? (0x0 - 0x5)
     uint8_t bar;
     // Padding to fill the next 3 bytes
     uint8_t pad[3];
@@ -156,7 +156,7 @@ typedef struct VirtioDeviceRing {
     // uint16_t     avail_event;
 } VirtioDeviceRing;
 
-struct PciDevice;
+struct PCIDevice;
 struct List;
 
 // This is the actual Virtio device structure that the OS will
@@ -165,14 +165,11 @@ struct List;
 typedef struct VirtioDevice {
     // A pointer the PCI device structure for this Virtio device.
     // Right now this just points to the ECAM for the device.
-    struct PciDevice *pcidev;
-    // The common configuration for the device.
+    struct PCIDevice *pcidev;
+    
     volatile VirtioPciCommonCfg *common_cfg;
-    // The notify register for the device. This is not the notify
-    // structure; we go ahead and do the address calculation before
-    // storing the pointer here.
-    volatile char *notify;
-    // The ISR capability for the device.
+    volatile VirtioPciNotifyCap *notify_cap;
+    // volatile uint16_t *notify;
     volatile VirtioPciIsrCap *isr;
 
     // The descriptor ring for the device.
@@ -189,7 +186,7 @@ typedef struct VirtioDevice {
     uint16_t driver_idx;
     uint16_t device_idx;
 
-    uint16_t notifymult;
+    // uint16_t notifymult;
     bool     ready;
 } VirtioDevice;
 
