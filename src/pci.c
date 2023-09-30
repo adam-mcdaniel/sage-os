@@ -109,7 +109,7 @@ PCIDevice *pci_find_device_by_irq(uint8_t irq) {
 struct VirtioPciCommonCfg *pci_get_virtio_common_config(PCIDevice *device) {
     return (struct VirtioPciCommonCfg *)pci_get_virtio_capability(device, VIRTIO_PCI_CAP_COMMON_CFG);
 }
-struct VirtioPciNotifyCfg *pci_get_virtio_notify_config(PCIDevice *device) {
+struct VirtioPciNotifyCfg *pci_get_virtio_notify_capability(PCIDevice *device) {
     return (struct VirtioPciNotifyCfg *)pci_get_virtio_capability(device, VIRTIO_PCI_CAP_NOTIFY_CFG);
 }
 struct VirtioPciISRStatus *pci_get_virtio_isr_status(PCIDevice *device) {
