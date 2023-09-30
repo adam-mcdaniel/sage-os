@@ -13,6 +13,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <vector.h>
+
 
 // PciEcam follows the structure of the PCI ECAM in the
 // PCIe manual.
@@ -32,6 +34,7 @@ struct pci_ecam {
     };
     uint8_t cacheline_size;
     uint8_t latency_timer;
+    // The type of the header (type 0 - device, type 1 - pci-to-pci bridge, type 2 - cardbus bridge)
     uint8_t header_type;
     uint8_t bist;
     union {
@@ -85,6 +88,31 @@ struct pci_ecam {
     };
 };
 
+typedef struct PCIDevice {
+    // A pointer to the PCI device's ECAM header.
+    struct pci_ecam *ecam_header;
+} PCIDevice;
+
+// Find a saved device by vendor and device ID.
+PCIDevice *pci_find_saved_device(uint16_t vendor_id, uint16_t device_id);
+
+// Save the device to the `all_pci_devices` vector. This will allow us to
+// find the device later.
+PCIDevice *pci_save_device(PCIDevice device);
+
+// Get a saved device by index.
+PCIDevice *pci_get_saved_device(uint16_t n);
+
+// Find the device for a given IRQ. This will check the `queue_interrupt`
+// bit of the status register to see if the device is the one that
+// interrupted.
+PCIDevice *pci_find_device_by_irq(uint8_t irq);
+
+// Count all the saved devices connected to the PCI port.
+uint64_t pci_count_saved_devices(void);
+
+// Count all the devices connected to PCI listening to a given IRQ.
+uint64_t pci_count_irq_listeners(uint8_t irq);
 
 struct pci_cape {
     uint8_t id;
