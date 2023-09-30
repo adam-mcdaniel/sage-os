@@ -93,6 +93,13 @@ typedef struct PCIDevice {
     struct pci_ecam *ecam_header;
 } PCIDevice;
 
+
+// Get the bus number for a given PCI device.
+uint8_t pci_get_bus_number(PCIDevice *dev);
+
+// Get the slot number for a given PCI device.
+uint8_t pci_get_slot_number(PCIDevice *dev);
+
 // Find a saved device by vendor and device ID.
 PCIDevice *pci_find_saved_device(uint16_t vendor_id, uint16_t device_id);
 

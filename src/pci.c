@@ -70,13 +70,21 @@ uint64_t pci_count_irq_listeners(uint8_t irq) {
     return vector_size(irq_pci_devices[vector_idx]);
 }
 
+uint8_t pci_get_bus_number(PCIDevice *dev) {
+    return ((uintptr_t)dev->ecam_header >> 20) & 0xF;
+}
+
+uint8_t pci_get_slot_number(PCIDevice *dev) {
+    return ((uintptr_t)dev->ecam_header >> 15) & 0x1F;
+}
+
 PCIDevice *pci_save_device(PCIDevice device) {
     PCIDevice *pcidev = (PCIDevice *)kmalloc(sizeof(PCIDevice));
     pcidev->ecam_header = device.ecam_header;
     // pcidev->capabilities = device.capabilities;
     vector_push_ptr(all_pci_devices, pcidev);
-    uint8_t bus = ((uintptr_t)device.ecam_header >> 20) & 0xF;
-    uint8_t slot = ((uintptr_t)device.ecam_header >> 15) & 0x1F;
+    uint8_t bus = pci_get_bus_number(pcidev);
+    uint8_t slot = pci_get_slot_number(pcidev);
     debugf("Saving device with vendor ID: 0x%04x, device ID: 0x%04x\n", device.ecam_header->vendor_id, device.ecam_header->device_id);
     debugf("  Bus: %d, slot: %d\n", bus, slot);
     uint32_t vector_idx = (bus + slot) % 4;
@@ -251,7 +259,7 @@ void print_vendor_specific_capabilities(PCIDevice *pcidevice)
     uint8_t cap_pointer = header->type0.capes_pointer;  
     debugf("Vendor specific capabilities with offset 0x%02x\n", cap_pointer);
     debugf("  Common configuration capability at: 0x%08x\n", pci_get_virtio_common_config(pcidevice));
-    debugf("  Notify configuration capability at: 0x%08x\n", pci_get_virtio_notify_config(pcidevice));
+    debugf("  Notify configuration capability at: 0x%08x\n", pci_get_virtio_notify_capability(pcidevice));
     debugf("  ISR configuration capability at: 0x%08x\n", pci_get_virtio_isr_status(pcidevice));
     debugf("  Device configuration capability at: 0x%08x\n", pci_get_virtio_capability(pcidevice, 0x04));
     debugf("  PCI configuration access capability at: 0x%08x\n", pci_get_virtio_capability(pcidevice, 0x05));
