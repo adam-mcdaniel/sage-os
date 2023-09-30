@@ -226,6 +226,7 @@ void pci_dispatch_irq(int irq)
     for (int i=0; i<vector_size(irq_pci_devices[vector_idx]); i++) {
         struct pci_ecam *device;
         vector_get_ptr(irq_pci_devices[vector_idx], i, device);
+        if (device->vendor_id != 0x1AF4) continue;  
         
         if (!pci_device_exists(device->vendor_id)) {
             continue;
