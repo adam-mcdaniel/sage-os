@@ -25,7 +25,7 @@ void virtio_notify(VirtioDevice *viodev, uint16_t which_queue)
 {
     uint16_t num_queues = viodev->common_cfg->num_queues;
 
-    if (which_queue >= viodev->common_cfg->num_queues) {
+    if (which_queue >= num_queues) {
         logf(LOG_ERROR, "virtio_notify: Provided queue number is too big...\n");
         return;
     }
@@ -40,7 +40,6 @@ void virtio_notify(VirtioDevice *viodev, uint16_t which_queue)
     uint32_t notify_off_multiplier = viodev->notify_cap->notify_off_multiplier;
     uint32_t bar = viodev->pcidev->ecam_header->type0.bar[bar_num];
 
-    // FIXME: 
     uint16_t *notify = bar + BAR_NOTIFY_CAP(offset, queue_notify_off, notify_off_multiplier);
 
     // Write the queue's number to the notify register
