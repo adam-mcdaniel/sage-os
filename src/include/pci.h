@@ -101,7 +101,7 @@ PCIDevice *pci_find_saved_device(uint16_t vendor_id, uint16_t device_id);
 PCIDevice *pci_save_device(PCIDevice device);
 
 // Get a saved device by index.
-PCIDevice *pci_get_saved_device(uint16_t n);
+PCIDevice *pci_get_nth_saved_device(uint16_t n);
 
 // Find the device for a given IRQ. This will check the `queue_interrupt`
 // bit of the status register to see if the device is the one that
@@ -113,6 +113,16 @@ uint64_t pci_count_saved_devices(void);
 
 // Count all the devices connected to PCI listening to a given IRQ.
 uint64_t pci_count_irq_listeners(uint8_t irq);
+
+// This will enumerate through the capabilities structure of the PCI device.
+// This will return the nth capability of the given type. If the capability
+// is not found, then NULL is returned.
+struct pci_cape* pci_get_capability(PCIDevice *dev, uint8_t type, uint8_t nth);
+
+struct VirtioCapability *pci_get_virtio_capability(PCIDevice *device, uint8_t virtio_cap_type);
+struct VirtioPciCommonCfg *pci_get_virtio_common_config(PCIDevice *device);
+struct VirtioPciNotifyCfg *pci_get_virtio_notify_config(PCIDevice *device);
+struct VirtioPciISRStatus *pci_get_virtio_isr_status(PCIDevice *device);
 
 struct pci_cape {
     uint8_t id;
