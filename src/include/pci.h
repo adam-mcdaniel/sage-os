@@ -134,9 +134,9 @@ struct VirtioCapability *pci_get_virtio_capability(PCIDevice *device, uint8_t vi
 /// Get the common configuration structure for a given virtio device connected to PCI.
 struct VirtioPciCommonCfg *pci_get_virtio_common_config(PCIDevice *device);
 /// Get the notify configuration structure for a given virtio device connected to PCI.
-struct VirtioPciNotifyCfg *pci_get_virtio_notify_capability(PCIDevice *device);
+struct VirtioPciNotifyCap *pci_get_virtio_notify_capability(PCIDevice *device);
 /// Get the interrupt service routine structure for a given virtio device connected to PCI.
-struct VirtioPciISRStatus *pci_get_virtio_isr_status(PCIDevice *device);
+struct VirtioPciIsrCap *pci_get_virtio_isr_status(PCIDevice *device);
 
 struct pci_cape {
     uint8_t id;
@@ -154,7 +154,6 @@ static uint64_t VIRTIO_LAST_BAR = 0x40000000;
 
 /**
  * @brief Initialize the PCI subsystem
- *
  */
 void pci_init(void);
 
