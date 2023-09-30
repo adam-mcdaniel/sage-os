@@ -20,27 +20,28 @@ void virtio_init(void) {
         PCIDevice *device = pci_get_nth_saved_device(i);
         
         if (device->ecam_header->vendor_id == 0x1AF4) { // Access through ecam_header
-            VirtioDevice *virtio_dev = kmalloc(sizeof(VirtioDevice));
-            virtio_dev->pcidev = device;
-            virtio_dev->common_cfg = pci_get_virtio_common_config(device);
-            virtio_dev->notify_cap = pci_get_virtio_notify_capability(device);
-            virtio_dev->isr = pci_get_virtio_isr_status(device);
+            VirtioDevice *viodev = kmalloc(sizeof(VirtioDevice));
+            viodev->pcidev = device;
+            viodev->common_cfg = pci_get_virtio_common_config(device);
+            viodev->notify_cap = pci_get_virtio_notify_capability(device);
+            viodev->isr = pci_get_virtio_isr_status(device);
+            // Fix qsize below
             uint16_t qsize = 128;
             // Allocate contiguous physical memory for descriptor table, driver ring, and device ring
-            virtio_dev->desc = (VirtioDescriptor *)kmalloc(VIRTIO_DESCRIPTOR_TABLE_BYTES(qsize));
-            virtio_dev->driver = (VirtioDriverRing *)kmalloc(VIRTIO_DRIVER_TABLE_BYTES(qsize));
-            virtio_dev->device = (VirtioDeviceRing *)kmalloc(VIRTIO_DEVICE_TABLE_BYTES(qsize));
+            viodev->desc = (VirtioDescriptor *)kmalloc(VIRTIO_DESCRIPTOR_TABLE_BYTES(qsize));
+            viodev->driver = (VirtioDriverRing *)kmalloc(VIRTIO_DRIVER_TABLE_BYTES(qsize));
+            viodev->device = (VirtioDeviceRing *)kmalloc(VIRTIO_DEVICE_TABLE_BYTES(qsize));
 
             // Initialize the indices
-            virtio_dev->desc_idx = 0;
-            virtio_dev->driver_idx = 0;
-            virtio_dev->device_idx = 0;
+            viodev->desc_idx = 0;
+            viodev->driver_idx = 0;
+            viodev->device_idx = 0;
             
             // Enable the queue
-            virtio_dev->common_cfg->queue_enable = 1;
+            viodev->common_cfg->queue_enable = 1;
             
             // Add to vector using vector_push
-            vector_push(virtio_devices, (uint64_t)virtio_dev);
+            vector_push(virtio_devices, (uint64_t)viodev);
         }
     }
 }
