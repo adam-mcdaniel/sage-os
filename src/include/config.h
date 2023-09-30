@@ -18,7 +18,7 @@
 #define USE_MMU
 #define USE_HEAP
 #define USE_PCI
-// #define USE_VIRTIO
+#define USE_VIRTIO
 
 
 // The maximum number of HARTS we can support. The more HARTs,
