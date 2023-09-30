@@ -3,19 +3,118 @@
 #include <pci.h>
 #include <virtio.h>
 #include <vector.h>
+#include <kmalloc.h>
 
 #define MMIO_ECAM_BASE 0x30000000
 #define MMIO_ECAM_END   0x30FFFFFF
 #define MEMORY_BARRIER() __asm__ volatile("" ::: "memory")
-
-static uint8_t next_bus_number = 1;
-static uint64_t next_mmio_address = 0x41000000;
 
 // These contain pointers to the common configurations for each device.
 // The `all_pci_devices` vector contains all devices, while the
 // `irq_pci_devices` vector contains devices that share an IRQ number (32, 33, 34, and 35).
 // These vectors contain the pointers to the devices in the ECAM address space.
 static struct Vector *all_pci_devices, *irq_pci_devices[4];
+
+static inline bool pci_device_exists(uint16_t vendor_id)
+{
+    return vendor_id != 0xFFFF;
+}
+
+PCIDevice *pci_find_saved_device(uint16_t vendor_id, uint16_t device_id) {
+    for (uint32_t i=0; i<vector_size(all_pci_devices); i++) {
+        PCIDevice *pcidev;
+        vector_get_ptr(all_pci_devices, i, pcidev);
+        if (pcidev->ecam_header->vendor_id == vendor_id && pcidev->ecam_header->device_id == device_id) {
+            return pcidev;
+        }
+    }
+    return NULL;
+}
+
+uint64_t pci_count_saved_devices(void) {
+    return vector_size(all_pci_devices);
+}
+
+uint64_t pci_count_irq_listeners(uint8_t irq) {
+    uint32_t vector_idx = irq - 32;
+    return vector_size(irq_pci_devices[vector_idx]);
+}
+
+PCIDevice *pci_save_device(PCIDevice device) {
+    debugf("Saving device with vendor ID: 0x%04x, device ID: 0x%04x\n", device.ecam_header->vendor_id, device.ecam_header->device_id);
+    PCIDevice *pcidev = (PCIDevice *)kmalloc(sizeof(PCIDevice));
+    pcidev->ecam_header = device.ecam_header;
+    // pcidev->capabilities = device.capabilities;
+    vector_push(all_pci_devices, (uint64_t)pcidev);
+    uint8_t bus = ((uintptr_t)device.ecam_header >> 20) & 0xF;
+    uint8_t slot = ((uintptr_t)device.ecam_header >> 15) & 0x1F;
+    uint32_t vector_idx = (bus + slot) % 4;
+    vector_push(irq_pci_devices[vector_idx], (uint64_t)pcidev);
+    return pcidev;
+}
+
+PCIDevice *pci_get_saved_device(uint16_t n) {
+    PCIDevice *pcidev;
+    vector_get_ptr(all_pci_devices, n, pcidev);
+    return pcidev;
+}
+
+PCIDevice *pci_find_device_by_irq(uint8_t irq) {
+    uint32_t vector_idx = irq - 32;
+
+    // Check all devices in the vector
+    for (uint32_t i=0; i<vector_size(irq_pci_devices[vector_idx]); i++) {
+        PCIDevice *device;
+        vector_get_ptr(irq_pci_devices[vector_idx], i, device);
+        if (device->ecam_header->vendor_id != 0x1AF4) continue;  
+        
+        if (!pci_device_exists(device->ecam_header->vendor_id)) {
+            continue;
+        }
+
+        uint8_t cap_pointer = device->ecam_header->type0.capes_pointer;  
+        debugf("Vendor specific capabilities pointer: 0x%02x\n", cap_pointer);
+        while (cap_pointer) {
+            struct pci_cape* cape = (struct pci_cape*)((uintptr_t)device + cap_pointer);
+
+            if (cape->id == 0x09) {  
+
+                struct VirtioCapability* virtio_cap = (struct VirtioCapability*)cape;
+                switch (virtio_cap->type) {
+                case VIRTIO_PCI_CAP_COMMON_CFG: /* 1 */
+                    break;
+                case VIRTIO_PCI_CAP_NOTIFY_CFG: /* 2 */
+                    break;
+                case VIRTIO_PCI_CAP_ISR_CFG:    /* 3 */
+                    debugf("  ISR configuration capability at offset: 0x%02x\n", cap_pointer);
+                    struct VirtioPciIsrCap* isr_cap = (struct VirtioPciIsrCap*)virtio_cap;
+                    debugf("    ISR capability: 0x%08x\n", isr_cap->isr_cap);
+                    if (isr_cap->queue_interrupt) {
+                        debugf("    Queue interrupt\n");
+                    }
+                    if (isr_cap->device_cfg_interrupt) {
+                        debugf("    Device configuration interrupt\n");
+                    }
+                    return device;
+                    break;
+                case VIRTIO_PCI_CAP_DEVICE_CFG: /* 4 */
+                    break;
+                case VIRTIO_PCI_CAP_PCI_CFG:    /* 5 */
+                    break;
+                default:
+                    fatalf("Unknown virtio capability %d at offset: 0x%02x\n", virtio_cap->type, cap_pointer);
+                    break;
+                }
+            }
+
+            cap_pointer = cape->next;  
+        }
+    }
+    return NULL;
+}
+
+static uint8_t next_bus_number = 1;
+static uint64_t next_mmio_address = 0x41000000;
 
 static void pci_configure_device(struct pci_ecam *device);
 static void pci_configure_bridge(struct pci_ecam *bridge);
@@ -50,12 +149,6 @@ static inline uint32_t pci_get_config_address(uint8_t bus, uint8_t device, uint8
         return 0; 
     }
 }
-
-static inline bool pci_device_exists(uint16_t vendor_id)
-{
-    return vendor_id != 0xFFFF;
-}
-
 static void pci_enumerate_bus(uint8_t bus) {
     for (uint8_t device = 0; device < 32; device++) {
         //debugf("Checking device at bus %d, device %d, function %d\n", bus, device, function);
@@ -114,9 +207,12 @@ static void pci_configure_device(struct pci_ecam *device)
     uint8_t slot = ((uintptr_t)device >> 15) & 0x1F;
     // The vector index is the sum of the bus and slot numbers, modulo 4.
     uint32_t vector_idx = (bus + slot) % 4;
-    debugf("Pushing device at bus %d, slot %d into vector %d\n", bus, slot, vector_idx);
-    vector_push(all_pci_devices, (uint64_t)device);
-    vector_push(irq_pci_devices[vector_idx], (uint64_t)device);
+    // debugf("Pushing device at bus %d, slot %d into vector %d\n", bus, slot, vector_idx);
+    // vector_push(all_pci_devices, (uint64_t)device);
+    // vector_push(irq_pci_devices[vector_idx], (uint64_t)device);
+    PCIDevice pcidev;
+    pcidev.ecam_header = device;
+    pci_save_device(pcidev);
 
     for (int i = 0; i < 6; i++) {
         // Disable the device before modifying the BAR
@@ -199,7 +295,13 @@ void pci_init(void)
         irq_pci_devices[i] = vector_new();
     }
 
-    pci_enumerate_bus(0);  
+    pci_enumerate_bus(0);
+
+    debugf("PCI devices: %d\n", pci_count_saved_devices());
+    debugf("PCI devices sharing IRQ 32: %d\n", pci_count_irq_listeners(32));
+    debugf("PCI devices sharing IRQ 33: %d\n", pci_count_irq_listeners(33));
+    debugf("PCI devices sharing IRQ 34: %d\n", pci_count_irq_listeners(34));
+    debugf("PCI devices sharing IRQ 35: %d\n", pci_count_irq_listeners(35));
 }
 
 /**
@@ -220,53 +322,11 @@ void pci_dispatch_irq(int irq)
     // the interrupt occurred.
 
     // IRQ#=32+(bus+slot)mod4
-    uint32_t vector_idx = irq - 32;
-
-    // Check all devices in the vector
-    for (int i=0; i<vector_size(irq_pci_devices[vector_idx]); i++) {
-        struct pci_ecam *device;
-        vector_get_ptr(irq_pci_devices[vector_idx], i, device);
-        if (device->vendor_id != 0x1AF4) continue;  
-        
-        if (!pci_device_exists(device->vendor_id)) {
-            continue;
-        }
-
-        uint8_t cap_pointer = device->type0.capes_pointer;  
-        debugf("Vendor specific capabilities pointer: 0x%02x\n", cap_pointer);
-        while (cap_pointer) {
-            struct pci_cape* cape = (struct pci_cape*)((uintptr_t)device + cap_pointer);
-
-            if (cape->id == 0x09) {  
-
-                struct VirtioCapability* virtio_cap = (struct VirtioCapability*)cape;
-                switch (virtio_cap->type) {
-                case VIRTIO_PCI_CAP_COMMON_CFG: /* 1 */
-                    break;
-                case VIRTIO_PCI_CAP_NOTIFY_CFG: /* 2 */
-                    break;
-                case VIRTIO_PCI_CAP_ISR_CFG:    /* 3 */
-                    debugf("  ISR configuration capability at offset: 0x%02x\n", cap_pointer);
-                    struct VirtioPciIsrCap* isr_cap = (struct VirtioPciIsrCap*)virtio_cap;
-                    debugf("    ISR capability: 0x%08x\n", isr_cap->isr_cap);
-                    if (isr_cap->queue_interrupt) {
-                        debugf("    Queue interrupt\n");
-                    }
-                    if (isr_cap->device_cfg_interrupt) {
-                        debugf("    Device configuration interrupt\n");
-                    }
-                    break;
-                case VIRTIO_PCI_CAP_DEVICE_CFG: /* 4 */
-                    break;
-                case VIRTIO_PCI_CAP_PCI_CFG:    /* 5 */
-                    break;
-                default:
-                    fatalf("Unknown virtio capability %d at offset: 0x%02x\n", virtio_cap->type, cap_pointer);
-                    break;
-                }
-            }
-
-            cap_pointer = cape->next;  
-        }
+    // uint32_t vector_idx = irq - 32;
+    PCIDevice *pcidevice = pci_find_device_by_irq(irq);
+    debugf("PCI device with IRQ %d: 0x%04x\n", irq, pcidevice->ecam_header->device_id);
+    if (pcidevice == NULL) {
+        debugf("No PCI device found with IRQ %d\n", irq);
+        return;
     }
 }
