@@ -12,6 +12,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <pci.h>
 
 #define VIRTIO_PCI_VENDOR_ID      0x1AF4
 #define VIRTIO_PCI_DEVICE_ID(x)   (0x1040 + (x))
@@ -156,7 +157,6 @@ typedef struct VirtioDeviceRing {
     // uint16_t     avail_event;
 } VirtioDeviceRing;
 
-struct PciDevice;
 struct List;
 
 // This is the actual Virtio device structure that the OS will
@@ -165,7 +165,7 @@ struct List;
 typedef struct VirtioDevice {
     // A pointer the PCI device structure for this Virtio device.
     // Right now this just points to the ECAM for the device.
-    struct PciDevice *pcidev;
+    struct PCIDevice *pcidev;
     // The common configuration for the device.
     volatile VirtioPciCommonCfg *common_cfg;
     // The notify register for the device. This is not the notify
