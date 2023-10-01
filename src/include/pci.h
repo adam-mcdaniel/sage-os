@@ -100,7 +100,9 @@ uint8_t pci_get_bus_number(PCIDevice *dev);
 // Get the slot number for a given PCI device.
 uint8_t pci_get_slot_number(PCIDevice *dev);
 
-// Find a saved device by vendor and device ID.
+// Find the saved PCI device with the given vendor and device ID.
+// This will retrieve the bookkeeping structure for the PCI device
+// maintained by the OS.
 PCIDevice *pci_find_saved_device(uint16_t vendor_id, uint16_t device_id);
 
 // Save the device to the `all_pci_devices` vector. This will allow us to
