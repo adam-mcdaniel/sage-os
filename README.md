@@ -14,6 +14,15 @@ Every week, you will need to write entries in this journal. Include brief inform
 
 Sort your entries in descending order (newest entries at the top).
 
+# 30-September-2023
+- `amcdan23`: Added `PCIDevice` infrastructure for setting up VirtIO. Created functions for quickly getting and setting vital info about each PCI device and VirtIO config info from the device. Added functions for performing all the `PCIDevice`'s lookups with the static tables. Added this structure to the `VirtioDevice` structure. Changed PCI functions to use these methods for enumerating devices and printing capabilities. Also added methods for managing the `VirtioDevice`s saved by the operating system when initialized. Fixed bug where rings not set properly in `virtio_init`.
+
+- `ttahmid`: Implemented `virtio_init` to set up the `virtio_devices` from `PCIDevice`. Allocated memory for each identified virtio device. Made an initial memory allocation for descriptor table, driver ring, and device ring. Need to set up qsize properly.
+
+- `jpark78`: Implemented `virtio_notify`.
+# 29-September-2023
+- `amcdan23`: Added some changes suggested by Dr. Marz. Use vectors to store address to configuration structures for each of the devices connected to PCI (one vector that contains all the devices, another 4 for each of the shared IRQ numbers). Added ISR checking to `pci_irq_dispatch`. Now when `pci_irq_dispatch` is called, it only looks through the smaller shared vector , and now it checks the ISR register's `queue_interrupt` and `device_cfg_interrupt` for each device. -- Also added some copy-pasted comments from lab into the `virtio.h` include file for future reference.
+
 # 24-September-2023
 - `jpark78`: Fixed a bug with 64b BAR allocation and removed unneeded looping of the function bits in `pci_enumerate_bus`.
 
