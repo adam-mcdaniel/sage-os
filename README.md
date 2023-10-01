@@ -15,7 +15,7 @@ Every week, you will need to write entries in this journal. Include brief inform
 Sort your entries in descending order (newest entries at the top).
 
 # 30-September-2023
-- `amcdan23`: Added `PCIDevice` infrastructure for setting up VirtIO. Created functions for quickly getting and setting vital info about each PCI device and VirtIO config info from the device. Added functions for memoizing all the `PCIDevice`s for lookups. Added this structure to the `VirtioDevice` structure. Changed PCI functions to use these methods for enumerating devices and printing capabilities. Also added methods for managing the `VirtioDevice`s saved by the operating system when initialized. Fixed bug where rings not set properly in `virtio_init`.
+- `amcdan23`: Added `PCIDevice` infrastructure for setting up VirtIO. Created functions for quickly getting and setting vital info about each PCI device and VirtIO config info from the device. Added functions for performing all the `PCIDevice`'s lookups with the static tables. Added this structure to the `VirtioDevice` structure. Changed PCI functions to use these methods for enumerating devices and printing capabilities. Also added methods for managing the `VirtioDevice`s saved by the operating system when initialized. Fixed bug where rings not set properly in `virtio_init`.
 
 - `ttahmid`: Implemented `virtio_init` to set up the `virtio_devices` from `PCIDevice`. Allocated memory for each identified virtio device. Made an initial memory allocation for descriptor table, driver ring, and device ring. Need to set up qsize properly.
 
