@@ -221,4 +221,4 @@ uint64_t virtio_count_saved_devices(void);
 // If this is zero, it will get the common configuration capability. If this is
 // one, it will get the notify capability. If this is two, it will get the ISR
 // capability. Etc.
-VirtioCapability *virtio_get_capability(VirtioDevice *dev, uint8_t type);
+volatile VirtioCapability *virtio_get_capability(VirtioDevice *dev, uint8_t type);

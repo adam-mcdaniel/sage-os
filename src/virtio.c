@@ -30,7 +30,7 @@ uint64_t virtio_count_saved_devices(void) {
 // If this is zero, it will get the common configuration capability. If this is
 // one, it will get the notify capability. If this is two, it will get the ISR
 // capability. Etc.
-VirtioCapability *virtio_get_capability(VirtioDevice *dev, uint8_t type) {
+volatile struct VirtioCapability *virtio_get_capability(VirtioDevice *dev, uint8_t type) {
     return pci_get_virtio_capability(dev->pcidev, type);
 }
 
@@ -40,6 +40,7 @@ VirtioCapability *virtio_get_capability(VirtioDevice *dev, uint8_t type) {
 
 
 void virtio_init(void) {
+    debugf("virtio_init: Initializing virtio system...\n");
     virtio_devices = vector_new();
     uint64_t num_pci_devices = pci_count_saved_devices();
     
@@ -64,13 +65,17 @@ void virtio_init(void) {
             viodev.driver_idx = 0;
             viodev.device_idx = 0;
             
-            // Enable the queue
+            // Comment until verify that this is correct
+            // viodev.common_cfg->queue_desc = (uint64_t)viodev.desc;
+            // viodev.common_cfg->queue_driver = (uint64_t)viodev.driver;
+            // viodev.common_cfg->queue_device = (uint64_t)viodev.device;
             viodev.common_cfg->queue_enable = 1;
             
             // Add to vector using vector_push
             virtio_save_device(viodev);
         }
     }
+    debugf("virtio_init: Done initializing virtio system\n");
 }
 
 /**
