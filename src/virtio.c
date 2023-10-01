@@ -66,9 +66,9 @@ void virtio_init(void) {
             viodev.device_idx = 0;
             
             // Comment until verify that this is correct
-            // viodev.common_cfg->queue_desc = (uint64_t)viodev.desc;
-            // viodev.common_cfg->queue_driver = (uint64_t)viodev.driver;
-            // viodev.common_cfg->queue_device = (uint64_t)viodev.device;
+            viodev.common_cfg->queue_desc = (uint64_t)viodev.desc;
+            viodev.common_cfg->queue_driver = (uint64_t)viodev.driver;
+            viodev.common_cfg->queue_device = (uint64_t)viodev.device;
             viodev.common_cfg->queue_enable = 1;
             
             // Add to vector using vector_push
