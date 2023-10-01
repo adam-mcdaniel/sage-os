@@ -157,8 +157,6 @@ typedef struct VirtioDeviceRing {
     // uint16_t     avail_event;
 } VirtioDeviceRing;
 
-struct List;
-
 // This is the actual Virtio device structure that the OS will
 // keep track of for each device. It contains the data for the OS
 // to quickly access vital information for the device.
