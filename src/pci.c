@@ -32,8 +32,8 @@ PCIDevice *pci_find_saved_device(uint16_t vendor_id, uint16_t device_id) {
     return NULL;
 }
 
-struct pci_cape *pci_get_capability(PCIDevice *device, uint8_t type, uint8_t nth) {
-    struct pci_ecam *header = device->ecam_header;
+volatile struct pci_cape *pci_get_capability(PCIDevice *device, uint8_t type, uint8_t nth) {
+    volatile struct pci_ecam *header = device->ecam_header;
     uint8_t cap_pointer = header->type0.capes_pointer;
     uint8_t count = 0;
     
@@ -49,10 +49,10 @@ struct pci_cape *pci_get_capability(PCIDevice *device, uint8_t type, uint8_t nth
     return NULL;
 }
 
-struct VirtioCapability *pci_get_virtio_capability(PCIDevice *device, uint8_t virtio_cap_type) {
+volatile struct VirtioCapability *pci_get_virtio_capability(PCIDevice *device, uint8_t virtio_cap_type) {
     for (uint8_t i=0; i<10; i++) {
-        struct pci_cape *cape = pci_get_capability(device, 0x09, i);
-        struct VirtioCapability *virtio_cap = (struct VirtioCapability *)cape;
+        volatile struct pci_cape *cape = pci_get_capability(device, 0x09, i);
+        volatile struct VirtioCapability *virtio_cap = (struct VirtioCapability *)cape;
         if (virtio_cap && virtio_cap->type == virtio_cap_type) {
             return virtio_cap;
         }
@@ -111,7 +111,7 @@ PCIDevice *pci_find_device_by_irq(uint8_t irq) {
             continue;
         }
 
-        struct VirtioPciIsrCap *isr = pci_get_virtio_isr_status(device);
+        volatile struct VirtioPciIsrCap *isr = pci_get_virtio_isr_status(device);
 
         if (isr->device_cfg_interrupt) {
             debugf("Device configuration interrupt from device 0x%04x\n", device->ecam_header->device_id);
@@ -127,21 +127,21 @@ PCIDevice *pci_find_device_by_irq(uint8_t irq) {
     return NULL;
 }
 
-struct VirtioPciCommonCfg *pci_get_virtio_common_config(PCIDevice *device) {
+volatile struct VirtioPciCommonCfg *pci_get_virtio_common_config(PCIDevice *device) {
     return (struct VirtioPciCommonCfg *)pci_get_virtio_capability(device, VIRTIO_PCI_CAP_COMMON_CFG);
 }
-struct VirtioPciNotifyCap *pci_get_virtio_notify_capability(PCIDevice *device) {
+volatile struct VirtioPciNotifyCap *pci_get_virtio_notify_capability(PCIDevice *device) {
     return (struct VirtioPciNotifyCap *)pci_get_virtio_capability(device, VIRTIO_PCI_CAP_NOTIFY_CFG);
 }
-struct VirtioPciIsrCap *pci_get_virtio_isr_status(PCIDevice *device) {
+volatile struct VirtioPciIsrCap *pci_get_virtio_isr_status(PCIDevice *device) {
     return (struct VirtioPciIsrCap *)pci_get_virtio_capability(device, VIRTIO_PCI_CAP_ISR_CFG);
 }
 
 static uint8_t next_bus_number = 1;
 static uint64_t next_mmio_address = 0x41000000;
 
-static void pci_configure_device(struct pci_ecam *device);
-static void pci_configure_bridge(struct pci_ecam *bridge);
+static void pci_configure_device(volatile struct pci_ecam *device);
+static void pci_configure_bridge(volatile struct pci_ecam *bridge);
 
 static volatile struct pci_ecam *pci_get_ecam(uint8_t bus,
                                                uint8_t device,
@@ -194,7 +194,7 @@ static void pci_enumerate_bus(uint8_t bus) {
     }
 }
 
-static void pci_configure_bridge(struct pci_ecam *bridge)
+static void pci_configure_bridge(volatile struct pci_ecam *bridge)
 {
     bridge->type1.primary_bus_no = next_bus_number;
     bridge->type1.secondary_bus_no = ++next_bus_number;  
@@ -212,7 +212,7 @@ static void pci_configure_bridge(struct pci_ecam *bridge)
     next_mmio_address += 0x01000000;
 }
 
-static void pci_configure_device(struct pci_ecam *device)
+static void pci_configure_device(volatile struct pci_ecam *device)
 {
     // Push the device into the appropriate vector.
     // The appropriate vector is the (bus + slot) % 4 for the device.

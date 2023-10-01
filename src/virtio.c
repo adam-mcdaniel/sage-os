@@ -4,8 +4,35 @@
 #include <vector.h>
 #include <pci.h>
 #include <kmalloc.h> 
+#include <vector.h>
 
 static Vector *virtio_devices = NULL;
+
+VirtioDevice *virtio_get_nth_saved_device(uint16_t n) {
+    VirtioDevice *result;
+    vector_get_ptr(virtio_devices, n, &result);
+    return result;
+}
+
+void virtio_save_device(VirtioDevice device) {
+    VirtioDevice *mem = (VirtioDevice *)kmalloc(sizeof(VirtioDevice));
+    *mem = device;
+
+    vector_push_ptr(virtio_devices, mem);
+}
+
+// Get the number of saved Virtio devices.
+uint64_t virtio_count_saved_devices(void) {
+    return vector_size(virtio_devices);
+}
+
+// Get a virtio capability for a given device by the virtio capability's type.
+// If this is zero, it will get the common configuration capability. If this is
+// one, it will get the notify capability. If this is two, it will get the ISR
+// capability. Etc.
+VirtioCapability *virtio_get_capability(VirtioDevice *dev, uint8_t type) {
+    return pci_get_virtio_capability(dev->pcidev, type);
+}
 
 /**
  * @brief Initialize the virtio system
@@ -20,28 +47,28 @@ void virtio_init(void) {
         PCIDevice *device = pci_get_nth_saved_device(i);
         
         if (device->ecam_header->vendor_id == 0x1AF4) { // Access through ecam_header
-            VirtioDevice *viodev = kmalloc(sizeof(VirtioDevice));
-            viodev->pcidev = device;
-            viodev->common_cfg = pci_get_virtio_common_config(device);
-            viodev->notify_cap = pci_get_virtio_notify_capability(device);
-            viodev->isr = pci_get_virtio_isr_status(device);
+            VirtioDevice viodev;
+            viodev.pcidev = device;
+            viodev.common_cfg = pci_get_virtio_common_config(device);
+            viodev.notify_cap = pci_get_virtio_notify_capability(device);
+            viodev.isr = pci_get_virtio_isr_status(device);
             // Fix qsize below
             uint16_t qsize = 128;
             // Allocate contiguous physical memory for descriptor table, driver ring, and device ring
-            viodev->desc = (VirtioDescriptor *)kmalloc(VIRTIO_DESCRIPTOR_TABLE_BYTES(qsize));
-            viodev->driver = (VirtioDriverRing *)kmalloc(VIRTIO_DRIVER_TABLE_BYTES(qsize));
-            viodev->device = (VirtioDeviceRing *)kmalloc(VIRTIO_DEVICE_TABLE_BYTES(qsize));
+            viodev.desc = (VirtioDescriptor *)kmalloc(VIRTIO_DESCRIPTOR_TABLE_BYTES(qsize));
+            viodev.driver = (VirtioDriverRing *)kmalloc(VIRTIO_DRIVER_TABLE_BYTES(qsize));
+            viodev.device = (VirtioDeviceRing *)kmalloc(VIRTIO_DEVICE_TABLE_BYTES(qsize));
 
             // Initialize the indices
-            viodev->desc_idx = 0;
-            viodev->driver_idx = 0;
-            viodev->device_idx = 0;
+            viodev.desc_idx = 0;
+            viodev.driver_idx = 0;
+            viodev.device_idx = 0;
             
             // Enable the queue
-            viodev->common_cfg->queue_enable = 1;
+            viodev.common_cfg->queue_enable = 1;
             
             // Add to vector using vector_push
-            vector_push(virtio_devices, (uint64_t)viodev);
+            virtio_save_device(viodev);
         }
     }
 }

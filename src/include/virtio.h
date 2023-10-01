@@ -207,3 +207,18 @@ typedef struct VirtioDevice {
 
 void virtio_init(void);
 void virtio_notify(VirtioDevice *viodev, uint16_t which_queue);
+
+// Find a saved device by its index.
+VirtioDevice *virtio_get_nth_saved_device(uint16_t n);
+
+// Save the Virtio device for later use.
+void virtio_save_device(VirtioDevice device);
+
+// Get the number of saved Virtio devices.
+uint64_t virtio_count_saved_devices(void);
+
+// Get a virtio capability for a given device by the virtio capability's type.
+// If this is zero, it will get the common configuration capability. If this is
+// one, it will get the notify capability. If this is two, it will get the ISR
+// capability. Etc.
+VirtioCapability *virtio_get_capability(VirtioDevice *dev, uint8_t type);
