@@ -163,8 +163,10 @@ struct List;
 // keep track of for each device. It contains the data for the OS
 // to quickly access vital information for the device.
 typedef struct VirtioDevice {
-    // A pointer the PCI device structure for this Virtio device.
-    // Right now this just points to the ECAM for the device.
+    // A pointer the PCIDevice bookkeeping structure.
+    // This is used by the OS to track useful information about
+    // the PCIDevice, and as a useful interface for configuring
+    // the device.
     struct PCIDevice *pcidev;
     // The common configuration for the device.
     volatile VirtioPciCommonCfg *common_cfg;
