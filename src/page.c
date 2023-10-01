@@ -150,12 +150,12 @@ void *page_nalloc(int n)
             consecutive++;
 
             if (consecutive >= n) {
-                debugf("page_nalloc: found %d consecutive pages starting at 0x%08lx\n", n, start);
+                // debugf("page_nalloc: found %d consecutive pages starting at 0x%08lx\n", n, start);
                 for (int j = 0; j < n; j++) {
-                    debugf("page_nalloc: marking page 0x%08lx as taken\n", start + j);
+                    // debugf("page_nalloc: marking page 0x%08lx as taken\n", start + j);
                     set_taken(start + j);
                 }
-                debugf("page_nalloc: marking page 0x%08lx as last\n", start + n - 1);
+                // debugf("page_nalloc: marking page 0x%08lx as last\n", start + n - 1);
                 set_last(start + n - 1);
 
                 mutex_unlock(&page_lock);
@@ -179,7 +179,7 @@ void *page_znalloc(int n)
     
     void *mem = page_nalloc(n);
     if (mem) {
-        debugf("page_znalloc: zeroing out %d pages starting at 0x%08lx\n", n, mem);
+        // debugf("page_znalloc: zeroing out %d pages starting at 0x%08lx\n", n, mem);
         memset(mem, 0, n * PAGE_SIZE);
     }
     return mem;
@@ -192,13 +192,13 @@ void page_free(void *p)
     }
     /* Free the page */
     uint64_t x = ((uint64_t)p - (uint64_t)bookkeeping) / PAGE_SIZE;
-    debugf("page_free: freeing page %lu at address 0x%p\n", x, p);
+    // debugf("page_free: freeing page %lu at address 0x%p\n", x, p);
 
     mutex_spinlock(&page_lock);
 
 
     if (!is_taken(x)) {
-        logf(LOG_ERROR, "page_free: page 0x%08lx is already free!\n", x);
+        // logf(LOG_ERROR, "page_free: page 0x%08lx is already free!\n", x);
         mutex_unlock(&page_lock);
         return;
     }
