@@ -1,7 +1,7 @@
 #include <debug.h>
 #include <virtio.h>
 #include <util.h>
-#include <vector.h>
+#include <mmu.h>
 #include <pci.h>
 #include <kmalloc.h> 
 #include <vector.h>
@@ -66,9 +66,12 @@ void virtio_init(void) {
             viodev.device_idx = 0;
             
             // Comment until verify that this is correct
-            viodev.common_cfg->queue_desc = (uint64_t)viodev.desc;
-            viodev.common_cfg->queue_driver = (uint64_t)viodev.driver;
-            viodev.common_cfg->queue_device = (uint64_t)viodev.device;
+            viodev.common_cfg->queue_desc = kernel_mmu_translate(viodev.desc);
+            viodev.common_cfg->queue_driver = kernel_mmu_translate(viodev.driver);
+            viodev.common_cfg->queue_device = kernel_mmu_translate(viodev.device);
+            debugf("virtio_init: queue_desc = 0x%08lx physical (0x%08lx virtual)\n", viodev.common_cfg->queue_desc, viodev.desc);
+            debugf("virtio_init: queue_driver = 0x%08lx physical (0x%08lx virtual)\n", viodev.common_cfg->queue_driver, viodev.driver);
+            debugf("virtio_init: queue_device = 0x%08lx physical (0x%08lx virtual)\n", viodev.common_cfg->queue_device, viodev.device);
             viodev.common_cfg->queue_enable = 1;
             
             // Add to vector using vector_push

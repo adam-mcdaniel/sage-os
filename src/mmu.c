@@ -161,7 +161,12 @@ uint64_t mmu_translate(const struct page_table *tab, uint64_t vaddr)
     // debugf("mmu_translate: paddr == 0x%08lx\n", result);
 
     return result; // Combine with the offset within the page
-} 
+}
+
+uint64_t kernel_mmu_translate(uint64_t vaddr) 
+{ 
+    return mmu_translate(kernel_mmu_table, vaddr); 
+}
 
 uint64_t mmu_map_range(struct page_table *tab, 
                        uint64_t start_virt, 
