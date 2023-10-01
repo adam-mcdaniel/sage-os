@@ -110,6 +110,18 @@ PCIDevice *pci_find_device_by_irq(uint8_t irq) {
         if (!pci_device_exists(device->ecam_header->vendor_id)) {
             continue;
         }
+
+        struct VirtioPciIsrCap *isr = pci_get_virtio_isr_status(device);
+
+        if (isr->device_cfg_interrupt) {
+            debugf("Device configuration interrupt from device 0x%04x\n", device->ecam_header->device_id);
+            return device;
+        }
+
+        if (isr->queue_interrupt) {
+            debugf("Device queue interrupt from device 0x%04x\n", device->ecam_header->device_id);
+            return device;
+        }
     }
     return NULL;
 }
