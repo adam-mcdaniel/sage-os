@@ -123,6 +123,7 @@ PCIDevice *pci_find_device_by_irq(uint8_t irq) {
             return device;
         }
     }
+    debugf("No device found with IRQ %d\n", irq);
     return NULL;
 }
 
