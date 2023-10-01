@@ -10,8 +10,8 @@
 #define KERNEL_HEAP_PAGES       4096
 #define KERNEL_HEAP_END_VADDR   (KERNEL_HEAP_START_VADDR + (KERNEL_HEAP_PAGES * 4096))
 
-#define DEBUG_KMALLOC
-#define DEBUG_HEAP
+// #define DEBUG_KMALLOC
+// #define DEBUG_HEAP
 
 typedef struct Block {
     void *addr;
