@@ -94,6 +94,9 @@ typedef struct PCIDevice {
 } PCIDevice;
 
 
+// Is this a virtio device?
+bool pci_is_virtio_device(PCIDevice *dev);
+
 // Get the bus number for a given PCI device.
 uint8_t pci_get_bus_number(PCIDevice *dev);
 

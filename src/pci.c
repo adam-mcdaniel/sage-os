@@ -20,6 +20,11 @@ static inline bool pci_device_exists(uint16_t vendor_id)
     return vendor_id != 0xFFFF;
 }
 
+// Is this a virtio device?
+bool pci_is_virtio_device(PCIDevice *dev) {
+    return dev->ecam_header->vendor_id == 0x1AF4;
+}
+
 // Find the saved PCI device with the given vendor and device ID.
 // This will retrieve the bookkeeping structure for the PCI device
 // maintained by the OS.
@@ -147,7 +152,7 @@ PCIDevice *pci_find_device_by_irq(uint8_t irq) {
         PCIDevice *device;
         vector_get_ptr(irq_pci_devices[vector_idx], i, &device);
         // If the device is a Virtio device, check the Virtio ISR status
-        if (device->ecam_header->vendor_id != 0x1AF4) continue;  
+        if (!pci_is_virtio_device(device)) continue;  
         
         // Confirm that the device exists
         if (!pci_device_exists(device->ecam_header->vendor_id)) {
@@ -314,8 +319,8 @@ static void pci_configure_device(volatile struct pci_ecam *device)
 
 void print_vendor_specific_capabilities(PCIDevice *pcidevice)
 {
+    if (!pci_is_virtio_device(pcidevice)) return;  
     struct pci_ecam *header = pcidevice->ecam_header;
-    if (header->vendor_id != 0x1AF4) return;  
 
     uint8_t cap_pointer = header->type0.capes_pointer;  
     debugf("Vendor specific capabilities with offset 0x%02x\n", cap_pointer);
