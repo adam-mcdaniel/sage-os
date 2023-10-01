@@ -41,18 +41,27 @@ volatile struct VirtioCapability *virtio_get_capability(VirtioDevice *dev, uint8
 
 void virtio_init(void) {
     debugf("virtio_init: Initializing virtio system...\n");
+    // Initialize the vector of virtio devices
     virtio_devices = vector_new();
+
+    // Get the number of PCI devices saved
+    // This will allow us to iterate through all of them and find the virtio devices
     uint64_t num_pci_devices = pci_count_saved_devices();
     
     for (uint64_t i = 0; i < num_pci_devices; ++i) {
-        PCIDevice *device = pci_get_nth_saved_device(i);
+        // Get the PCI device
+        PCIDevice *pcidevice = pci_get_nth_saved_device(i);
         
-        if (device->ecam_header->vendor_id == 0x1AF4) { // Access through ecam_header
+        // Is this a virtio device?
+        if (pci_is_virtio_device(pcidevice)) { // Access through ecam_header
+            // Create a new bookkeeping structure for the virtio device
             VirtioDevice viodev;
-            viodev.pcidev = device;
-            viodev.common_cfg = pci_get_virtio_common_config(device);
-            viodev.notify_cap = pci_get_virtio_notify_capability(device);
-            viodev.isr = pci_get_virtio_isr_status(device);
+            // Add the PCI device to the bookkeeping structure
+            viodev.pcidev = pcidevice;
+            // Add the common configuration, notify capability, and ISR to the bookkeeping structure
+            viodev.common_cfg = pci_get_virtio_common_config(pcidevice);
+            viodev.notify_cap = pci_get_virtio_notify_capability(pcidevice);
+            viodev.isr = pci_get_virtio_isr_status(pcidevice);
             // Fix qsize below
             uint16_t qsize = 128;
             // Allocate contiguous physical memory for descriptor table, driver ring, and device ring
@@ -65,7 +74,7 @@ void virtio_init(void) {
             viodev.driver_idx = 0;
             viodev.device_idx = 0;
             
-            // Comment until verify that this is correct
+            // Add the physical addresses for the descriptor table, driver ring, and device ring to the common configuration
             viodev.common_cfg->queue_desc = kernel_mmu_translate(viodev.desc);
             viodev.common_cfg->queue_driver = kernel_mmu_translate(viodev.driver);
             viodev.common_cfg->queue_device = kernel_mmu_translate(viodev.device);
