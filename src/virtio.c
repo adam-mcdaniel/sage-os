@@ -21,6 +21,17 @@ void virtio_save_device(VirtioDevice device) {
     vector_push_ptr(virtio_devices, mem);
 }
 
+VirtioDevice *virtio_get_by_device(PCIDevice *pcidevice){
+    for(int i = 0; i < vector_size(virtio_devices);i++){
+        VirtioDevice *curr_virt_device;
+        vector_get_ptr(virtio_devices,i,curr_virt_device);
+        if(curr_virt_device->pcidev == pcidevice){
+            return curr_virt_device;
+        }
+    }
+    return NULL;
+}
+
 // Get the number of saved Virtio devices.
 uint64_t virtio_count_saved_devices(void) {
     return vector_size(virtio_devices);
@@ -85,6 +96,7 @@ void virtio_init(void) {
             
             // Add to vector using vector_push
             virtio_save_device(viodev);
+            rng_init();
         }
     }
     debugf("virtio_init: Done initializing virtio system\n");
