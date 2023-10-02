@@ -411,4 +411,15 @@ void pci_dispatch_irq(int irq)
         debugf("No PCI device found with IRQ %d\n", irq);
         return;
     }
+    // Is this a virtio device?
+    if (pci_is_virtio_device(pcidevice)) { 
+        // Access through ecam_header
+        VirtioDevice *virtdevice = virtio_get_by_device(pcidevice);
+
+        //rng device
+        if(virtdevice->pcidev->ecam_header->device_id == VIRTIO_PCI_DEVICE_ID(VIRTIO_PCI_DEVICE_ENTROPY)){
+            rng_job_done(virtdevice);
+        }
+        
+    }
 }

@@ -222,3 +222,6 @@ uint64_t virtio_count_saved_devices(void);
 // one, it will get the notify capability. If this is two, it will get the ISR
 // capability. Etc.
 volatile VirtioCapability *virtio_get_capability(VirtioDevice *dev, uint8_t type);
+
+//get a virtio device by using a pcidevice pointer
+VirtioDevice *virtio_get_by_device(PCIDevice *pcidevice);
