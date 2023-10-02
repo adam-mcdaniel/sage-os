@@ -6,8 +6,7 @@
 #include <kmalloc.h>
 
 #define MMIO_ECAM_BASE 0x30000000
-#define MMIO_ECAM_END   0x30FFFFFF
-#define MEMORY_BARRIER() __asm__ volatile("" ::: "memory")
+#define MMIO_ECAM_END  0x30FFFFFF
 
 // These contain pointers to the common configurations for each device.
 // The `all_pci_devices` vector contains all devices, while the
@@ -286,10 +285,8 @@ static void pci_configure_device(volatile struct pci_ecam *device)
     for (int i = 0; i < 6; i++) {
         // Disable the device before modifying the BAR
         device->command_reg &= ~(1 << 1);  // Clear Memory Space bit
-        MEMORY_BARRIER();
 
         device->type0.bar[i] = 0xFFFFFFFF;
-        MEMORY_BARRIER();
         
         uint32_t bar_value = device->type0.bar[i];
 
@@ -313,7 +310,6 @@ static void pci_configure_device(volatile struct pci_ecam *device)
 
         // Re-enable the device after modifying the BAR
         device->command_reg |= (1 << 1);
-        MEMORY_BARRIER();
     }
 }
 
