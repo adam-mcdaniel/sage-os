@@ -14,6 +14,9 @@
 //tells the number generator to fill a buffer with numbers
 void rng_get_numbers(struct VirtioDevice *viodev, void *buffer, uint16_t size, void* callback);
 
+bool rng_fill(void *buffer, uint16_t size, struct VirtioDevice *rng_device);
+
+//TODO print values
 void rng_print();
 
 void rng_job_done(VirtioDevice *vertdevice);

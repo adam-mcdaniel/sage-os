@@ -224,4 +224,4 @@ uint64_t virtio_count_saved_devices(void);
 volatile VirtioCapability *virtio_get_capability(VirtioDevice *dev, uint8_t type);
 
 //get a virtio device by using a pcidevice pointer
-VirtioDevice *virtio_get_by_device(PCIDevice *pcidevice)
+VirtioDevice *virtio_get_by_device(PCIDevice *pcidevice);

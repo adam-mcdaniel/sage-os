@@ -22,7 +22,7 @@ void rng_init(){
 void rng_get_numbers(struct VirtioDevice *viodev, void *buffer, uint16_t size, void* callback){
     //select rng device 
     if(viodev->pcidev->ecam_header->device_id != VIRTIO_PCI_DEVICE_ID(VIRTIO_PCI_DEVICE_ENTROPY)){
-        logf("[RNG] Incorrect device provided");
+        logf(LOG_ERROR,"[RNG] Incorrect device provided\n");
     }
 
     //create a job
@@ -36,7 +36,7 @@ void rng_get_numbers(struct VirtioDevice *viodev, void *buffer, uint16_t size, v
 
     //get random numbers
     if(!rng_fill(buffer,size,viodev)){
-        logf("[RNG] Failed to generate random numbers");
+        logf(LOG_ERROR,"[RNG] Failed to generate random numbers\n");
     }
 }
 
@@ -52,7 +52,7 @@ bool rng_fill(void *buffer, uint16_t size, struct VirtioDevice *rng_device) {
     at_idx = rng_device->desc_idx;
 
     // All VirtIO devices deal with physical memory.
-    uint64_t virt = page_kzalloc((size/PAGE_SIZE_4K)+1);
+    uint64_t virt = kzalloc(size);
     phys = mmu_translate(virt, (uint64_t)buffer);
 
     // Fill all fields of the descriptor. Since we reuse descriptors
