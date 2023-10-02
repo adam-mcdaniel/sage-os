@@ -15,6 +15,7 @@ Every week, you will need to write entries in this journal. Include brief inform
 Sort your entries in descending order (newest entries at the top).
 
 # 30-September-2023
+- `gmorale1`: Added some initial code for the rng device which should use the driver ring when called.  Also added a getter funciton for getting VirtIO devices from a pci device pointer. Used when we need to find an interrupt from a pci device.
 - `amcdan23`: Added `PCIDevice` infrastructure for setting up VirtIO. Created functions for quickly getting and setting vital info about each PCI device and VirtIO config info from the device. Added functions for performing all the `PCIDevice`'s lookups with the static tables. Added this structure to the `VirtioDevice` structure. Changed PCI functions to use these methods for enumerating devices and printing capabilities. Also added methods for managing the `VirtioDevice`s saved by the operating system when initialized. Fixed bug where rings not set properly in `virtio_init`.
 
 - `ttahmid`: Implemented `virtio_init` to set up the `virtio_devices` from `PCIDevice`. Allocated memory for each identified virtio device. Made an initial memory allocation for descriptor table, driver ring, and device ring. Need to set up qsize properly.
