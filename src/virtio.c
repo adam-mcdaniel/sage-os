@@ -91,7 +91,9 @@ void virtio_init(void) {
             viodev.notify_cap = pci_get_virtio_notify_capability(pcidevice);
             viodev.isr = pci_get_virtio_isr_status(pcidevice);
             // Fix qsize below
-            uint16_t qsize = 128;
+            viodev.common_cfg->queue_select = 0;
+            uint16_t qsize = viodev.common_cfg->queue_size;
+
             // Allocate contiguous physical memory for descriptor table, driver ring, and device ring
             // These are virtual memory pointers that we will use in the OS side.
             viodev.desc = (VirtioDescriptor *)kmalloc(VIRTIO_DESCRIPTOR_TABLE_BYTES(qsize));
@@ -102,6 +104,11 @@ void virtio_init(void) {
             viodev.desc_idx = 0;
             viodev.driver_idx = 0;
             viodev.device_idx = 0;
+
+            viodev.common_cfg->device_status = VIRTIO_F_RESET;
+            viodev.common_cfg->device_status = VIRTIO_F_ACKNOWLEDGE;
+            viodev.common_cfg->device_status |= VIRTIO_F_DRIVER;
+            viodev.common_cfg->device_status |= VIRTIO_F_FEATURES_OK;
             
             // Add the physical addresses for the descriptor table, driver ring, and device ring to the common configuration
             // We translate the virtual addresses so the devices can actuall access the memory.
@@ -112,7 +119,7 @@ void virtio_init(void) {
             debugf("virtio_init: queue_driver = 0x%08lx physical (0x%08lx virtual)\n", viodev.common_cfg->queue_driver, viodev.driver);
             debugf("virtio_init: queue_device = 0x%08lx physical (0x%08lx virtual)\n", viodev.common_cfg->queue_device, viodev.device);
             viodev.common_cfg->queue_enable = 1;
-            
+            viodev.common_cfg->device_status |= VIRTIO_F_DRIVER_OK;
             // Add to vector using vector_push
             virtio_save_device(viodev);
         }
