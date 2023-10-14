@@ -12,9 +12,9 @@
 #include <kmalloc.h>
 
 //tells the number generator to fill a buffer with numbers
-void rng_get_numbers(struct VirtioDevice *viodev, void *buffer, uint16_t size, void* callback);
+void rng_get_numbers(void *buffer, uint16_t size, void* callback);
 
-bool rng_fill(void *buffer, uint16_t size, struct VirtioDevice *rng_device);
+bool rng_fill(void *buffer, uint16_t size);
 
 //TODO print values
 void rng_print();

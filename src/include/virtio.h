@@ -165,7 +165,7 @@ typedef struct VirtioDevice {
     // This is used by the OS to track useful information about
     // the PCIDevice, and as a useful interface for configuring
     // the device.
-    struct PCIDevice *pcidev;
+    volatile struct PCIDevice *pcidev;
     // The common configuration for the device.
     volatile VirtioPciCommonCfg *common_cfg;
     // The notify configuration for the device.
@@ -210,6 +210,11 @@ void virtio_notify(VirtioDevice *viodev, uint16_t which_queue);
 
 // Find a saved device by its index.
 VirtioDevice *virtio_get_nth_saved_device(uint16_t n);
+
+// Get the RNG device from the list of virtio devices.
+VirtioDevice *virtio_get_rng_device();
+// Is this an RNG device?
+bool virtio_is_rng_device(VirtioDevice *dev);
 
 // Save the Virtio device for later use.
 void virtio_save_device(VirtioDevice device);

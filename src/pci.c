@@ -388,6 +388,7 @@ void pci_init(void)
  */
 void pci_dispatch_irq(int irq)
 {
+    debugf("IRQ handled\n");
     // An IRQ came from the PLIC, but recall PCI devices
     // share IRQs. So, you need to check the ISR register
     // of potential virtio devices.
@@ -413,9 +414,8 @@ void pci_dispatch_irq(int irq)
         VirtioDevice *virtdevice = virtio_get_by_device(pcidevice);
 
         //rng device
-        if(virtdevice->pcidev->ecam_header->device_id == VIRTIO_PCI_DEVICE_ID(VIRTIO_PCI_DEVICE_ENTROPY)){
+        if(virtdevice->pcidev->ecam_header->device_id == VIRTIO_PCI_DEVICE_ID(VIRTIO_PCI_DEVICE_ENTROPY)) {
             rng_job_done(virtdevice);
         }
-        
     }
 }

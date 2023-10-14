@@ -5,8 +5,25 @@
 #include <pci.h>
 #include <kmalloc.h> 
 #include <vector.h>
+#include "include/virtio.h"
 
 static Vector *virtio_devices = NULL;
+
+bool virtio_is_rng_device(VirtioDevice *dev) {
+    return dev->pcidev->ecam_header->device_id != VIRTIO_PCI_DEVICE_ID(VIRTIO_PCI_DEVICE_ENTROPY);
+}
+
+VirtioDevice *virtio_get_rng_device() {
+    for (uint16_t i=0; i<virtio_count_saved_devices(); i++) {
+        VirtioDevice *dev = virtio_get_nth_saved_device(i);
+        if (virtio_is_rng_device(dev)) {
+            return dev;
+        }
+    }
+
+    debugf("No RNG device could be found");
+    return NULL;
+}
 
 VirtioDevice *virtio_get_nth_saved_device(uint16_t n) {
     VirtioDevice *result;
@@ -76,6 +93,7 @@ void virtio_init(void) {
             // Fix qsize below
             uint16_t qsize = 128;
             // Allocate contiguous physical memory for descriptor table, driver ring, and device ring
+            // These are virtual memory pointers that we will use in the OS side.
             viodev.desc = (VirtioDescriptor *)kmalloc(VIRTIO_DESCRIPTOR_TABLE_BYTES(qsize));
             viodev.driver = (VirtioDriverRing *)kmalloc(VIRTIO_DRIVER_TABLE_BYTES(qsize));
             viodev.device = (VirtioDeviceRing *)kmalloc(VIRTIO_DEVICE_TABLE_BYTES(qsize));
@@ -86,6 +104,7 @@ void virtio_init(void) {
             viodev.device_idx = 0;
             
             // Add the physical addresses for the descriptor table, driver ring, and device ring to the common configuration
+            // We translate the virtual addresses so the devices can actuall access the memory.
             viodev.common_cfg->queue_desc = kernel_mmu_translate(viodev.desc);
             viodev.common_cfg->queue_driver = kernel_mmu_translate(viodev.driver);
             viodev.common_cfg->queue_device = kernel_mmu_translate(viodev.device);
@@ -96,9 +115,9 @@ void virtio_init(void) {
             
             // Add to vector using vector_push
             virtio_save_device(viodev);
-            rng_init();
         }
     }
+    rng_init();
     debugf("virtio_init: Done initializing virtio system\n");
 }
 
@@ -124,12 +143,16 @@ void virtio_notify(VirtioDevice *viodev, uint16_t which_queue)
     uint32_t offset = viodev->notify_cap->cap.offset;
     uint16_t queue_notify_off = viodev->common_cfg->queue_notify_off;
     uint32_t notify_off_multiplier = viodev->notify_cap->notify_off_multiplier;
-    uint32_t bar = viodev->pcidev->ecam_header->type0.bar[bar_num];
+    uint64_t bar = viodev->pcidev->ecam_header->type0.bar[bar_num];
+    debugf("BAR at %x, offset=%x, queue_notify_off=%x, notify_off_mult=%x", bar, offset, queue_notify_off, notify_off_multiplier);
 
     uint16_t *notify = bar + BAR_NOTIFY_CAP(offset, queue_notify_off, notify_off_multiplier);
+    debugf("Notifying at %x...\n", notify);
 
     // Write the queue's number to the notify register
-    *notify = which_queue; 
+    *notify = which_queue;
+
+    debugf("Done\n");
 
     return;
 };
