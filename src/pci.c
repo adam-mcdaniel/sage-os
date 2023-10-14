@@ -118,7 +118,7 @@ uint8_t pci_get_slot_number(PCIDevice *dev) {
 // information about the device for quick access later.
 PCIDevice *pci_save_device(PCIDevice device) {
     // Allocate some memory for the device's bookkeeping structure
-    PCIDevice *pcidev = (PCIDevice *)kmalloc(sizeof(PCIDevice));
+    PCIDevice *pcidev = (PCIDevice *)kzalloc(sizeof(PCIDevice));
     // Record the device's ECAM header
     pcidev->ecam_header = device.ecam_header;
     // Store the device in the all devices vector
