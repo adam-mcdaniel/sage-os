@@ -83,6 +83,22 @@ static void init_systems(void)
 #endif
 #ifdef USE_VIRTIO
     virtio_init();
+    uint8_t buffer[16] = {0};
+    debugf("RNG State Before:");
+    for (int i=0; i<sizeof(buffer)/sizeof(buffer[0]); i++) {
+        debugf(" %d ", buffer[i]);
+    }
+    debugf("\n");
+
+    debugf("RNG init done; about to fill\n");
+    rng_fill(buffer, 16);
+    WFI();
+
+    debugf("RNG State After:");
+    for (int i=0; i<sizeof(buffer)/sizeof(buffer[0]); i++) {
+        debugf(" %d ", buffer[i]);
+    }
+    debugf("\n");
 #endif
 }
 
