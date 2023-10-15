@@ -88,6 +88,12 @@ void virtio_init(void) {
             viodev.pcidev = pcidevice;
             // Add the common configuration, notify capability, and ISR to the bookkeeping structure
             viodev.common_cfg = pci_get_virtio_common_config(pcidevice);
+
+            // Fix qsize below
+            viodev.common_cfg->queue_select = 0;
+            uint16_t qsize = viodev.common_cfg->queue_size;
+            debugf("Virtio device has queue size %d\n", qsize);
+
             viodev.notify_cap = pci_get_virtio_notify_capability(pcidevice);
             viodev.isr = pci_get_virtio_isr_status(pcidevice);
 
@@ -96,16 +102,14 @@ void virtio_init(void) {
             viodev.common_cfg->device_status |= VIRTIO_F_DRIVER;
             viodev.common_cfg->device_status |= VIRTIO_F_FEATURES_OK;
             
-            // Fix qsize below
-            viodev.common_cfg->queue_select = 0;
-            uint16_t qsize = viodev.common_cfg->queue_size;
-            debugf("Virtio device has queue size %d\n", qsize);
-
             // Allocate contiguous physical memory for descriptor table, driver ring, and device ring
             // These are virtual memory pointers that we will use in the OS side.
             viodev.desc = (VirtioDescriptor *)kzalloc(VIRTIO_DESCRIPTOR_TABLE_BYTES(qsize));
             viodev.driver = (VirtioDriverRing *)kzalloc(VIRTIO_DRIVER_TABLE_BYTES(qsize));
             viodev.device = (VirtioDeviceRing *)kzalloc(VIRTIO_DEVICE_TABLE_BYTES(qsize));
+            debugf("Descriptor ring size: %d\n", VIRTIO_DESCRIPTOR_TABLE_BYTES(qsize));
+            debugf("Driver ring size: %d\n", VIRTIO_DRIVER_TABLE_BYTES(qsize));
+            debugf("Device ring size: %d\n", VIRTIO_DEVICE_TABLE_BYTES(qsize));
 
             // Initialize the indices
             viodev.desc_idx = 0;
@@ -114,12 +118,25 @@ void virtio_init(void) {
 
             // Add the physical addresses for the descriptor table, driver ring, and device ring to the common configuration
             // We translate the virtual addresses so the devices can actuall access the memory.
-            viodev.common_cfg->queue_desc = kernel_mmu_translate(viodev.desc);
-            viodev.common_cfg->queue_driver = kernel_mmu_translate(viodev.driver);
-            viodev.common_cfg->queue_device = kernel_mmu_translate(viodev.device);
-            debugf("virtio_init: queue_desc = 0x%08lx physical (0x%08lx virtual)\n", viodev.common_cfg->queue_desc, viodev.desc);
-            debugf("virtio_init: queue_driver = 0x%08lx physical (0x%08lx virtual)\n", viodev.common_cfg->queue_driver, viodev.driver);
-            debugf("virtio_init: queue_device = 0x%08lx physical (0x%08lx virtual)\n", viodev.common_cfg->queue_device, viodev.device);
+            void *phys_desc = kernel_mmu_translate(viodev.desc),
+                *phys_driver = kernel_mmu_translate(viodev.driver),
+                *phys_device = kernel_mmu_translate(viodev.device);
+            viodev.common_cfg->queue_desc = phys_desc;
+            viodev.common_cfg->queue_driver = phys_driver;
+            viodev.common_cfg->queue_device = phys_device;
+            debugf("virtio_init: queue_desc = 0x%08lx physical (0x%08lx virtual)\n", phys_desc, viodev.desc);
+            debugf("virtio_init: queue_driver = 0x%08lx physical (0x%08lx virtual)\n", phys_driver, viodev.driver);
+            debugf("virtio_init: queue_device = 0x%08lx physical (0x%08lx virtual)\n", phys_device, viodev.device);
+            while (viodev.common_cfg->queue_desc != phys_desc) {
+                debugf("Device does not reflect physical descriptor\n");
+            }
+            while (viodev.common_cfg->queue_driver != phys_driver) {
+                debugf("Device does not reflect physical driver ring\n");
+            }
+            while (viodev.common_cfg->queue_device != phys_device){
+                debugf("Device does not reflect physical device ring");
+            }
+            debugf("Set up tables for virtio device");
             viodev.common_cfg->queue_enable = 1;
             viodev.common_cfg->device_status |= VIRTIO_F_DRIVER_OK;
             // Add to vector using vector_push
