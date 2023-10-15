@@ -18,6 +18,7 @@ void rng_init() {
     rng_active_jobs = vector_new();
     rng_device = virtio_get_rng_device();
     debugf("RNG init done for device at %p\n", rng_device);
+    rng_device->ready = true;
 }
 
 //ask an rng device for numbers
@@ -45,6 +46,10 @@ void rng_get_numbers(void *buffer, uint16_t size, void* callback) {
 bool rng_fill(void *virtual_buffer_address, uint16_t size) {
     if (!virtio_is_rng_device(rng_device)) {
         fatalf("[RNG] Incorrect device provided\n");
+    }
+
+    if (rng_device->ready == false) {
+        return false;
     }
 
     uint64_t queue_size = rng_device->common_cfg->queue_size;
