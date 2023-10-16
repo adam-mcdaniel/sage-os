@@ -38,7 +38,7 @@ void virtio_save_device(VirtioDevice device) {
     vector_push_ptr(virtio_devices, mem);
 }
 
-VirtioDevice *virtio_get_by_device(PCIDevice *pcidevice) {
+volatile VirtioDevice *virtio_get_by_device(volatile PCIDevice *pcidevice) {
     for(int i = 0; i < vector_size(virtio_devices);i++){
         VirtioDevice *curr_virt_device;
         vector_get_ptr(virtio_devices,i,curr_virt_device);
@@ -58,7 +58,7 @@ uint64_t virtio_count_saved_devices(void) {
 // If this is zero, it will get the common configuration capability. If this is
 // one, it will get the notify capability. If this is two, it will get the ISR
 // capability. Etc.
-volatile struct VirtioCapability *virtio_get_capability(VirtioDevice *dev, uint8_t type) {
+volatile struct VirtioCapability *virtio_get_capability(volatile VirtioDevice *dev, uint8_t type) {
     return pci_get_virtio_capability(dev->pcidev, type);
 }
 
@@ -83,7 +83,7 @@ void virtio_init(void) {
         // Is this a virtio device?
         if (pci_is_virtio_device(pcidevice)) { // Access through ecam_header
             // Create a new bookkeeping structure for the virtio device
-            VirtioDevice viodev;
+            volatile VirtioDevice viodev;
             // Add the PCI device to the bookkeeping structure
             viodev.pcidev = pcidevice;
             // Add the common configuration, notify capability, and ISR to the bookkeeping structure
@@ -101,6 +101,9 @@ void virtio_init(void) {
             viodev.common_cfg->device_status = VIRTIO_F_ACKNOWLEDGE;
             viodev.common_cfg->device_status |= VIRTIO_F_DRIVER;
             viodev.common_cfg->device_status |= VIRTIO_F_FEATURES_OK;
+            if (!(viodev.common_cfg->device_status & VIRTIO_F_FEATURES_OK)) {
+                debugf("Device does not accept features\n");
+            }
             
             // Allocate contiguous physical memory for descriptor table, driver ring, and device ring
             // These are virtual memory pointers that we will use in the OS side.
@@ -172,15 +175,15 @@ void virtio_notify(VirtioDevice *viodev, uint16_t which_queue)
     uint16_t queue_notify_off = viodev->common_cfg->queue_notify_off;
     uint32_t notify_off_multiplier = viodev->notify_cap->notify_off_multiplier;
     uint64_t bar = viodev->pcidev->ecam_header->type0.bar[bar_num];
-    debugf("BAR at %x, offset=%x, queue_notify_off=%x, notify_off_mult=%x", bar, offset, queue_notify_off, notify_off_multiplier);
+    debugf("BAR at %x, offset=%x, queue_notify_off=%x, notify_off_mult=%x\n", bar, offset, queue_notify_off, notify_off_multiplier);
 
     uint16_t *notify = bar + BAR_NOTIFY_CAP(offset, queue_notify_off, notify_off_multiplier);
-    debugf("Notifying at %x...\n", notify);
+    debugf("Notifying at 0x%x...\n", notify);
 
     // Write the queue's number to the notify register
     *notify = which_queue;
 
-    debugf("Done\n");
+    debugf("Notified device\n\n");
 
     return;
 };

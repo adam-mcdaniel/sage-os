@@ -11,8 +11,8 @@
 #include <vector.h>
 
 //use this like a queue
-static Vector *rng_active_jobs;
-static VirtioDevice *rng_device;
+volatile static Vector *rng_active_jobs;
+volatile static VirtioDevice *rng_device;
 
 void rng_init() {
     rng_active_jobs = vector_new();
@@ -82,9 +82,9 @@ bool rng_fill(void *virtual_buffer_address, uint16_t size) {
     // by the queue notification multiplier from the notification PCI capability.
     // We then add this to the BAR offset from the capability's "offset" field.
     // Then, we add all of this to the base address.
-    debugf("Notifying RNG...\n");
+    // debugf("Notifying RNG...\n");
     virtio_notify(rng_device, descriptor_index);
-    debugf("Done\n");
+    // debugf("Done\n");
     return true;
 }
 
