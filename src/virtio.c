@@ -128,13 +128,13 @@ void virtio_init(void) {
             debugf("virtio_init: queue_driver = 0x%08lx physical (0x%08lx virtual)\n", phys_driver, viodev.driver);
             debugf("virtio_init: queue_device = 0x%08lx physical (0x%08lx virtual)\n", phys_device, viodev.device);
             if (viodev.common_cfg->queue_desc != phys_desc) {
-                debugf("Device does not reflect physical descriptor\n");
+                debugf("Device does not reflect physical desc ring  @0x%08x (wrote %x but read %x)\n", &viodev.common_cfg->queue_desc, phys_desc, viodev.common_cfg->queue_desc);
             }
             if (viodev.common_cfg->queue_driver != phys_driver) {
-                debugf("Device does not reflect physical driver ring\n");
+                debugf("Device does not reflect physical driver ring@0x%08x (wrote %x but read %x)\n", &viodev.common_cfg->queue_driver, phys_driver, viodev.common_cfg->queue_driver);
             }
             if (viodev.common_cfg->queue_device != phys_device){
-                debugf("Device does not reflect physical device ring\n");
+                debugf("Device does not reflect physical device ring@0x%08x (wrote %x but read %x)\n", &viodev.common_cfg->queue_device, phys_device, viodev.common_cfg->queue_device);
             }
             debugf("Set up tables for virtio device");
             viodev.common_cfg->queue_enable = 1;
