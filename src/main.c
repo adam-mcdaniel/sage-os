@@ -28,6 +28,7 @@ static void init_systems(void)
 #ifdef USE_MMU
     struct page_table *pt = mmu_table_create();
     kernel_mmu_table = pt;
+    debugf("Kernel page table at %p\n", pt);
     // Map memory segments for our kernel
     debugf("Mapping kernel segments\n");
     mmu_map_range(pt, sym_start(text), sym_end(heap), sym_start(text), MMU_LEVEL_1G,
@@ -37,10 +38,10 @@ static void init_systems(void)
     mmu_map_range(pt, 0x0C000000, 0x0C2FFFFF, 0x0C000000, MMU_LEVEL_2M, PB_READ | PB_WRITE);
     // PCIe ECAM
     debugf("Mapping PCIe ECAM\n");
-    mmu_map_range(pt, 0x30000000, 0x30FFFFFF, 0x30000000, MMU_LEVEL_2M, PB_READ | PB_WRITE);
+    mmu_map_range(pt, 0x30000000, 0x3FFFFFFF, 0x30000000, MMU_LEVEL_2M, PB_READ | PB_WRITE);
     // PCIe MMIO
     debugf("Mapping PCIe MMIO\n");
-    mmu_map_range(pt, 0x40000000, 0x40FFFFFF, 0x40000000, MMU_LEVEL_2M, PB_READ | PB_WRITE);
+    mmu_map_range(pt, 0x40000000, 0x4FFFFFFF, 0x40000000, MMU_LEVEL_2M, PB_READ | PB_WRITE);
     // debugf("Testing MMU translation\n");
     // debugf("0x%08lx -> 0x%08lx\n", 0x0C000000, mmu_translate(pt, 0x0C000000));
     // debugf("0x%08lx -> 0x%08lx\n", 0x30000000, mmu_translate(pt, 0x30000000));
@@ -92,7 +93,6 @@ static void init_systems(void)
 
     debugf("RNG init done; about to fill\n");
     rng_fill(buffer, 16);
-    WFI();
 
     debugf("RNG State After:");
     for (int i=0; i<sizeof(buffer)/sizeof(buffer[0]); i++) {

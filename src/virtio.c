@@ -38,7 +38,7 @@ void virtio_save_device(VirtioDevice device) {
     vector_push_ptr(virtio_devices, mem);
 }
 
-VirtioDevice *virtio_get_by_device(PCIDevice *pcidevice){
+VirtioDevice *virtio_get_by_device(PCIDevice *pcidevice) {
     for(int i = 0; i < vector_size(virtio_devices);i++){
         VirtioDevice *curr_virt_device;
         vector_get_ptr(virtio_devices,i,curr_virt_device);
@@ -127,14 +127,14 @@ void virtio_init(void) {
             debugf("virtio_init: queue_desc = 0x%08lx physical (0x%08lx virtual)\n", phys_desc, viodev.desc);
             debugf("virtio_init: queue_driver = 0x%08lx physical (0x%08lx virtual)\n", phys_driver, viodev.driver);
             debugf("virtio_init: queue_device = 0x%08lx physical (0x%08lx virtual)\n", phys_device, viodev.device);
-            while (viodev.common_cfg->queue_desc != phys_desc) {
+            if (viodev.common_cfg->queue_desc != phys_desc) {
                 debugf("Device does not reflect physical descriptor\n");
             }
-            while (viodev.common_cfg->queue_driver != phys_driver) {
+            if (viodev.common_cfg->queue_driver != phys_driver) {
                 debugf("Device does not reflect physical driver ring\n");
             }
-            while (viodev.common_cfg->queue_device != phys_device){
-                debugf("Device does not reflect physical device ring");
+            if (viodev.common_cfg->queue_device != phys_device){
+                debugf("Device does not reflect physical device ring\n");
             }
             debugf("Set up tables for virtio device");
             viodev.common_cfg->queue_enable = 1;
@@ -163,6 +163,8 @@ void virtio_notify(VirtioDevice *viodev, uint16_t which_queue)
 
     // Select the queue we are looking at
     viodev->common_cfg->queue_select = which_queue;
+    debugf("Notify config at 0x%08x\n", viodev->notify_cap);
+    debugf("Common config at 0x%08x\n", viodev->common_cfg);
 
     // Determine offset for the given queue
     uint8_t bar_num = viodev->notify_cap->cap.bar;
