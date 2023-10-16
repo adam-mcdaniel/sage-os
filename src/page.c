@@ -20,6 +20,7 @@ Mutex page_lock;
 #define BK_SIZE_IN_PAGES (BK_SIZE_IN_BYTES / PAGE_SIZE)
 
 static uint8_t *bookkeeping;  // Pointer to the bookkeeping area
+static void *heap_start;
 
 // For some reason, the macros didn't work for me, so I used the static functions like Marz said and it works.
 static void set_taken(uint64_t index)
@@ -66,7 +67,7 @@ void page_init(void)
     for (uint64_t i = 0; i < BK_SIZE_IN_PAGES; i++) {
         set_taken(i);
     }
-    set_last(BK_SIZE_IN_PAGES - 1);
+    set_last(BK_SIZE_IN_PAGES-1);
 
     debugf("page_init: bookkeeping area initialized\n");
     debugf("page_init: bookkeeping area starts at 0x%08lx\n", bookkeeping);
@@ -74,11 +75,12 @@ void page_init(void)
     mutex_unlock(&page_lock);
 
     // Print out the bookkeeping area's contents
-    // logf(LOG_INFO, "Page Init: 0x%08lx -> 0x%08lx\n", bookkeeping, bookkeeping + BK_SIZE_IN_BYTES);
-    // logf(LOG_INFO, "  Heap size: 0x%lx bytes, %lu pages\n", HEAP_SIZE_IN_BYTES, HEAP_SIZE_IN_PAGES);
-    // logf(LOG_INFO, "  Bookkeeping size: 0x%lx bytes, %lu pages\n", BK_SIZE_IN_BYTES, BK_SIZE_IN_PAGES);
-    // logf(LOG_INFO, "  Taken pages: %lu\n", page_count_taken());
-    // logf(LOG_INFO, "  Free pages: %lu\n", page_count_free());
+    logf(LOG_INFO, "Page Init: 0x%08lx -> 0x%08lx\n", bookkeeping, bookkeeping + BK_SIZE_IN_BYTES);
+    logf(LOG_INFO, "  Heap: 0x%08lx -> 0x%08lx", bookkeeping + BK_SIZE_IN_BYTES, bookkeeping + HEAP_SIZE_IN_BYTES);
+    logf(LOG_INFO, "  Heap size: 0x%lx bytes, %lu pages\n", HEAP_SIZE_IN_BYTES, HEAP_SIZE_IN_PAGES);
+    logf(LOG_INFO, "  Bookkeeping size: 0x%lx bytes, %lu pages\n", BK_SIZE_IN_BYTES, BK_SIZE_IN_PAGES);
+    logf(LOG_INFO, "  Taken pages: %lu\n", page_count_taken());
+    logf(LOG_INFO, "  Free pages: %lu\n", page_count_free());
     
     // This code tests the page allocator
     // void *a = page_nalloc(1);
@@ -142,7 +144,7 @@ void *page_nalloc(int n)
     int consecutive = 0;
 
     for (uint64_t i = 0; i < HEAP_SIZE_IN_PAGES; i++) {
-        if (!is_taken(i)) {
+        if (!is_taken(i) && !is_last(i)) {
             if (consecutive == 0) {
                 start = i;
             }
@@ -154,12 +156,18 @@ void *page_nalloc(int n)
                 for (int j = 0; j < n; j++) {
                     // debugf("page_nalloc: marking page 0x%08lx as taken\n", start + j);
                     set_taken(start + j);
+                    if (j == n - 1) {
+                        set_last(start + j);
+                    }
                 }
                 // debugf("page_nalloc: marking page 0x%08lx as last\n", start + n - 1);
-                set_last(start + n - 1);
 
                 mutex_unlock(&page_lock);
-                return (void *)(bookkeeping + start * PAGE_SIZE);
+                // debugf("Found free %d pages at #%d, %d\n", n, start, i);
+                void *result = ((uint64_t)bookkeeping + ((uint64_t)start * PAGE_SIZE));
+
+                debugf("Found %d free pages at %p\n", n, result);
+                return result;
             }
         } else {
             // debugf("page_nalloc: page 0x%08lx is taken\n", i);
@@ -185,13 +193,22 @@ void *page_znalloc(int n)
     return mem;
 }
 
+uint64_t page_to_index(void *page) {
+    return ((uint64_t)page - (uint64_t)bookkeeping) / PAGE_SIZE;
+}
+
+void *index_to_page(uint64_t idx) {
+    return (void*)(idx * PAGE_SIZE + (uint64_t)bookkeeping);
+}
+
 void page_free(void *p)
 {
     if (p == NULL) {
         return;
     }
     /* Free the page */
-    uint64_t x = ((uint64_t)p - (uint64_t)bookkeeping) / PAGE_SIZE;
+    // uint64_t x = ((uint64_t)p - (uint64_t)bookkeeping) / PAGE_SIZE;
+    uint64_t x = page_to_index(p);
     // debugf("page_free: freeing page %lu at address 0x%p\n", x, p);
 
     mutex_spinlock(&page_lock);

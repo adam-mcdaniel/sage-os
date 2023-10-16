@@ -49,6 +49,11 @@ PCIDevice *pci_find_saved_device(uint16_t vendor_id, uint16_t device_id) {
 volatile struct pci_cape *pci_get_capability(PCIDevice *device, uint8_t type, uint8_t nth) {
     // Get the header for the device
     volatile struct pci_ecam *header = device->ecam_header;
+    if (!(header->status_reg & 1 << 4)) {
+        debugf("Status reg bit 4 not set; no capabilities for device\n");
+        return NULL;
+    }
+    
     // Get the offset of the first capability
     uint8_t cap_pointer = header->type0.capes_pointer;
     // Count the number of capabilities we've seen
@@ -64,9 +69,12 @@ volatile struct pci_cape *pci_get_capability(PCIDevice *device, uint8_t type, ui
             if (count++ == nth) {
                 return cape;
             }
+        // } else if (cape->id != 9 && cape->id != 10) {
+            // fatalf("Unknown capability ID %d", cape->id);
+            // return NULL;
         }
         // Otherwise, continue to the next capability
-        cap_pointer = cape->next;  
+        cap_pointer = cape->next; 
     }
     return NULL;
 }

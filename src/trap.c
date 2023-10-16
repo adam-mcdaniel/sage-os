@@ -24,6 +24,7 @@ void c_trap_handler(void)
     
     int hart = sbi_whoami();
 
+    debugf("Handling trap...\n");
     if (SCAUSE_IS_ASYNC(cause)) {
         cause = SCAUSE_NUM(cause);
         switch (cause) {
