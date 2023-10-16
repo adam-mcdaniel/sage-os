@@ -93,7 +93,7 @@ static void init_systems(void)
 
     debugf("RNG init done; about to fill\n");
     rng_fill(buffer, 16);
-
+    // WFI_LOOP();
     debugf("RNG State After:");
     for (int i=0; i<sizeof(buffer)/sizeof(buffer[0]); i++) {
         debugf(" %d ", buffer[i]);

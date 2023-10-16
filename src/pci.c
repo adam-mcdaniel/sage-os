@@ -198,7 +198,7 @@ volatile struct VirtioPciIsrCap *pci_get_virtio_isr_status(PCIDevice *device) {
 }
 
 static uint8_t next_bus_number = 1;
-static uint64_t next_mmio_address = 0x41000000;
+static uint64_t next_mmio_address = 0x40000000;
 
 static void pci_configure_device(volatile struct pci_ecam *device);
 static void pci_configure_bridge(volatile struct pci_ecam *bridge);
@@ -256,6 +256,9 @@ static void pci_enumerate_bus(uint8_t bus) {
 
 static void pci_configure_bridge(volatile struct pci_ecam *bridge)
 {
+    /*
+    // Old, doesnt map correctly
+    bridge->command_reg = COMMAND_REG_MMIO;
     bridge->type1.primary_bus_no = next_bus_number;
     bridge->type1.secondary_bus_no = ++next_bus_number;  
     bridge->type1.subordinate_bus_no = next_bus_number;  
@@ -267,9 +270,27 @@ static void pci_configure_bridge(volatile struct pci_ecam *bridge)
     bridge->type1.memory_limit = end_address >> 16;
     bridge->type1.prefetch_memory_base = base_address >> 16;
     bridge->type1.prefetch_memory_limit = end_address >> 16;
-
     pci_enumerate_bus(bridge->type1.secondary_bus_no);  
     next_mmio_address += 0x01000000;
+    */
+
+    uint64_t bus = ((uint64_t)bridge >> 20) & 0xff;
+    uint64_t slot = ((uint64_t)bridge >> 15) & 0xff;
+    static uint8_t subordinate = 1;
+    uint64_t addrst = 0x40000000 | ((uint64_t)subordinate << 20);
+    uint64_t addred = addrst + ((1 << 20) - 1);
+    volatile struct pci_ecam *ec = pci_get_ecam(bus, slot, 0, 0);
+    next_mmio_address = addrst;
+    
+    bridge->type1.memory_base = addrst >> 16;
+    bridge->type1.memory_limit = addred >> 16;
+    bridge->type1.prefetch_memory_base = addrst >> 16;
+    bridge->type1.prefetch_memory_limit = addred >> 16;
+    bridge->type1.primary_bus_no = bus;
+    bridge->type1.secondary_bus_no = subordinate;
+    bridge->type1.subordinate_bus_no = subordinate;
+    subordinate += 1;
+    pci_enumerate_bus(bridge->type1.secondary_bus_no);  
 }
 
 static void pci_configure_device(volatile struct pci_ecam *device)
@@ -294,7 +315,7 @@ static void pci_configure_device(volatile struct pci_ecam *device)
         // Disable the device before modifying the BAR
         device->command_reg &= ~(1 << 1);  // Clear Memory Space bit
 
-        device->type0.bar[i] = 0xFFFFFFFF;
+        device->type0.bar[i] = -1UL;
         
         uint32_t bar_value = device->type0.bar[i];
 
@@ -304,17 +325,19 @@ static void pci_configure_device(volatile struct pci_ecam *device)
         }
         
         uint32_t size = ~(bar_value & ~0xF) + 1;
-        next_mmio_address = (next_mmio_address + size - 1) & ~(size - 1);
-    
-        device->type0.bar[i] = next_mmio_address;  
-        next_mmio_address += size;
+        uint64_t addr = next_mmio_address;
+
+        device->type0.bar[i] = addr;  
+        next_mmio_address = (next_mmio_address + size - 1);
+        // next_mmio_address += size;
 
         // 64-bit BAR
         if ((bar_value & 0x6) == 0x4) {
             i++;
-            device->type0.bar[i] = next_mmio_address >> 32; 
-            next_mmio_address += 4;  
+            device->type0.bar[i] = 0;
+            // next_mmio_address += 4;  
         }
+        // next_mmio_address += 0x0100000;
 
         // Re-enable the device after modifying the BAR
         device->command_reg |= (1 << 1);
