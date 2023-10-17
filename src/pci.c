@@ -4,6 +4,7 @@
 #include <virtio.h>
 #include <vector.h>
 #include <kmalloc.h>
+#include "include/pci.h"
 
 #define MMIO_ECAM_BASE 0x30000000
 #define MMIO_ECAM_END  0x30FFFFFF
@@ -274,6 +275,14 @@ static void pci_configure_bridge(volatile struct pci_ecam *bridge)
     next_mmio_address += 0x01000000;
     */
 
+    // Make sure to set the bus master (2) and memory space (1) bits and clear
+    // I/O space bit (0) before configuring the bridges
+    // debugf("pci_configure_bridge: Command register == %08x\n", bridge->command_reg);
+    bridge->command_reg |= COMMAND_REG_BUSMASTER;
+    bridge->command_reg |= COMMAND_REG_MMIO;
+    bridge->command_reg &= ~COMMAND_REG_PIO;
+    // debugf("pci_configure_bridge: Command register == %08x\n", bridge->command_reg);
+
     uint64_t bus = ((uint64_t)bridge >> 20) & 0xff;
     uint64_t slot = ((uint64_t)bridge >> 15) & 0xff;
     static uint8_t subordinate = 1;
@@ -313,7 +322,7 @@ static void pci_configure_device(volatile struct pci_ecam *device)
 
     for (int i = 0; i < 6; i++) {
         // Disable the device before modifying the BAR
-        device->command_reg &= ~(1 << 1);  // Clear Memory Space bit
+        device->command_reg &= ~COMMAND_REG_MMIO;  // Clear Memory Space bit
 
         device->type0.bar[i] = -1UL;
         
@@ -339,8 +348,10 @@ static void pci_configure_device(volatile struct pci_ecam *device)
         }
         // next_mmio_address += 0x0100000;
 
-        // Re-enable the device after modifying the BAR
-        device->command_reg |= (1 << 1);
+        // Re-enable the device after modifying the BAR and make sure I/O space
+        // bit is cleared
+        device->command_reg |= COMMAND_REG_MMIO;
+        device->command_reg &= ~COMMAND_REG_PIO;
     }
 }
 
