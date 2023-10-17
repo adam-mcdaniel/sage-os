@@ -151,6 +151,7 @@ struct pci_cape {
 // #define PCI_IS_64_BIT_BAR(dev, barno) (0b100 == ((dev)->ecam->type0.bar[barno] & 0b110))
 
 #define STATUS_REG_CAP                (1 << 4)
+#define COMMAND_REG_PIO               (1 << 0)
 #define COMMAND_REG_MMIO              (1 << 1)
 #define COMMAND_REG_BUSMASTER         (1 << 2)
 static const uint64_t ECAM_START   = 0x30000000;
