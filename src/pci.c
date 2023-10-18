@@ -183,15 +183,15 @@ PCIDevice *pci_find_device_by_irq(uint8_t irq) {
 }
 // Get the common configuration capability for the given virtio device.
 volatile struct VirtioPciCommonCfg *pci_get_virtio_common_config(PCIDevice *device) {
-    return (struct VirtioPciCommonCfg *)pci_get_virtio_capability(device, VIRTIO_PCI_CAP_COMMON_CFG);
+    return (volatile struct VirtioPciCommonCfg *)pci_get_virtio_capability(device, VIRTIO_PCI_CAP_COMMON_CFG);
 }
 // Get the notify capability for the given virtio device.
 volatile struct VirtioPciNotifyCap *pci_get_virtio_notify_capability(PCIDevice *device) {
-    return (struct VirtioPciNotifyCap *)pci_get_virtio_capability(device, VIRTIO_PCI_CAP_NOTIFY_CFG);
+    return (volatile struct VirtioPciNotifyCap *)pci_get_virtio_capability(device, VIRTIO_PCI_CAP_NOTIFY_CFG);
 }
 // Get the ISR capability for the given virtio device.
 volatile struct VirtioPciIsrCap *pci_get_virtio_isr_status(PCIDevice *device) {
-    return (struct VirtioPciIsrCap *)pci_get_virtio_capability(device, VIRTIO_PCI_CAP_ISR_CFG);
+    return (volatile struct VirtioPciIsrCap *)pci_get_virtio_capability(device, VIRTIO_PCI_CAP_ISR_CFG);
 }
 
 static void pci_configure_device(volatile struct pci_ecam *device, uint8_t bus_num, uint8_t device_num);
@@ -359,7 +359,7 @@ static void pci_configure_device(volatile struct pci_ecam *device, uint8_t bus_n
 
 void print_vendor_specific_capabilities(PCIDevice *pcidevice)
 {
-    if (!pci_is_virtio_device(pcidevice)) return;  
+    if (!pci_is_virtio_device(pcidevice)) return;
     struct pci_ecam *header = pcidevice->ecam_header;
 
     uint8_t cap_pointer = header->type0.capes_pointer;
