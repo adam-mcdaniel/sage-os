@@ -46,8 +46,8 @@ QEMU_DEVICES+= -device virtio-tablet-pci,bus=pcie.0,id=tablet
 QEMU_DEVICES+= -device virtio-rng-pci-non-transitional,bus=bridge1,id=rng
 QEMU_DEVICES+= -device virtio-gpu-pci,bus=bridge2,id=gpu
 # Block device
-#QEMU_DEVICES+= -device virtio-blk-pci-non-transitional,drive=hdd1,bus=bridge3,id=blk1
-#QEMU_DEVICES+= -drive if=none,format=raw,file=$(QEMU_HARD_DRIVE_1),id=hdd1
+QEMU_DEVICES+= -device virtio-blk-pci-non-transitional,drive=hdd1,bus=bridge3,id=blk1
+QEMU_DEVICES+= -drive if=none,format=raw,file=$(QEMU_HARD_DRIVE_1),id=hdd1
 # Network device (do not uncomment unless necessary)
 #QEMU_DEVICES+= -device virtio-net-pci-non-transitional,netdev=net1,bus=bridge4,id=net
 #QEMU_DEVICES+= -netdev user,id=net1,hostfwd=tcp::35555-:22
