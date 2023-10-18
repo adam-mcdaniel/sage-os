@@ -137,13 +137,13 @@ uint64_t mmu_translate(const struct page_table *tab, uint64_t vaddr)
         }
 
         if (!(tab->entries[vpn[i]] & PB_VALID)) {
-            debugf("mmu_translate: entry %x in page table at 0x%08lx is invalid\n", vpn[i], tab);
+            // debugf("mmu_translate: entry %x in page table at 0x%08lx is invalid\n", vpn[i], tab);
             return MMU_TRANSLATE_PAGE_FAULT; // Entry is not valid
         } else if (!is_leaf(tab->entries[vpn[i]])) {
-            debugf("mmu_translate: entry %x in page table at 0x%08lx is a branch to 0x%08lx\n", vpn[i], tab, (tab->entries[vpn[i]] & ~0x3FF) << 2);
+            // debugf("mmu_translate: entry %x in page table at 0x%08lx is a branch to 0x%08lx\n", vpn[i], tab, (tab->entries[vpn[i]] & ~0x3FF) << 2);
             tab = (struct page_table *)((tab->entries[vpn[i]] & ~0x3FF) << 2);
         } else {
-            debugf("mmu_translate: entry %x in page table at 0x%08lx is a leaf\n", vpn[i], tab);
+            // debugf("mmu_translate: entry %x in page table at 0x%08lx is a leaf\n", vpn[i], tab);
             lvl = i;
             break; // Entry is a leaf
         }
@@ -157,7 +157,7 @@ uint64_t mmu_translate(const struct page_table *tab, uint64_t vaddr)
     uint64_t paddr = ((tab->entries[vpn[lvl]] & ~0x3FF) << 2) & ~page_mask;
 
     uint64_t result = paddr | (vaddr & page_mask);
-    debugf("mmu_translate: paddr == 0x%08lx\n", result);
+    // debugf("mmu_translate: paddr == 0x%08lx\n", result);
 
     return result; // Combine with the offset within the page
 }

@@ -17,7 +17,7 @@ volatile static VirtioDevice *rng_device;
 void rng_init() {
     rng_active_jobs = vector_new();
     rng_device = virtio_get_rng_device();
-    debugf("RNG init done for device at %p\n", rng_device);
+    debugf("RNG init done for device at %p\n", rng_device->pcidev->ecam_header);
     rng_device->ready = true;
 }
 
@@ -49,6 +49,7 @@ bool rng_fill(void *virtual_buffer_address, uint16_t size) {
     }
 
     if (rng_device->ready == false) {
+        fatalf("RNG is not ready\n");
         return false;
     }
 
