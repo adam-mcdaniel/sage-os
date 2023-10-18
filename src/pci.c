@@ -2,12 +2,8 @@
 #include <mmu.h>
 #include <pci.h>
 #include <virtio.h>
-#include <vector.h>
 #include <kmalloc.h>
 #include "include/pci.h"
-
-#define MMIO_ECAM_BASE 0x30000000
-#define MMIO_ECAM_END  0x30FFFFFF
 
 // These contain pointers to the common configurations for each device.
 // The `all_pci_devices` vector contains all devices, while the
@@ -17,7 +13,7 @@ static struct Vector *all_pci_devices, *irq_pci_devices[4];
 
 static inline bool pci_device_exists(uint16_t vendor_id)
 {
-    return vendor_id != 0xFFFF;
+    return !((vendor_id == 0x0000) || (vendor_id == 0xFFFF));
 }
 
 // Is this a virtio device?
@@ -198,16 +194,13 @@ volatile struct VirtioPciIsrCap *pci_get_virtio_isr_status(PCIDevice *device) {
     return (struct VirtioPciIsrCap *)pci_get_virtio_capability(device, VIRTIO_PCI_CAP_ISR_CFG);
 }
 
-static uint8_t next_bus_number = 1;
-static uint64_t next_mmio_address = 0x40000000;
-
-static void pci_configure_device(volatile struct pci_ecam *device);
-static void pci_configure_bridge(volatile struct pci_ecam *bridge);
+static void pci_configure_device(volatile struct pci_ecam *device, uint8_t bus_num, uint8_t device_num);
+static void pci_configure_bridge(volatile struct pci_ecam *bridge, uint8_t bus);
 
 static volatile struct pci_ecam *pci_get_ecam(uint8_t bus,
-                                               uint8_t device,
-                                               uint8_t function,
-                                               uint16_t reg) 
+                                              uint8_t device,
+                                              uint8_t function,
+                                              uint16_t reg) 
 {
     // Since we're shifting, we need to make sure we
     // have enough space to shift into.
@@ -215,47 +208,48 @@ static volatile struct pci_ecam *pci_get_ecam(uint8_t bus,
     uint64_t device64 = device & 0x1f;
     uint64_t function64 = function & 0x7;
     uint64_t reg64 = reg & 0x3ff; 
+    
     // Finally, put the address together
-    return (struct pci_ecam *)
-                 (MMIO_ECAM_BASE |     // base 0x3000_0000
-                 (bus64 << 20) |       // bus number A[(20+n-1):20] (up to 8 bits)
-                 (device64 << 15) |    // device number A[19:15]
-                 (function64 << 12) |  // function number A[14:12]
-                 (reg64 << 2));        // register number A[11:2]
-}
-
-static inline uint32_t pci_get_config_address(uint8_t bus, uint8_t device, uint8_t offset)
-{
-    uint32_t addr = MMIO_ECAM_BASE | (bus << 20) | (device << 15) | (offset & 0xFC);
-    if (addr >= MMIO_ECAM_BASE && addr <= MMIO_ECAM_END) {
-        return addr;
-    } else {
-        debugf("Warning: PCI address out of bounds!\n");
+    uint64_t addr = (PCIE_ECAM_BASE |     // base 0x3000_0000
+                     (bus64 << 20) |      // bus number A[(20+n-1):20] (up to 8 bits)
+                     (device64 << 15) |   // device number A[19:15]
+                     (function64 << 12) | // function number A[14:12]
+                     (reg64 << 2));       // register number A[11:2]
+        
+    if (addr < PCIE_ECAM_BASE || addr > PCIE_ECAM_END) {
+        fatalf("pci_get_ecam: PCI address (0x%08x) out of bounds!\n", addr);
         return 0; 
     }
+    return (struct pci_ecam *)addr;
 }
-static void pci_enumerate_bus(uint8_t bus) {
-    for (uint8_t device = 0; device < 32; device++) {
-        volatile struct pci_ecam *header = (volatile struct pci_ecam *)(uintptr_t)pci_get_config_address(bus, device, 0);
 
-        if (!pci_device_exists(header->vendor_id)) {
-            // debugf("No device found at bus %d, device %d, function %d\n", bus, device, function);
-            continue;
-        }
+static void pci_enumerate_bus() {
+    for (int bus = 0; bus < 256; bus++) {
+        for (int device = 0; device < 32; device++) {
+            volatile struct pci_ecam *ecam = pci_get_ecam(bus, device, 0, 0);
 
+            if (!pci_device_exists(ecam->vendor_id)) {
+                // debugf("pci_enumerate_bus: No device found at bus %d, device %d\n", bus, device);
+                continue;
+            }
 
-        if ((header->header_type & 0x7F) == 1) {
-            pci_configure_bridge(header);
-        } else if ((header->header_type & 0x7F) == 0) {
-            pci_configure_device(header);
-            // print_vendor_specific_capabilities(PCIDevice);
-            PCIDevice *device = pci_find_saved_device(header->vendor_id, header->device_id);
-            print_vendor_specific_capabilities(device);
+            if ((ecam->header_type & 0x7F) == 1) {
+                // debugf("pci_enumerate_bus: Found bridge at bus %d, device %d, \n", bus, device);
+                pci_configure_bridge(ecam, bus);
+            } else if ((ecam->header_type & 0x7F) == 0) {
+                // debugf("pci_enumerate_bus: Found device at bus %d, device %d, \n", bus, device);
+                pci_configure_device(ecam, bus, device);
+                // PCIDevice *device = pci_find_saved_device(ecam->vendor_id, ecam->device_id);
+                // print_vendor_specific_capabilities(device);
+            }
         }
     }
 }
 
-static void pci_configure_bridge(volatile struct pci_ecam *bridge)
+static uint64_t next_mmio_address;
+static uint8_t subordinate = 1;
+
+static void pci_configure_bridge(volatile struct pci_ecam *bridge, uint8_t bus)
 {
     /*
     // Old, doesnt map correctly
@@ -277,18 +271,12 @@ static void pci_configure_bridge(volatile struct pci_ecam *bridge)
 
     // Make sure to set the bus master (2) and memory space (1) bits and clear
     // I/O space bit (0) before configuring the bridges
-    // debugf("pci_configure_bridge: Command register == %08x\n", bridge->command_reg);
     bridge->command_reg |= COMMAND_REG_BUSMASTER;
     bridge->command_reg |= COMMAND_REG_MMIO;
     bridge->command_reg &= ~COMMAND_REG_PIO;
-    // debugf("pci_configure_bridge: Command register == %08x\n", bridge->command_reg);
 
-    uint64_t bus = ((uint64_t)bridge >> 20) & 0xff;
-    uint64_t slot = ((uint64_t)bridge >> 15) & 0xff;
-    static uint8_t subordinate = 1;
     uint64_t addrst = 0x40000000 | ((uint64_t)subordinate << 20);
     uint64_t addred = addrst + ((1 << 20) - 1);
-    volatile struct pci_ecam *ec = pci_get_ecam(bus, slot, 0, 0);
     next_mmio_address = addrst;
     
     bridge->type1.memory_base = addrst >> 16;
@@ -299,20 +287,19 @@ static void pci_configure_bridge(volatile struct pci_ecam *bridge)
     bridge->type1.secondary_bus_no = subordinate;
     bridge->type1.subordinate_bus_no = subordinate;
     subordinate += 1;
-    pci_enumerate_bus(bridge->type1.secondary_bus_no);  
 }
 
-static void pci_configure_device(volatile struct pci_ecam *device)
+static void pci_configure_device(volatile struct pci_ecam *device, uint8_t bus_num, uint8_t device_num)
 {
     // Push the device into the appropriate vector.
     // The appropriate vector is the (bus + slot) % 4 for the device.
     // This is to simplify IRQ handling.
     // Get the bus number from the device address.
-    uint8_t bus = ((uintptr_t)device >> 20) & 0xF;
+    // uint8_t bus = ((uintptr_t)device >> 20) & 0xF;
     // Get the slot number from the device address.
-    uint8_t slot = ((uintptr_t)device >> 15) & 0x1F;
+    // uint8_t slot = ((uintptr_t)device >> 15) & 0x1F;
     // The vector index is the sum of the bus and slot numbers, modulo 4.
-    uint32_t vector_idx = (bus + slot) % 4;
+    // uint32_t vector_idx = (bus + slot) % 4;
     // debugf("Pushing device at bus %d, slot %d into vector %d\n", bus, slot, vector_idx);
     // vector_push(all_pci_devices, (uint64_t)device);
     // vector_push(irq_pci_devices[vector_idx], (uint64_t)device);
@@ -320,39 +307,49 @@ static void pci_configure_device(volatile struct pci_ecam *device)
     pcidev.ecam_header = device;
     pci_save_device(pcidev);
 
+    // debugf("pci_configure_device: At bus %d, device %d\n", bus_num, device_num);
+
+    // Disable the device before modifying the BAR
+    device->command_reg &= ~COMMAND_REG_MMIO; // Clear memory space bit
+    device->command_reg &= ~COMMAND_REG_PIO; // Clear I/O space bit
+
+    uint32_t addr = PCIE_MMIO_BASE + (bus_num << 20) + (device_num << 16);
+    
     for (int i = 0; i < 6; i++) {
-        // Disable the device before modifying the BAR
-        device->command_reg &= ~COMMAND_REG_MMIO;  // Clear Memory Space bit
-
-        device->type0.bar[i] = -1UL;
+        device->type0.bar[i] = -1U;
         
-        uint32_t bar_value = device->type0.bar[i];
-
         // BAR not writable
-        if (bar_value == 0) {
+        if (device->type0.bar[i] == 0) {
+            // debugf("  BAR[%d] is not used\n", i);
             continue;
         }
-        
-        uint32_t size = ~(bar_value & ~0xF) + 1;
-        uint64_t addr = next_mmio_address;
 
-        device->type0.bar[i] = addr;  
-        next_mmio_address = (next_mmio_address + size - 1);
-        // next_mmio_address += size;
+        uint64_t size;
 
-        // 64-bit BAR
-        if ((bar_value & 0x6) == 0x4) {
-            i++;
-            device->type0.bar[i] = 0;
-            // next_mmio_address += 4;  
+        if ((device->type0.bar[i] & 0x6) == 0x4) {
+            // debugf("  BAR[%d] is 64-bit\n", i);
+            device->type0.bar[i+1] = -1U;
+            uint64_t bar_value = (uint64_t) device->type0.bar[i+1] << 32 | device->type0.bar[i];
+            size = ~(bar_value & ~0xF) + 1;
+            // debugf("    device->type0.bar[i] == 0x%08x\n", device->type0.bar[i]);
+            // debugf("    device->type0.bar[i+1] == 0x%08x\n", device->type0.bar[i+1]);
+            // debugf("    bar_value == 0x%016llx\n", bar_value);
+            // debugf("    size == %016llx\n", size);
+            addr += size;
+            device->type0.bar[i] = addr;
+            device->type0.bar[i+1] = 0;
+            ++i;
+        } else {
+            // debugf("  BAR[%d] is 32-bit\n", i);
+            size = ~(device->type0.bar[i] & ~0xF) + 1;
+            // debugf("    size == %016llx\n", size);
+            addr += size;
+            device->type0.bar[i] = addr;
         }
-        // next_mmio_address += 0x0100000;
-
-        // Re-enable the device after modifying the BAR and make sure I/O space
-        // bit is cleared
-        device->command_reg |= COMMAND_REG_MMIO;
-        device->command_reg &= ~COMMAND_REG_PIO;
     }
+
+    // Re-enable the device after modifying the BAR
+    device->command_reg |= COMMAND_REG_MMIO;
 }
 
 void print_vendor_specific_capabilities(PCIDevice *pcidevice)
@@ -408,14 +405,12 @@ void print_vendor_specific_capabilities(PCIDevice *pcidevice)
 
 void pci_init(void)
 {
-    next_bus_number = 0;
-    next_mmio_address = 0x41000000;
     all_pci_devices = vector_new();
     for (int i=0; i<4; i++) {
         irq_pci_devices[i] = vector_new();
     }
 
-    pci_enumerate_bus(0);
+    pci_enumerate_bus();
 
     debugf("PCI devices: %d\n", pci_count_saved_devices());
     debugf("PCI devices sharing IRQ 32: %d\n", pci_count_irq_listeners(32));
