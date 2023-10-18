@@ -89,14 +89,14 @@ typedef struct VirtioPciCommonCfg {
 #define VIRTIO_PCI_CAP_NOTIFY_CFG 2
 // A notify register is how we tell the device to "go and do"
 // what we asked it to do.
-typedef struct VirtioPciNotifyCap {
+typedef struct VirtioPciNotifyCfg {
     // The actual memory address we write to notify a queue
     // is given by the **cap** portion of this structure. In there,
     // we retrieve the BAR + the offset.
     VirtioCapability cap;
     // Then, we multiply the `queue_notify_off` by the `notify_off_multiplier`.
     uint32_t notify_off_multiplier; /* Multiplier for queue_notify_off. */
-} VirtioPciNotifyCap;
+} VirtioPciNotifyCfg;
 #define BAR_NOTIFY_CAP(offset, queue_notify_off, notify_off_multiplier) \
     ((offset) + (queue_notify_off) * (notify_off_multiplier))
 
@@ -104,7 +104,7 @@ typedef struct VirtioPciNotifyCap {
 #define VIRTIO_PCI_CAP_ISR_CFG 3
 // The ISR notifies us that this particular device caused an interrupt.
 // The ISR has this layout.
-typedef struct VirtioPciIsrCap {
+typedef struct VirtioPciIsrCfg {
     union {
         struct {
             // If we read `queue_interrupt` and it is 1, then
@@ -121,7 +121,7 @@ typedef struct VirtioPciIsrCap {
         // integer.
         unsigned int isr_cap;
     };
-} VirtioPciIsrCap;
+} VirtioPciIsrCfg;
 
 #define VIRTIO_PCI_CAP_DEVICE_CFG 4
 #define VIRTIO_PCI_CAP_PCI_CFG    5
@@ -167,11 +167,11 @@ typedef struct VirtioDevice {
     // the device.
     volatile struct PCIDevice *pcidev;
     // The common configuration for the device.
-    struct VirtioPciCommonCfg *common_cfg;
+    volatile struct VirtioPciCommonCfg *common_cfg;
     // The notify configuration for the device.
-    struct VirtioPciNotifyCap *notify_cap;
+    volatile struct VirtioPciNotifyCfg *notify_cap;
     // volatile uint16_t *notify;
-    struct VirtioPciIsrCap *isr;
+    volatile struct VirtioPciIsrCfg *isr;
 
     // The descriptor ring for the device.
     volatile VirtioDescriptor *desc;
@@ -188,7 +188,7 @@ typedef struct VirtioDevice {
     uint16_t device_idx;
 
     // uint16_t notifymult;
-    bool     ready;
+    bool ready;
 } VirtioDevice;
 
 #define VIRTIO_F_RESET         0

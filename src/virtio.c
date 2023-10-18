@@ -82,7 +82,7 @@ void virtio_init(void) {
         // Is this a virtio device?
         if (pci_is_virtio_device(pcidevice)) { // Access through ecam_header
             // Create a new bookkeeping structure for the virtio device
-            volatile VirtioDevice viodev;
+            VirtioDevice viodev;
             // Add the PCI device to the bookkeeping structure
             viodev.pcidev = pcidevice;
             // Add the common configuration, notify capability, and ISR to the bookkeeping structure
@@ -90,19 +90,37 @@ void virtio_init(void) {
             viodev.notify_cap = pci_get_virtio_notify_capability(pcidevice);
             viodev.isr = pci_get_virtio_isr_status(pcidevice);
 
-            debugf("Common config at 0x%08x\n", viodev.common_cfg);
-            debugf("Notify config at 0x%08x\n", viodev.notify_cap);
+            debugf("  Common config at 0x%08x\n", viodev.common_cfg);
+            debugf("  Notify config at 0x%08x\n", viodev.notify_cap);
 
-            debugf("Status: %x\n", viodev.common_cfg->device_status);
+            debugf("  Device status: %x\n", viodev.common_cfg->device_status);
+            
+            debugf("  Reset device...\n");
             viodev.common_cfg->device_status = VIRTIO_F_RESET;
-            debugf("Status: %x\n", viodev.common_cfg->device_status);
+            debugf("  Device status: %x\n", viodev.common_cfg->device_status);
+
+            debugf("  Acknowledge that we (guest OS) noticed the device...\n");
             viodev.common_cfg->device_status = VIRTIO_F_ACKNOWLEDGE;
-            debugf("Status: %x\n", viodev.common_cfg->device_status);
+            debugf("  Device status: %x\n", viodev.common_cfg->device_status);
+
+            debugf("  Set the driver status bit...\n");
             viodev.common_cfg->device_status |= VIRTIO_F_DRIVER;
-            debugf("Status: %x\n", viodev.common_cfg->device_status);
+            debugf("  Device status: %x\n", viodev.common_cfg->device_status);
+            
+            // TODO BEGIN: Double check how the negotiation is supposed work
+            viodev.common_cfg->device_feature_select = 0;
+            debugf("  Device feature bits: 0x%08x\n", viodev.common_cfg->device_feature);
+
+            viodev.common_cfg->driver_feature_select = 0;
+            viodev.common_cfg->driver_feature = 0;
+            // TODO END
+
             viodev.common_cfg->device_status |= VIRTIO_F_FEATURES_OK;
+
+            debugf("  Device status: %x\n", viodev.common_cfg->device_status);
+
             if (!(viodev.common_cfg->device_status & VIRTIO_F_FEATURES_OK)) {
-                debugf("Device does not accept features\n");
+                debugf("  Device does not accept features\n");
             }
             
             // Fix qsize below
@@ -127,8 +145,8 @@ void virtio_init(void) {
             // Add the physical addresses for the descriptor table, driver ring, and device ring to the common configuration
             // We translate the virtual addresses so the devices can actuall access the memory.
             void *phys_desc = kernel_mmu_translate(viodev.desc),
-                *phys_driver = kernel_mmu_translate(viodev.driver),
-                *phys_device = kernel_mmu_translate(viodev.device);
+                 *phys_driver = kernel_mmu_translate(viodev.driver),
+                 *phys_device = kernel_mmu_translate(viodev.device);
             viodev.common_cfg->queue_desc = phys_desc;
             viodev.common_cfg->queue_driver = phys_driver;
             viodev.common_cfg->queue_device = phys_device;
