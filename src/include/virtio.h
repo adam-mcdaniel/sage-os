@@ -167,11 +167,11 @@ typedef struct VirtioDevice {
     // the device.
     volatile struct PCIDevice *pcidev;
     // The common configuration for the device.
-    volatile VirtioPciCommonCfg *common_cfg;
+    struct VirtioPciCommonCfg *common_cfg;
     // The notify configuration for the device.
-    volatile VirtioPciNotifyCap *notify_cap;
+    struct VirtioPciNotifyCap *notify_cap;
     // volatile uint16_t *notify;
-    volatile VirtioPciIsrCap *isr;
+    struct VirtioPciIsrCap *isr;
 
     // The descriptor ring for the device.
     volatile VirtioDescriptor *desc;

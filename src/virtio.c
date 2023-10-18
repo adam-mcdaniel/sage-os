@@ -77,7 +77,7 @@ void virtio_init(void) {
     
     for (uint64_t i = 0; i < num_pci_devices; ++i) {
         // Get the PCI device
-        PCIDevice *pcidevice = pci_get_nth_saved_device(i);
+        volatile PCIDevice *pcidevice = pci_get_nth_saved_device(i);
         
         // Is this a virtio device?
         if (pci_is_virtio_device(pcidevice)) { // Access through ecam_header
@@ -87,9 +87,9 @@ void virtio_init(void) {
             viodev.pcidev = pcidevice;
             // Add the common configuration, notify capability, and ISR to the bookkeeping structure
             viodev.common_cfg = pci_get_virtio_common_config(pcidevice);
-
             viodev.notify_cap = pci_get_virtio_notify_capability(pcidevice);
             viodev.isr = pci_get_virtio_isr_status(pcidevice);
+
             debugf("Common config at 0x%08x\n", viodev.common_cfg);
             debugf("Notify config at 0x%08x\n", viodev.notify_cap);
 
