@@ -139,9 +139,9 @@ volatile struct VirtioCapability *pci_get_virtio_capability(PCIDevice *device, u
 /// Get the common configuration structure for a given virtio device connected to PCI.
 volatile struct VirtioPciCommonCfg *pci_get_virtio_common_config(PCIDevice *device);
 /// Get the notify configuration structure for a given virtio device connected to PCI.
-volatile struct VirtioPciNotifyCap *pci_get_virtio_notify_capability(PCIDevice *device);
+volatile struct VirtioPciNotifyCfg *pci_get_virtio_notify_capability(PCIDevice *device);
 /// Get the interrupt service routine structure for a given virtio device connected to PCI.
-volatile struct VirtioPciIsrCap *pci_get_virtio_isr_status(PCIDevice *device);
+volatile struct VirtioPciIsrCfg *pci_get_virtio_isr_status(PCIDevice *device);
 
 struct pci_cape {
     uint8_t id;
@@ -169,4 +169,3 @@ void pci_init(void);
  * @param irq - the IRQ number that interrupted
  */
 void pci_dispatch_irq(int irq);
-
