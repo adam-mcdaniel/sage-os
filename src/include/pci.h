@@ -15,7 +15,6 @@
 #include <stdint.h>
 #include <vector.h>
 
-
 // PciEcam follows the structure of the PCI ECAM in the
 // PCIe manual.
 struct pci_ecam {
@@ -154,9 +153,10 @@ struct pci_cape {
 #define COMMAND_REG_PIO               (1 << 0)
 #define COMMAND_REG_MMIO              (1 << 1)
 #define COMMAND_REG_BUSMASTER         (1 << 2)
-static const uint64_t ECAM_START   = 0x30000000;
-static const uint64_t VIRTIO_START = 0x40000000;
-static uint64_t VIRTIO_LAST_BAR = 0x40000000;
+
+#define PCIE_ECAM_BASE 0x30000000
+#define PCIE_ECAM_END  0x3FFFFFFF
+#define PCIE_MMIO_BASE 0x40000000
 
 /**
  * @brief Initialize the PCI subsystem
