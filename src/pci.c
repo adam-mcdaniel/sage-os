@@ -125,7 +125,7 @@ PCIDevice *pci_save_device(PCIDevice device) {
     // Allocate some memory for the device's bookkeeping structure
     PCIDevice *pcidev = (PCIDevice *)kzalloc(sizeof(PCIDevice));
     // Record the device's ECAM header
-    pcidev->ecam_header = device.ecam_header;
+    memcpy(pcidev, &device, sizeof(PCIDevice));
     // Store the device in the all devices vector
     vector_push_ptr(all_pci_devices, pcidev);
     // Store the device in the appropriate IRQ vector
@@ -223,6 +223,9 @@ static volatile struct pci_ecam *pci_get_ecam(uint8_t bus,
     return (struct pci_ecam *)addr;
 }
 
+static uint64_t next_mmio_address;
+static uint8_t subordinate = 1;
+
 static void pci_enumerate_bus() {
     for (int bus = 0; bus < 256; bus++) {
         for (int device = 0; device < 32; device++) {
@@ -246,8 +249,6 @@ static void pci_enumerate_bus() {
     }
 }
 
-static uint64_t next_mmio_address;
-static uint8_t subordinate = 1;
 
 static void pci_configure_bridge(volatile struct pci_ecam *bridge, uint8_t bus)
 {
@@ -303,9 +304,6 @@ static void pci_configure_device(volatile struct pci_ecam *device, uint8_t bus_n
     // debugf("Pushing device at bus %d, slot %d into vector %d\n", bus, slot, vector_idx);
     // vector_push(all_pci_devices, (uint64_t)device);
     // vector_push(irq_pci_devices[vector_idx], (uint64_t)device);
-    PCIDevice pcidev;
-    pcidev.ecam_header = device;
-    pci_save_device(pcidev);
 
     // debugf("pci_configure_device: At bus %d, device %d\n", bus_num, device_num);
 
@@ -314,9 +312,12 @@ static void pci_configure_device(volatile struct pci_ecam *device, uint8_t bus_n
     device->command_reg &= ~COMMAND_REG_PIO; // Clear I/O space bit
 
     uint32_t addr = PCIE_MMIO_BASE + (bus_num << 20) + (device_num << 16);
+    PCIDevice pcidev;
+    pcidev.ecam_header = device;
     
     for (int i = 0; i < 6; i++) {
         device->type0.bar[i] = -1U;
+        pcidev.bars[i] = NULL;
         
         // BAR not writable
         if (device->type0.bar[i] == 0) {
@@ -327,29 +328,33 @@ static void pci_configure_device(volatile struct pci_ecam *device, uint8_t bus_n
         uint64_t size;
 
         if ((device->type0.bar[i] & 0x6) == 0x4) {
-            // debugf("  BAR[%d] is 64-bit\n", i);
+            debugf("  BAR[%d] is 64-bit\n", i);
             device->type0.bar[i+1] = -1U;
             uint64_t bar_value = (uint64_t) device->type0.bar[i+1] << 32 | device->type0.bar[i];
             size = ~(bar_value & ~0xF) + 1;
-            // debugf("    device->type0.bar[i] == 0x%08x\n", device->type0.bar[i]);
-            // debugf("    device->type0.bar[i+1] == 0x%08x\n", device->type0.bar[i+1]);
-            // debugf("    bar_value == 0x%016llx\n", bar_value);
-            // debugf("    size == %016llx\n", size);
             addr += size;
             device->type0.bar[i] = addr;
             device->type0.bar[i+1] = 0;
+            pcidev.bars[i] = addr & ~0xf;
+            pcidev.bars[i+1] = addr & ~0xf;
+            debugf("    device->type0.bar[i] == 0x%08x\n", device->type0.bar[i]);
+            debugf("    device->type0.bar[i+1] == 0x%08x\n", device->type0.bar[i+1]);
+            debugf("    bar_value == 0x%016llx\n", bar_value);
+            debugf("    size == %016llx\n", size);
             ++i;
         } else {
-            // debugf("  BAR[%d] is 32-bit\n", i);
+            debugf("  BAR[%d] is 32-bit\n", i);
             size = ~(device->type0.bar[i] & ~0xF) + 1;
-            // debugf("    size == %016llx\n", size);
+            debugf("    size == %016llx\n", size);
             addr += size;
             device->type0.bar[i] = addr;
+            pcidev.bars[i] = addr & ~0xf;
         }
     }
 
     // Re-enable the device after modifying the BAR
     device->command_reg |= COMMAND_REG_MMIO;
+    pci_save_device(pcidev);
 }
 
 void print_vendor_specific_capabilities(PCIDevice *pcidevice)
@@ -357,7 +362,7 @@ void print_vendor_specific_capabilities(PCIDevice *pcidevice)
     if (!pci_is_virtio_device(pcidevice)) return;  
     struct pci_ecam *header = pcidevice->ecam_header;
 
-    uint8_t cap_pointer = header->type0.capes_pointer;  
+    uint8_t cap_pointer = header->type0.capes_pointer;
     debugf("Vendor specific capabilities with offset 0x%02x\n", cap_pointer);
     debugf("  Common configuration capability at: 0x%08x\n", pci_get_virtio_common_config(pcidevice));
     debugf("  Notify configuration capability at: 0x%08x\n", pci_get_virtio_notify_capability(pcidevice));

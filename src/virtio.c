@@ -10,7 +10,7 @@
 static Vector *virtio_devices = NULL;
 
 bool virtio_is_rng_device(VirtioDevice *dev) {
-    return dev->pcidev->ecam_header->device_id != VIRTIO_PCI_DEVICE_ID(VIRTIO_PCI_DEVICE_ENTROPY);
+    return dev->pcidev->ecam_header->device_id == VIRTIO_PCI_DEVICE_ID(VIRTIO_PCI_DEVICE_ENTROPY);
 }
 
 VirtioDevice *virtio_get_rng_device() {
@@ -33,8 +33,7 @@ VirtioDevice *virtio_get_nth_saved_device(uint16_t n) {
 
 void virtio_save_device(VirtioDevice device) {
     VirtioDevice *mem = (VirtioDevice *)kzalloc(sizeof(VirtioDevice));
-    *mem = device;
-
+    memcpy(mem, &device, sizeof(VirtioDevice));
     vector_push_ptr(virtio_devices, mem);
 }
 
@@ -89,22 +88,28 @@ void virtio_init(void) {
             // Add the common configuration, notify capability, and ISR to the bookkeeping structure
             viodev.common_cfg = pci_get_virtio_common_config(pcidevice);
 
-            // Fix qsize below
-            viodev.common_cfg->queue_select = 0;
-            uint16_t qsize = viodev.common_cfg->queue_size;
-            debugf("Virtio device has queue size %d\n", qsize);
-
             viodev.notify_cap = pci_get_virtio_notify_capability(pcidevice);
             viodev.isr = pci_get_virtio_isr_status(pcidevice);
+            debugf("Common config at 0x%08x\n", viodev.common_cfg);
+            debugf("Notify config at 0x%08x\n", viodev.notify_cap);
 
+            debugf("Status: %x\n", viodev.common_cfg->device_status);
             viodev.common_cfg->device_status = VIRTIO_F_RESET;
+            debugf("Status: %x\n", viodev.common_cfg->device_status);
             viodev.common_cfg->device_status = VIRTIO_F_ACKNOWLEDGE;
+            debugf("Status: %x\n", viodev.common_cfg->device_status);
             viodev.common_cfg->device_status |= VIRTIO_F_DRIVER;
+            debugf("Status: %x\n", viodev.common_cfg->device_status);
             viodev.common_cfg->device_status |= VIRTIO_F_FEATURES_OK;
             if (!(viodev.common_cfg->device_status & VIRTIO_F_FEATURES_OK)) {
                 debugf("Device does not accept features\n");
             }
             
+            // Fix qsize below
+            viodev.common_cfg->queue_select = 0;
+            uint16_t qsize = viodev.common_cfg->queue_size;
+            debugf("Virtio device has queue size %d\n", qsize);
+
             // Allocate contiguous physical memory for descriptor table, driver ring, and device ring
             // These are virtual memory pointers that we will use in the OS side.
             viodev.desc = (VirtioDescriptor *)kzalloc(VIRTIO_DESCRIPTOR_TABLE_BYTES(qsize));
@@ -139,7 +144,7 @@ void virtio_init(void) {
             if (viodev.common_cfg->queue_device != phys_device){
                 debugf("Device does not reflect physical device ring@0x%08x (wrote %x but read %x)\n", &viodev.common_cfg->queue_device, phys_device, viodev.common_cfg->queue_device);
             }
-            debugf("Set up tables for virtio device");
+            debugf("Set up tables for virtio device\n");
             viodev.common_cfg->queue_enable = 1;
             viodev.common_cfg->device_status |= VIRTIO_F_DRIVER_OK;
             // Add to vector using vector_push
@@ -174,7 +179,8 @@ void virtio_notify(VirtioDevice *viodev, uint16_t which_queue)
     uint32_t offset = viodev->notify_cap->cap.offset;
     uint16_t queue_notify_off = viodev->common_cfg->queue_notify_off;
     uint32_t notify_off_multiplier = viodev->notify_cap->notify_off_multiplier;
-    uint64_t bar = viodev->pcidev->ecam_header->type0.bar[bar_num];
+    uint64_t bar = viodev->pcidev->ecam_header->type0.bar[bar_num] & ~0xf;
+    // uint64_t bar = viodev->pcidev->bars[bar_num];
     debugf("BAR at %x, offset=%x, queue_notify_off=%x, notify_off_mult=%x\n", bar, offset, queue_notify_off, notify_off_multiplier);
 
     uint16_t *notify = bar + BAR_NOTIFY_CAP(offset, queue_notify_off, notify_off_multiplier);

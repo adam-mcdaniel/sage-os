@@ -90,6 +90,7 @@ struct pci_ecam {
 typedef struct PCIDevice {
     // A pointer to the PCI device's ECAM header.
     volatile struct pci_ecam *ecam_header;
+    volatile void *bars[6];
 } PCIDevice;
 
 
