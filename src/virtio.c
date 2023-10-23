@@ -47,8 +47,8 @@ void virtio_save_device(VirtioDevice device) {
 
 volatile VirtioDevice *virtio_get_by_device(volatile PCIDevice *pcidevice) {
     for(int i = 0; i < vector_size(virtio_devices);i++){
-        VirtioDevice *curr_virt_device;
-        vector_get_ptr(virtio_devices,i,curr_virt_device);
+        VirtioDevice *curr_virt_device = NULL;
+        vector_get_ptr(virtio_devices, i, &curr_virt_device);
         if(curr_virt_device->pcidev == pcidevice){
             return curr_virt_device;
         }
