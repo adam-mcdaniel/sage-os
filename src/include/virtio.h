@@ -90,10 +90,10 @@ typedef struct VirtioPciCommonCfg {
 // A notify register is how we tell the device to "go and do"
 // what we asked it to do.
 typedef struct VirtioPciNotifyCfg {
+    VirtioCapability cap;
     // The actual memory address we write to notify a queue
     // is given by the **cap** portion of this structure. In there,
     // we retrieve the BAR + the offset.
-    VirtioCapability cap;
     // Then, we multiply the `queue_notify_off` by the `notify_off_multiplier`.
     uint32_t notify_off_multiplier; /* Multiplier for queue_notify_off. */
 } VirtioPciNotifyCfg;
@@ -230,3 +230,5 @@ volatile VirtioCapability *virtio_get_capability(volatile VirtioDevice *dev, uin
 
 //get a virtio device by using a pcidevice pointer
 volatile VirtioDevice *virtio_get_by_device(volatile PCIDevice *pcidevice);
+
+volatile uint16_t *virtio_notify_register(volatile VirtioDevice *device);

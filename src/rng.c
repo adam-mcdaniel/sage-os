@@ -54,6 +54,7 @@ bool rng_fill(void *virtual_buffer_address, uint16_t size) {
     }
 
     uint64_t queue_size = rng_device->common_cfg->queue_size;
+    debugf("Queue #%d with size 0x%x\n", rng_device->common_cfg->queue_select, rng_device->common_cfg->queue_size);
     uint64_t descriptor_index = rng_device->desc_idx;
 
 
@@ -83,9 +84,9 @@ bool rng_fill(void *virtual_buffer_address, uint16_t size) {
     // by the queue notification multiplier from the notification PCI capability.
     // We then add this to the BAR offset from the capability's "offset" field.
     // Then, we add all of this to the base address.
-    // debugf("Notifying RNG...\n");
+    debugf("Notifying RNG...\n");
     virtio_notify(rng_device, descriptor_index);
-    // debugf("Done\n");
+    debugf("Done\n");
     return true;
 }
 
