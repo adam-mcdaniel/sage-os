@@ -24,7 +24,7 @@ void os_trap_handler(void)
     CSR_READ(tval, "stval");
     
     int hart = sbi_whoami();
-    debugf("TRAP\n");
+    debugf("TRAP at instruction %p\n", epc);
     // WFI_LOOP();
 
     if (SCAUSE_IS_ASYNC(cause)) {
@@ -41,8 +41,9 @@ void os_trap_handler(void)
             case CAUSE_SEIP:
                 // Forward to src/plic.c
                 plic_handle_irq(hart);
+                CSR_WRITE("sepc", epc + 4);
                 SRET();
-                // CSR_WRITE("sepc", epc + 4);
+                fatalf("Could not return from trap\n");
                 break;
             default:
                 debugf("Unhandled Asynchronous interrupt %ld\n", cause);
