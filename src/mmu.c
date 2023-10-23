@@ -6,6 +6,7 @@
 #include <lock.h>
 #include <mmu.h>
 #include <page.h>
+#include <csr.h>
 #include <util.h>
 
 #define PTE_PPN0_BIT 10
@@ -104,6 +105,7 @@ void mmu_free(struct page_table *tab)
     } 
 
     page_free(tab); 
+    SFENCE_ALL();
 }
 
 uint64_t mmu_translate(const struct page_table *tab, uint64_t vaddr) 
@@ -193,7 +195,7 @@ uint64_t mmu_map_range(struct page_table *tab,
         pages_mapped += 1;
     }
     // debugf("mmu_map_range: mapped %d pages\n", pages_mapped);
-
+    SFENCE_ALL();
     return pages_mapped;
 } 
 

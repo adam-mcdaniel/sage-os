@@ -77,6 +77,7 @@ void plic_handle_irq(int hart)
             break;
     }
     plic_complete(hart, irq);
+    debugf("Handled IRQ\n");
 }
 
 void plic_init(void)
