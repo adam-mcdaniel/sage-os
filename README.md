@@ -14,6 +14,23 @@ Every week, you will need to write entries in this journal. Include brief inform
 
 Sort your entries in descending order (newest entries at the top).
 
+
+# 17-October-2023
+
+- `amcdan23`: Fixed bug where bar calculations were including the last 4 bits of the bar (*not used*). Fixed bug where wrong virtio device was being used for the RNG requests.
+
+# 16-October-2023
+
+- `amcdan23`: Fixed mapped ECAM memory address range. Found that the mapped addresses for the PCI device enumeration was wrong: the devices and bridges were being configured in the wrong order, and the bus + slot were being stored in the wrong part of the address. Fixed these bugs. Also added bar pointers directly to the PCI bookkeeping structures, and the virtio bookkeeping structures.
+
+# 15-October-2023
+
+- `amcdan23`: Added checks in `virtio.c` to confirm the descriptors of the device are set; also found that they were not being written properly. This led to the discovery that the capability pointers we were storing in our virtio bookkeeping were wrong. This fixed the bug where notifying the RNG (writing to the notify register) freezed the OS.
+
+# 14-October-2023
+
+- `amcdan23`: Added functions for identifying the virtio devices like the RNG, added fixes to `rng_get_numbers` to store the jobs. Discovered bug with notifying RNG devices and started fix. Added initialization of the virtio devices in `virtio_init`.
+
 # 30-September-2023
 - `gmorale1`: Added some initial code for the rng device which should use the driver ring when called.  Also added a getter funciton for getting VirtIO devices from a pci device pointer. Used when we need to find an interrupt from a pci device.
 - `amcdan23`: Added `PCIDevice` infrastructure for setting up VirtIO. Created functions for quickly getting and setting vital info about each PCI device and VirtIO config info from the device. Added functions for performing all the `PCIDevice`'s lookups with the static tables. Added this structure to the `VirtioDevice` structure. Changed PCI functions to use these methods for enumerating devices and printing capabilities. Also added methods for managing the `VirtioDevice`s saved by the operating system when initialized. Fixed bug where rings not set properly in `virtio_init`.
