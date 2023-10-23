@@ -5,6 +5,14 @@
 #include <pci.h>
 #include <kmalloc.h> 
 #include <vector.h>
+#include <config.h>
+#include <csr.h>
+#include <plic.h>
+#include <sbi.h>
+#include <sched.h>
+#include <syscall.h>
+#include <compiler.h>
+
 #include "include/virtio.h"
 
 static Vector *virtio_devices = NULL;
@@ -156,6 +164,28 @@ void virtio_init(void) {
     debugf("virtio_init: Done initializing virtio system\n");
 }
 
+
+// Get the notify capability for the given virtio device.
+volatile uint16_t *virtio_notify_register(volatile VirtioDevice *device) {
+    // Determine offset for the given queue
+    // struct VirtioCapability *vio_cap = pci_get_virtio_capability(device->pcidev, VIRTIO_PCI_CAP_NOTIFY_CFG);
+    struct VirtioCapability *vio_cap = pci_get_virtio_capability(device->pcidev, VIRTIO_PCI_CAP_NOTIFY_CFG);
+    volatile VirtioPciNotifyCfg *notify_cap = pci_get_virtio_notify_capability(device->pcidev);
+    uint8_t bar_num = vio_cap->bar;
+    uint64_t offset = (uint64_t)vio_cap->offset;
+    debugf("Notify cap bar=%d offset=%d\n", bar_num, offset);
+
+    volatile VirtioPciCommonCfg *common_cfg = pci_get_virtio_common_config(device->pcidev);
+
+    uint16_t queue_notify_off = common_cfg->queue_notify_off;
+    uint32_t notify_off_multiplier = notify_cap->notify_off_multiplier;
+    uint64_t bar = (uint64_t)pci_get_device_bar(device->pcidev, bar_num);
+    debugf("BAR at %x, offset=%x, queue_notify_off=%x, notify_off_mult=%x\n", bar, offset, queue_notify_off, notify_off_multiplier);
+
+    uint16_t *notify = bar + BAR_NOTIFY_CAP(offset, queue_notify_off, notify_off_multiplier);
+    return notify;
+}
+
 /**
  * @brief Virtio notification
  * @param viodev - virtio device to notify for
@@ -172,25 +202,37 @@ void virtio_notify(VirtioDevice *viodev, uint16_t which_queue)
 
     // Select the queue we are looking at
     viodev->common_cfg->queue_select = which_queue;
-    debugf("Notify config at 0x%08x\n", viodev->notify_cap);
-    debugf("Common config at 0x%08x\n", viodev->common_cfg);
 
-    // Determine offset for the given queue
-    uint8_t bar_num = viodev->notify_cap->cap.bar;
-    uint32_t offset = viodev->notify_cap->cap.offset;
-    uint16_t queue_notify_off = viodev->common_cfg->queue_notify_off;
-    uint32_t notify_off_multiplier = viodev->notify_cap->notify_off_multiplier;
-    uint64_t bar = viodev->pcidev->ecam_header->type0.bar[bar_num] & ~0xf;
-    // uint64_t bar = viodev->pcidev->bars[bar_num];
-    debugf("BAR at %x, offset=%x, queue_notify_off=%x, notify_off_mult=%x\n", bar, offset, queue_notify_off, notify_off_multiplier);
-
-    uint16_t *notify = bar + BAR_NOTIFY_CAP(offset, queue_notify_off, notify_off_multiplier);
-    debugf("Notifying at 0x%x...\n", notify);
-
-    // Write the queue's number to the notify register
-    *notify = which_queue;
-
+    uint16_t *notify_register = virtio_notify_register(viodev);
+    debugf("Notifying at 0x%p...\n", notify_register);
+    *notify_register = which_queue;
     debugf("Notified device\n\n");
+
+
+    // debugf("Device ECAM at 0x%08x\n", viodev->pcidev->ecam_header);
+    // // volatile VirtioPciNotifyCfg *notify_cfg = virtio_get_capability(viodev, VIRTIO_PCI_CAP_NOTIFY_CFG);
+    // debugf("Notify config at 0x%08x\n", viodev->notify_cap);
+    // debugf("Common config at 0x%08x\n", viodev->common_cfg);
+
+    // // Determine offset for the given queue
+    // volatile VirtioCapability *notify_cap = pci_get_virtio_capability(viodev->pcidev, VIRTIO_PCI_CAP_NOTIFY_CFG);
+    // // volatile VirtioCapability *notify_cap = (volatile VirtioCapability *)viodev->notify_cap;
+    // uint8_t bar_num = notify_cap->bar;
+    // uint8_t offset = notify_cap->offset;
+    // debugf("Notify cap bar=%d offset=%d\n", bar_num, offset);
+
+    // uint16_t queue_notify_off = viodev->common_cfg->queue_notify_off;
+    // uint32_t notify_off_multiplier = viodev->notify_cap->notify_off_multiplier;
+    // uint64_t bar = viodev->pcidev->ecam_header->type0.bar[bar_num] & ~0xf;
+    // // uint64_t bar = viodev->pcidev->bars[bar_num];
+    // debugf("BAR at %x, offset=%x, queue_notify_off=%x, notify_off_mult=%x\n", bar, offset, queue_notify_off, notify_off_multiplier);
+
+    // uint16_t *notify = bar + BAR_NOTIFY_CAP(offset, queue_notify_off, notify_off_multiplier);
+
+    // // Write the queue's number to the notify register
+    // *notify = which_queue;
+    // WFI_LOOP();
+
 
     return;
 };
