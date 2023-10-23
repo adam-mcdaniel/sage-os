@@ -117,7 +117,7 @@ _trap:
     csrw    satp, t5
 
     # src/trap.c
-    call    c_trap_handler
+    call    os_trap_handler
 
     # sscratch will be mapped in kernel space
     # at this point.
