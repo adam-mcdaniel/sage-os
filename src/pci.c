@@ -3,6 +3,7 @@
 #include <pci.h>
 #include <virtio.h>
 #include <kmalloc.h>
+#include <csr.h>
 #include "include/pci.h"
 
 // These contain pointers to the common configurations for each device.
@@ -165,25 +166,37 @@ PCIDevice *pci_get_nth_saved_device(uint16_t n) {
 // Get the device responsible for a given IRQ.
 PCIDevice *pci_find_device_by_irq(uint8_t irq) {
     uint32_t vector_idx = irq - 32;
+    debugf("Finding device with IRQ %d\n", irq);
 
     // Check all devices in the vector
     for (uint32_t i=0; i<vector_size(irq_pci_devices[vector_idx]); i++) {
         // Get the nth PCI device listening for the IRQ
-        PCIDevice *device;
+        volatile PCIDevice *device = NULL;
         vector_get_ptr(irq_pci_devices[vector_idx], i, &device);
+        debugf("Device: %p\n", device->ecam_header);
         // If the device is a Virtio device, check the Virtio ISR status
-        if (!pci_is_virtio_device(device)) continue;  
+        if (!pci_is_virtio_device(device)) {
+            debugf("%p not a virtio device\n", device);
+            continue;
+        }
         
         // Confirm that the device exists
         if (!pci_device_exists(device->ecam_header->vendor_id)) {
+            debugf("%p device doesn't exist\n", device);
             continue;
         }
 
         // Get the Virtio ISR status
         volatile struct VirtioPciIsrCfg *isr = pci_get_virtio_isr_status(device);
+        int result = isr->isr_cap;
+        debugf("ISR at %p=0x%x\n", isr, result);
+        if (result) {
+            debugf("IRQ device responsible: %p\n", device);
+            return device;
+        }
 
         // Check if the device's configuration has changed
-        if (isr->device_cfg_interrupt) {
+        if (isr->isr_cap) {
             debugf("Device configuration interrupt from device 0x%04x\n", device->ecam_header->device_id);
             return device;
         }
@@ -489,10 +502,12 @@ void pci_dispatch_irq(int irq)
     if (pci_is_virtio_device(pcidevice)) { 
         // Access through ecam_header
         VirtioDevice *virtdevice = virtio_get_by_device(pcidevice);
-
-        //rng device
-        if(virtdevice->pcidev->ecam_header->device_id == VIRTIO_PCI_DEVICE_ID(VIRTIO_PCI_DEVICE_ENTROPY)) {
-            rng_job_done(virtdevice);
-        }
+        debugf("Virtio device! %p\n", virtdevice->pcidev->ecam_header);
+        
+        // if (virtio_is_rng_device(virtdevice)) {
+        //     debugf("RNG sent interrupt!\n");
+        // }
     }
+
+    debugf("Leaving dispatch IRQ\n");
 }

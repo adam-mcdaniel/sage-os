@@ -24,10 +24,11 @@ void os_trap_handler(void)
     CSR_READ(tval, "stval");
     
     int hart = sbi_whoami();
-    // debugf("Handling trap...\n");
+    debugf("TRAP\n");
     // WFI_LOOP();
 
     if (SCAUSE_IS_ASYNC(cause)) {
+        debugf("Is async!\n");
         cause = SCAUSE_NUM(cause);
         switch (cause) {
             case CAUSE_STIP:
@@ -40,6 +41,8 @@ void os_trap_handler(void)
             case CAUSE_SEIP:
                 // Forward to src/plic.c
                 plic_handle_irq(hart);
+                SRET();
+                // CSR_WRITE("sepc", epc + 4);
                 break;
             default:
                 debugf("Unhandled Asynchronous interrupt %ld\n", cause);
@@ -47,10 +50,14 @@ void os_trap_handler(void)
         }
     }
     else {
+        debugf("Is sync!\n");
         switch (cause) {
             case CAUSE_ECALL_U_MODE:  // ECALL U-Mode
                 // Forward to src/syscall.c
                 syscall_handle(hart, epc, scratch);
+                // We have to move beyond the ECALL instruction, which is exactly 4 bytes.
+                // CSR_WRITE("sepc", epc + 4);
+                SRET();
                 break;
             default:
                 debugf(
@@ -61,4 +68,7 @@ void os_trap_handler(void)
                 break;
         }
     }
+    // debugf("Jumping to %p...\n", epc + 4);
+    // CSR_WRITE("pc", epc + 4);
+    // debugf("Leaving trap handler!\n");
 }
