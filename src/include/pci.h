@@ -143,10 +143,14 @@ volatile struct VirtioPciNotifyCfg *pci_get_virtio_notify_capability(PCIDevice *
 /// Get the interrupt service routine structure for a given virtio device connected to PCI.
 volatile struct VirtioPciIsrCfg *pci_get_virtio_isr_status(PCIDevice *device);
 
+volatile uint8_t *pci_get_device_bar(PCIDevice *device, uint8_t bar_num);
+
 struct pci_cape {
     uint8_t id;
     uint8_t next;
 };
+
+
 
 // #define PCI_IS_64_BIT_BAR(dev, barno) (0b100 == ((dev)->ecam->type0.bar[barno] & 0b110))
 
