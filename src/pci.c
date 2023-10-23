@@ -207,12 +207,14 @@ volatile struct VirtioPciCommonCfg *pci_get_virtio_common_config(PCIDevice *devi
 // Get the notify capability for the given virtio device.
 volatile struct VirtioPciNotifyCfg *pci_get_virtio_notify_capability(PCIDevice *device) {
     struct VirtioCapability *vio_cap = pci_get_virtio_capability(device, VIRTIO_PCI_CAP_NOTIFY_CFG);
-    debugf("(%p) Getting notify capability from bar #%d = %p + 0x%x\n", device, vio_cap->bar, ((uint64_t)device->ecam_header->type0.bar[vio_cap->bar] & ~0xf), (uint64_t)vio_cap->offset);
+    debugf("Cap at %p\n", vio_cap);
+    debugf("Getting notify capability from bar #%d = %p + 0x%x (len=%d) %d\n", vio_cap->bar, ((uint64_t)device->ecam_header->type0.bar[vio_cap->bar] & ~0xf), (uint64_t)vio_cap->offset, vio_cap->len, sizeof(VirtioPciNotifyCfg));
+
     // return (volatile struct VirtioPciNotifyCfg *)(((uint64_t)device->ecam_header->type0.bar[vio_cap->bar] & ~0xf) + (uint64_t)vio_cap->offset);
     return vio_cap;
 }
 
-void *pci_get_device_bar(PCIDevice *device, uint8_t bar_num) {
+volatile uint8_t *pci_get_device_bar(PCIDevice *device, uint8_t bar_num) {
     return device->ecam_header->type0.bar[bar_num] & ~0xf;
 }
 
