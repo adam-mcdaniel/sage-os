@@ -166,21 +166,18 @@ void virtio_init(void) {
 
 
 // Get the notify capability for the given virtio device.
-volatile uint16_t *virtio_notify_register(volatile VirtioDevice *device) {
+volatile uint32_t *virtio_notify_register(volatile VirtioDevice *device) {
     // struct VirtioCapability *vio_cap = pci_get_virtio_capability(device->pcidev, VIRTIO_PCI_CAP_NOTIFY_CFG);
     // volatile VirtioPciNotifyCfg *notify_cap = pci_get_virtio_notify_capability(device->pcidev);
     uint8_t bar_num = device->notify_cap->cap.bar;
     uint64_t offset = device->notify_cap->cap.offset;
-    debugf("Notify cap bar=%d offset=%x, (len=%d)\n", bar_num, offset, device->notify_cap->cap.length);
-
-    volatile VirtioPciCommonCfg *common_cfg = pci_get_virtio_common_config(device->pcidev);
-
-    uint16_t queue_notify_off = common_cfg->queue_notify_off;
+    uint16_t queue_notify_off = device->common_cfg->queue_notify_off;
     uint32_t notify_off_multiplier = device->notify_cap->notify_off_multiplier;
     uint64_t bar = (uint64_t)pci_get_device_bar(device->pcidev, bar_num);
+    debugf("Notify cap bar=%d offset=%x, (len=%d)\n", bar_num, offset, device->notify_cap->cap.length);
     debugf("BAR at %x, offset=%x, queue_notify_off=%x, notify_off_mult=%x\n", bar, offset, queue_notify_off, notify_off_multiplier);
 
-    uint16_t *notify = bar + BAR_NOTIFY_CAP(offset, queue_notify_off, notify_off_multiplier);
+    uint32_t *notify = bar + BAR_NOTIFY_CAP(offset, queue_notify_off, notify_off_multiplier);
     return notify;
 }
 
@@ -189,7 +186,7 @@ volatile uint16_t *virtio_notify_register(volatile VirtioDevice *device) {
  * @param viodev - virtio device to notify for
  * @param which_queue - queue number to notify
  */
-void virtio_notify(VirtioDevice *viodev, uint16_t which_queue)
+void virtio_notify(volatile VirtioDevice *viodev, uint16_t which_queue)
 {
     uint16_t num_queues = viodev->common_cfg->num_queues;
 
@@ -201,10 +198,8 @@ void virtio_notify(VirtioDevice *viodev, uint16_t which_queue)
     // Select the queue we are looking at
     viodev->common_cfg->queue_select = which_queue;
 
-    uint16_t *notify_register = virtio_notify_register(viodev);
+    volatile uint16_t *notify_register = virtio_notify_register(viodev);
     debugf("Notifying at 0x%p...\n", notify_register);
     *notify_register = which_queue;
     debugf("Notified device\n\n");
-
-    return;
-};
+}

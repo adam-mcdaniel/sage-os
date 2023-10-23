@@ -6,12 +6,13 @@
 #include <sched.h>
 #include <syscall.h>
 #include <compiler.h>
+#include <trap.h>
 
 // From src/syscall.c
 void syscall_handle(int hart, uint64_t epc, int64_t *scratch);
 
 // Called from asm/spawn.S: _spawn_trap
-void c_trap_handler(void)
+void os_trap_handler(void)
 {
     unsigned long cause;
     long *scratch;
@@ -23,7 +24,8 @@ void c_trap_handler(void)
     CSR_READ(tval, "stval");
     
     int hart = sbi_whoami();
-    debugf("Handling trap...\n");
+    // debugf("Handling trap...\n");
+    // WFI_LOOP();
 
     if (SCAUSE_IS_ASYNC(cause)) {
         cause = SCAUSE_NUM(cause);

@@ -48,7 +48,7 @@ bool rng_fill(void *virtual_buffer_address, uint16_t size) {
         fatalf("[RNG] Incorrect device provided\n");
     }
 
-    if (rng_device->ready == false) {
+    if (!rng_device->ready) {
         fatalf("RNG is not ready\n");
         return false;
     }
@@ -73,7 +73,7 @@ bool rng_fill(void *virtual_buffer_address, uint16_t size) {
     // Add the descriptor we just filled to the driver ring.
     rng_device->driver->ring[rng_device->driver->idx % queue_size] = descriptor_index;
     // As soon as we increment the index, it is "visible"
-    rng_device->driver->idx++;
+    rng_device->driver->idx += 1;
     rng_device->desc_idx = (rng_device->desc_idx + 1) % queue_size;
     // Write to the notify register to tell it to "do something"
 
@@ -84,9 +84,10 @@ bool rng_fill(void *virtual_buffer_address, uint16_t size) {
     // by the queue notification multiplier from the notification PCI capability.
     // We then add this to the BAR offset from the capability's "offset" field.
     // Then, we add all of this to the base address.
-    debugf("Notifying RNG...\n");
+    // debugf("Notifying RNG...\n");
     virtio_notify(rng_device, descriptor_index);
-    debugf("Done\n");
+    
+    // debugf("Done\n");
     return true;
 }
 

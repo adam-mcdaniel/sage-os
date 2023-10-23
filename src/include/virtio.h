@@ -206,7 +206,7 @@ typedef struct VirtioDevice {
 #define VIRTIO_DEVICE_TABLE_BYTES(qsize)       (6 + 8 * (qsize))
 
 void virtio_init(void);
-void virtio_notify(VirtioDevice *viodev, uint16_t which_queue);
+void virtio_notify(volatile VirtioDevice *viodev, uint16_t which_queue);
 
 // Find a saved device by its index.
 VirtioDevice *virtio_get_nth_saved_device(uint16_t n);
@@ -231,4 +231,4 @@ volatile VirtioCapability *virtio_get_capability(volatile VirtioDevice *dev, uin
 //get a virtio device by using a pcidevice pointer
 volatile VirtioDevice *virtio_get_by_device(volatile PCIDevice *pcidevice);
 
-volatile uint16_t *virtio_notify_register(volatile VirtioDevice *device);
+volatile uint32_t *virtio_notify_register(volatile VirtioDevice *device);

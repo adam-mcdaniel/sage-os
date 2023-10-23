@@ -10,6 +10,7 @@
 #include <debug.h>
 #include <mmu.h>
 #include <page.h>
+#include <trap.h>
 
 // Global MMU table for the kernel. This is used throughout
 // the kernel.
@@ -84,21 +85,37 @@ static void init_systems(void)
 #endif
 #ifdef USE_VIRTIO
     virtio_init();
-    uint8_t buffer[16] = {0};
-    debugf("RNG State Before:");
-    for (int i=0; i<sizeof(buffer)/sizeof(buffer[0]); i++) {
-        debugf(" %d ", buffer[i]);
-    }
-    debugf("\n");
+    uint64_t stvec = (uint64_t)os_trap_handler;
+    stvec &= ~0x3;
+    CSR_WRITE("stvec", stvec);
+    debugf("STVEC: 0x%p, 0x%p\n", stvec, os_trap_handler);
 
-    debugf("RNG init done; about to fill\n");
-    rng_fill(buffer, 16);
-    WFI_LOOP();
-    debugf("RNG State After:");
-    for (int i=0; i<sizeof(buffer)/sizeof(buffer[0]); i++) {
-        debugf(" %d ", buffer[i]);
-    }
-    debugf("\n");
+    // uint8_t buffer[16] = {0};
+    // debugf("RNG State Before:");
+    // for (int i=0; i<sizeof(buffer)/sizeof(buffer[0]); i++) {
+    //     debugf(" %d ", buffer[i]);
+    // }
+    // debugf("\n");
+
+    // debugf("RNG init done; about to fill\n");
+    // rng_fill(buffer, 16);
+    // WFI_LOOP();
+    // debugf("RNG State After:");
+    // for (int i=0; i<sizeof(buffer)/sizeof(buffer[0]); i++) {
+    //     debugf(" %d ", buffer[i]);
+    // }
+    // debugf("\n");char bytes[5] = {0};
+    char bytes[5] = {0};
+    rng_fill(bytes, sizeof(bytes));
+    // WFI();
+    // The WFI above should continue after the PLIC
+    // receives an interrupt from the virtio device.
+    printf("%02x %02x %02x %02x %02x\n",
+    bytes[0], 
+    bytes[1], 
+    bytes[2], 
+    bytes[3], 
+    bytes[4]);
 #endif
 }
 
