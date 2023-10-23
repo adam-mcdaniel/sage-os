@@ -466,7 +466,6 @@ void pci_init(void)
  */
 void pci_dispatch_irq(int irq)
 {
-    debugf("IRQ handled\n");
     // An IRQ came from the PLIC, but recall PCI devices
     // share IRQs. So, you need to check the ISR register
     // of potential virtio devices.
@@ -481,11 +480,11 @@ void pci_dispatch_irq(int irq)
     // IRQ#=32+(bus+slot)mod4
     // uint32_t vector_idx = irq - 32;
     PCIDevice *pcidevice = pci_find_device_by_irq(irq);
-    debugf("PCI device with IRQ %d: 0x%04x\n", irq, pcidevice->ecam_header->device_id);
     if (pcidevice == NULL) {
         debugf("No PCI device found with IRQ %d\n", irq);
         return;
     }
+    debugf("PCI device with IRQ %d: 0x%04x\n", irq, pcidevice->ecam_header->device_id);
     // Is this a virtio device?
     if (pci_is_virtio_device(pcidevice)) { 
         // Access through ecam_header
