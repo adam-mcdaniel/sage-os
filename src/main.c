@@ -41,7 +41,7 @@ static void init_systems(void)
     mmu_map_range(pt, 0x30000000, 0x3FFFFFFF, 0x30000000, MMU_LEVEL_2M, PB_READ | PB_WRITE);
     // PCIe MMIO
     debugf("Mapping PCIe MMIO\n");
-    mmu_map_range(pt, 0x40000000, 0x4FFFFFFF, 0x40000000, MMU_LEVEL_2M, PB_READ | PB_WRITE);
+    mmu_map_range(pt, 0x40000000, 0x5FFFFFFF, 0x40000000, MMU_LEVEL_2M, PB_READ | PB_WRITE);
     // debugf("Testing MMU translation\n");
     // debugf("0x%08lx -> 0x%08lx\n", 0x0C000000, mmu_translate(pt, 0x0C000000));
     // debugf("0x%08lx -> 0x%08lx\n", 0x30000000, mmu_translate(pt, 0x30000000));
