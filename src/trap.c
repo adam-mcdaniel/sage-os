@@ -22,42 +22,69 @@ void os_trap_handler(void)
     CSR_READ(scratch, "sscratch");
     CSR_READ(epc, "sepc");
     CSR_READ(tval, "stval");
+    CSR_CLEAR("sip");
     
     int hart = sbi_whoami();
-    debugf("TRAP at instruction %p\n", epc);
-    // WFI_LOOP();
 
     if (SCAUSE_IS_ASYNC(cause)) {
-        debugf("Is async!\n");
         cause = SCAUSE_NUM(cause);
+        debugf("Is async!\n");
         switch (cause) {
             case CAUSE_STIP:
                 // Ack timer will reset the timer to INFINITE
                 // In src/sbi.c
                 sbi_ack_timer();
+                SRET();
                 // We typically invoke our scheduler if we get a timer
                 // sched_invoke(hart);
                 break;
             case CAUSE_SEIP:
                 // Forward to src/plic.c
                 plic_handle_irq(hart);
-                CSR_WRITE("sepc", epc + 4);
                 SRET();
-                fatalf("Could not return from trap\n");
+                // fatalf("Could not return from trap\n");
                 break;
             default:
-                debugf("Unhandled Asynchronous interrupt %ld\n", cause);
+                fatalf("Unhandled Asynchronous interrupt %ld\n", cause);
+                WFI_LOOP();
                 break;
         }
     }
     else {
         debugf("Is sync!\n");
         switch (cause) {
+            case CAUSE_ILLEGAL_INSTRUCTION:
+                debugf("Illegal instruction \"%x\" at %p", *((uint64_t*)epc), epc);
+                CSR_WRITE("sepc", epc + 4);
+                SRET();
+                break;
+            case CAUSE_INSTRUCTION_ACCESS_FAULT:
+                debugf("Couldn't access instructoin at %p", epc);
+                CSR_WRITE("sepc", epc + 4);
+                SRET();
+                break;
+            case CAUSE_INSTRUCTION_PAGE_FAULT:
+                debugf("Instruction page fault at %p", epc);
+                CSR_WRITE("sepc", epc + 4);
+                SRET();
+                break;
+            case CAUSE_LOAD_PAGE_FAULT:
+                debugf("Load page fault at %p", epc);
+                CSR_WRITE("sepc", epc + 4);
+                SRET();
+                break;
             case CAUSE_ECALL_U_MODE:  // ECALL U-Mode
                 // Forward to src/syscall.c
                 syscall_handle(hart, epc, scratch);
                 // We have to move beyond the ECALL instruction, which is exactly 4 bytes.
-                // CSR_WRITE("sepc", epc + 4);
+                CSR_WRITE("sepc", epc + 4);
+                SRET();
+                break;
+            case CAUSE_ECALL_S_MODE:  // ECALL U-Mode
+                // Forward to src/syscall.c
+                syscall_handle(hart, epc, scratch);
+                // We have to move beyond the ECALL instruction, which is exactly 4 bytes.
+                CSR_WRITE("sepc", epc + 4);
                 SRET();
                 break;
             default:
@@ -71,5 +98,4 @@ void os_trap_handler(void)
     }
     // debugf("Jumping to %p...\n", epc + 4);
     // CSR_WRITE("pc", epc + 4);
-    // debugf("Leaving trap handler!\n");
 }
