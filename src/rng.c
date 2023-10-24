@@ -9,6 +9,7 @@
 #include <mmu.h>
 #include <kmalloc.h>
 #include <vector.h>
+#include <csr.h>
 
 //use this like a queue
 volatile static Vector *rng_active_jobs;
@@ -85,8 +86,9 @@ bool rng_fill(void *virtual_buffer_address, uint16_t size) {
     // We then add this to the BAR offset from the capability's "offset" field.
     // Then, we add all of this to the base address.
     // debugf("Notifying RNG...\n");
-    virtio_notify(rng_device, descriptor_index);
     
+    virtio_notify(rng_device, 0);
+    // os_trap_handler
     // debugf("Done\n");
     return true;
 }

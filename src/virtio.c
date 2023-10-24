@@ -191,7 +191,7 @@ void virtio_notify(volatile VirtioDevice *viodev, uint16_t which_queue)
     uint16_t num_queues = viodev->common_cfg->num_queues;
 
     if (which_queue >= num_queues) {
-        logf(LOG_ERROR, "virtio_notify: Provided queue number is too big...\n");
+        logf(LOG_ERROR, "virtio_notify: Provided queue number %d is too big (num_queues=%d)...\n", which_queue, num_queues);
         return;
     }
 
@@ -199,7 +199,7 @@ void virtio_notify(volatile VirtioDevice *viodev, uint16_t which_queue)
     viodev->common_cfg->queue_select = which_queue;
 
     volatile uint16_t *notify_register = virtio_notify_register(viodev);
-    debugf("Notifying at 0x%p...\n", notify_register);
+    debugf("Notifying at 0x%p on instruction...\n", notify_register);
     *notify_register = which_queue;
     debugf("Notified device\n\n");
 }
