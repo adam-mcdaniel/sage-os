@@ -24,11 +24,14 @@ Sort your entries in descending order (newest entries at the top).
 
 - `amcdan23`: Fixed notify register address calculations, fixed how bars were stored in bookkeeping. Successfully got the ISR to change for our RNG device, but now PC gets zeroed when we write here. Fixed issue where notification did not trigger trap handler; now trap handler is triggered when we notify a device.
 
+# 18-October-2023
+- `amcdan23`: Added bar pointers directly to the PCI bookkeeping structures, and the virtio bookkeeping structures. Changed how bookkeeping structures were copied so we can add new fields without breaking the implementation. Added reporting for the enumerated PCI device's bookkeeping. Fixed bug where wrong virtio device was being used for the RNG requests.
+
 # 17-October-2023
-- `amcdan23`: Fixed bug where bar calculations were including the last 4 bits of the bar (*not used*). Fixed bug where wrong virtio device was being used for the RNG requests.
+- `amcdan23`: Fixed bug where bar calculations were including the last 4 bits of the bar (*not used*).
 
 # 16-October-2023
-- `amcdan23`: Fixed mapped ECAM memory address range. Found that the mapped addresses for the PCI device enumeration was wrong: the devices and bridges were being configured in the wrong order, and the bus + slot were being stored in the wrong part of the address. This fixed the bug where notifying the RNG (writing to the notify register) freezed the OS. Fixed these bugs. Also added bar pointers directly to the PCI bookkeeping structures, and the virtio bookkeeping structures.
+- `amcdan23`: Fixed mapped ECAM memory address range. Found that the mapped addresses for the PCI device enumeration was wrong: the devices and bridges were being configured in the wrong order, and the bus + slot were being stored in the wrong part of the address. This fixed the bug where notifying the RNG (writing to the notify register) freezed the OS. Fixed these bugs.
 
 # 15-October-2023
 - `amcdan23`: Added checks in `virtio.c` to confirm the descriptors of the device are set; also found that they were not being written properly. This led to the discovery that the capability pointers we were storing in our virtio bookkeeping were wrong. =
