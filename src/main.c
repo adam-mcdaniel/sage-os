@@ -85,10 +85,10 @@ static void init_systems(void)
 #endif
 #ifdef USE_VIRTIO
     virtio_init();
-    uint64_t stvec = (uint64_t)os_trap_handler;
+    uint64_t stvec = _spawn_kthread;
     stvec &= ~0x3;
     CSR_WRITE("stvec", stvec);
-    debugf("STVEC: 0x%p, 0x%p\n", stvec, os_trap_handler);
+    debugf("STVEC: 0x%p, 0x%p\n", stvec, _spawn_kthread);
 
     uint8_t buffer[16] = {0};
     debugf("RNG State Before:");

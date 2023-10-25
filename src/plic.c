@@ -87,10 +87,10 @@ void plic_init(void)
     plic_enable(0, PLIC_PCI_INTC);
     plic_enable(0, PLIC_PCI_INTD);
 
-    plic_set_threshold(0, 3);
+    plic_set_threshold(0, 0);
 
-    plic_set_priority(PLIC_PCI_INTA, 3);
-    plic_set_priority(PLIC_PCI_INTB, 3);
-    plic_set_priority(PLIC_PCI_INTC, 3);
-    plic_set_priority(PLIC_PCI_INTD, 3);
+    plic_set_priority(PLIC_PCI_INTA, 7);
+    plic_set_priority(PLIC_PCI_INTB, 7);
+    plic_set_priority(PLIC_PCI_INTC, 7);
+    plic_set_priority(PLIC_PCI_INTD, 7);
 }

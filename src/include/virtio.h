@@ -232,3 +232,45 @@ volatile VirtioCapability *virtio_get_capability(volatile VirtioDevice *dev, uin
 volatile VirtioDevice *virtio_get_by_device(volatile PCIDevice *pcidevice);
 
 volatile uint32_t *virtio_notify_register(volatile VirtioDevice *device);
+
+
+void virtio_send_descriptor(volatile VirtioDevice *device, uint16_t which_queue, VirtioDescriptor descriptor, bool notify_device_when_done);
+
+VirtioDescriptor *virtio_receive_descriptor(volatile VirtioDevice *device, uint16_t which_queue, uint32_t *id, uint32_t *len);
+
+uint64_t virtio_count_received_descriptors(volatile VirtioDevice *device, uint16_t which_queue);
+
+
+typedef struct VirtioBlockConfig {
+   uint64_t capacity;
+   uint32_t size_max;
+   uint32_t seg_max;
+   struct VirtioBlockGeometry {
+      uint16_t cylinders;
+      uint8_t heads;
+      uint8_t sectors;
+   } geometry;
+   uint32_t blk_size; // the size of a sector, usually 512
+   struct VirtioBlockTopology {
+      // # of logical blocks per physical block (log2)
+      uint8_t physical_block_exp;
+      // offset of first aligned logical block
+      uint8_t alignment_offset;
+      // suggested minimum I/O size in blocks
+      uint16_t min_io_size;
+      // optimal (suggested maximum) I/O size in blocks
+      uint32_t opt_io_size;
+   } topology;
+   uint8_t writeback;
+   uint8_t unused0[3];
+   uint32_t max_discard_sectors;
+   uint32_t max_discard_seg;
+   uint32_t discard_sector_alignment;
+   uint32_t max_write_zeroes_sectors;
+   uint32_t max_write_zeroes_seg;
+   uint8_t write_zeroes_may_unmap;
+   uint8_t unused1[3];
+} VirtioBlockConfig;
+
+
+volatile struct VirtioBlockConfig *virtio_get_block_config(VirtioDevice *device);

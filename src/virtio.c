@@ -17,20 +17,44 @@
 
 static Vector *virtio_devices = NULL;
 
-bool virtio_is_rng_device(VirtioDevice *dev) {
-    return dev->pcidev->ecam_header->device_id == VIRTIO_PCI_DEVICE_ID(VIRTIO_PCI_DEVICE_ENTROPY);
+volatile struct VirtioBlockConfig *virtio_get_block_config(VirtioDevice *device) {
+    return (volatile struct VirtioBlockConfig *)pci_get_device_specific_config(device->pcidev);
 }
 
-VirtioDevice *virtio_get_rng_device() {
+uint16_t virtio_get_device_id(VirtioDevice *dev) {
+    return dev->pcidev->ecam_header->device_id;
+}
+
+bool virtio_is_rng_device(VirtioDevice *dev) {
+    return virtio_get_device_id(dev) == VIRTIO_PCI_DEVICE_ID(VIRTIO_PCI_DEVICE_ENTROPY);
+}
+
+bool virtio_is_block_device(VirtioDevice *dev) {
+    return virtio_get_device_id(dev) == VIRTIO_PCI_DEVICE_ID(VIRTIO_PCI_DEVICE_BLOCK);
+}
+
+VirtioDevice *virtio_get_device(uint16_t device_type) {
     for (uint16_t i=0; i<virtio_count_saved_devices(); i++) {
         VirtioDevice *dev = virtio_get_nth_saved_device(i);
-        if (virtio_is_rng_device(dev)) {
+        if (virtio_get_device_id(dev) == VIRTIO_PCI_DEVICE_ID(device_type)) {
             return dev;
         }
     }
 
-    debugf("No RNG device could be found");
+    debugf("No device could be found");
     return NULL;
+}
+
+VirtioDevice *virtio_get_rng_device(void) {
+    return virtio_get_device(VIRTIO_PCI_DEVICE_ENTROPY);
+}
+
+VirtioDevice *virtio_get_block_device(void) {
+    return virtio_get_device(VIRTIO_PCI_DEVICE_BLOCK);
+}
+
+VirtioDevice *virtio_get_gpu_device(void) {
+    return virtio_get_device(VIRTIO_PCI_DEVICE_GPU);
 }
 
 VirtioDevice *virtio_get_nth_saved_device(uint16_t n) {
@@ -161,6 +185,7 @@ void virtio_init(void) {
         }
     }
     rng_init();
+    block_device_init();
     debugf("virtio_init: Done initializing virtio system\n");
 }
 
@@ -202,4 +227,70 @@ void virtio_notify(volatile VirtioDevice *viodev, uint16_t which_queue)
     debugf("Notifying at 0x%p on instruction...\n", notify_register);
     *notify_register = which_queue;
     debugf("Notified device\n\n");
+}
+
+// Select the queue and get its size
+uint64_t virtio_set_queue_and_get_size(volatile VirtioDevice *device, uint16_t which_queue) {
+    device->common_cfg->queue_select = which_queue;
+    uint16_t num_queues = device->common_cfg->num_queues;
+
+    if (which_queue >= num_queues) {
+        fatalf(LOG_ERROR, "virtio_notify: Provided queue number %d is too big (num_queues=%d)...\n", which_queue, num_queues);
+        return -1ULL;
+    }
+
+    return device->common_cfg->queue_size;
+}
+
+void virtio_send_descriptor(volatile VirtioDevice *device, uint16_t which_queue, VirtioDescriptor descriptor, bool notify_device_when_done) {
+    // Confirm the device is ready
+    if (!device->ready) {
+        fatalf("device is not ready\n");
+        return;
+    }
+
+    // Select the queue we're using
+    if (which_queue >= device->common_cfg->num_queues) {
+        fatalf("queue number %d is too big (num_queues=%d)\n", which_queue, device->common_cfg->num_queues);
+        return;
+    }
+
+    // The size of the queue we're using
+    uint64_t queue_size = virtio_set_queue_and_get_size(device, which_queue);
+    uint64_t descriptor_index = device->desc_idx;
+
+    // Put the descriptor in the descriptor table
+    device->desc[descriptor_index] = descriptor;
+    // Put the descriptor into the driver ring
+    device->driver->ring[device->driver->idx % queue_size] = descriptor_index;
+    // Increment the index to make it "visible" to the device
+    device->driver->idx++;
+    // Update the descriptor index for our bookkeeping
+    device->desc_idx = (device->desc_idx + 1) % queue_size;
+
+    // Notify the device if we're ready to do so
+    if (notify_device_when_done) {
+        virtio_notify(device, which_queue);
+    }
+}
+
+VirtioDescriptor *virtio_receive_descriptor(volatile VirtioDevice *device, uint16_t which_queue, uint32_t *id, uint32_t *len) {
+    uint64_t queue_size = virtio_set_queue_and_get_size(device, which_queue);
+    uint64_t descriptor_index = device->device_idx;
+    VirtioDescriptor *descriptor = &device->desc[descriptor_index];
+    *id = device->device->ring[device->device_idx % queue_size].id;
+    *len = device->device->ring[device->device_idx % queue_size].len;
+    device->device_idx = (device->device_idx + 1) % queue_size;
+    return descriptor;
+}
+
+uint64_t virtio_count_received_descriptors(volatile VirtioDevice *device, uint16_t which_queue) {
+    uint64_t queue_size = virtio_set_queue_and_get_size(device, which_queue);
+    uint64_t device_idx = device->device_idx;
+    uint64_t driver_idx = device->driver_idx;
+    uint64_t result = driver_idx - device_idx;
+    if (device_idx > driver_idx) {
+        result += queue_size;
+    }
+    return result;
 }
