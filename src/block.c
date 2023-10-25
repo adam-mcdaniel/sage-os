@@ -26,9 +26,9 @@ void block_device_send_request(BlockRequestPacket *packet) {
     debugf("Sending block request\n");
     // First descriptor is the header
     VirtioDescriptor header;
-    header.addr = kernel_mmu_translate(packet);
+    header.addr = kernel_mmu_translate((uint64_t)packet);
     header.flags = VIRTQ_DESC_F_NEXT;
-    header.len = sizeof(BlockRequestPacket);
+    header.len = sizeof(uint32_t) + sizeof(uint32_t) + sizeof(uint64_t);
 
     // Second descriptor is the data
     VirtioDescriptor data;
