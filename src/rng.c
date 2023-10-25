@@ -12,10 +12,10 @@
 #include <csr.h>
 
 //use this like a queue
-volatile static Vector *rng_active_jobs;
-volatile static VirtioDevice *rng_device;
+static Vector *rng_active_jobs;
+static VirtioDevice *rng_device;
 
-void rng_init() {
+void rng_device_init() {
     rng_active_jobs = vector_new();
     rng_device = virtio_get_rng_device();
     debugf("RNG init done for device at %p\n", rng_device->pcidev->ecam_header);
@@ -30,11 +30,11 @@ void rng_fill(void *virtual_buffer_address, uint16_t size) {
 
     if (!rng_device->ready) {
         fatalf("RNG is not ready\n");
-        return false;
+        return;
     }
 
     VirtioDescriptor desc;
-    desc.addr = kernel_mmu_translate(virtual_buffer_address);
+    desc.addr = kernel_mmu_translate((uintptr_t)virtual_buffer_address);
     desc.len = size;
     desc.flags = VIRTQ_DESC_F_WRITE;
     desc.next = 0;

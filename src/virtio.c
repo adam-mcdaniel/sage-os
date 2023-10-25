@@ -12,8 +12,9 @@
 #include <sched.h>
 #include <syscall.h>
 #include <compiler.h>
+#include <block.h>
+#include <rng.h>
 
-#include "include/virtio.h"
 
 static Vector *virtio_devices = NULL;
 
@@ -69,8 +70,8 @@ void virtio_save_device(VirtioDevice device) {
     vector_push_ptr(virtio_devices, mem);
 }
 
-volatile VirtioDevice *virtio_get_by_device(volatile PCIDevice *pcidevice) {
-    for(int i = 0; i < vector_size(virtio_devices);i++){
+VirtioDevice *virtio_from_pci_device(PCIDevice *pcidevice) {
+    for(uint32_t i = 0; i < vector_size(virtio_devices);i++){
         VirtioDevice *curr_virt_device = NULL;
         vector_get_ptr(virtio_devices, i, &curr_virt_device);
         if(curr_virt_device->pcidev == pcidevice){
@@ -89,7 +90,7 @@ uint64_t virtio_count_saved_devices(void) {
 // If this is zero, it will get the common configuration capability. If this is
 // one, it will get the notify capability. If this is two, it will get the ISR
 // capability. Etc.
-volatile struct VirtioCapability *virtio_get_capability(volatile VirtioDevice *dev, uint8_t type) {
+volatile struct VirtioCapability *virtio_get_capability(VirtioDevice *dev, uint8_t type) {
     return pci_get_virtio_capability(dev->pcidev, type);
 }
 
@@ -109,13 +110,13 @@ void virtio_init(void) {
     
     for (uint64_t i = 0; i < num_pci_devices; ++i) {
         // Get the PCI device
-        volatile PCIDevice *pcidevice = pci_get_nth_saved_device(i);
+        PCIDevice *pcidevice = pci_get_nth_saved_device(i);
         
         // Is this a virtio device?
         if (pci_is_virtio_device(pcidevice)) { // Access through ecam_header
 
             // Create a new bookkeeping structure for the virtio device
-            volatile VirtioDevice viodev;
+            VirtioDevice viodev;
             // Add the PCI device to the bookkeeping structure
             viodev.pcidev = pcidevice;
             // Add the common configuration, notify capability, and ISR to the bookkeeping structure
@@ -171,9 +172,9 @@ void virtio_init(void) {
 
             // Add the physical addresses for the descriptor table, driver ring, and device ring to the common configuration
             // We translate the virtual addresses so the devices can actuall access the memory.
-            void *phys_desc = kernel_mmu_translate(viodev.desc),
-                *phys_driver = kernel_mmu_translate(viodev.driver),
-                *phys_device = kernel_mmu_translate(viodev.device);
+            uint64_t phys_desc = kernel_mmu_translate((uint64_t)viodev.desc),
+                phys_driver = kernel_mmu_translate((uint64_t)viodev.driver),
+                phys_device = kernel_mmu_translate((uint64_t)viodev.device);
             viodev.common_cfg->queue_desc = phys_desc;
             viodev.common_cfg->queue_driver = phys_driver;
             viodev.common_cfg->queue_device = phys_device;
@@ -196,14 +197,14 @@ void virtio_init(void) {
             virtio_save_device(viodev);
         }
     }
-    rng_init();
+    rng_device_init();
     block_device_init();
     debugf("virtio_init: Done initializing virtio system\n");
 }
 
 
 // Get the notify capability for the given virtio device.
-volatile uint32_t *virtio_notify_register(volatile VirtioDevice *device) {
+volatile uint16_t *virtio_notify_register(VirtioDevice *device) {
     // struct VirtioCapability *vio_cap = pci_get_virtio_capability(device->pcidev, VIRTIO_PCI_CAP_NOTIFY_CFG);
     // volatile VirtioPciNotifyCfg *notify_cap = pci_get_virtio_notify_capability(device->pcidev);
     uint8_t bar_num = device->notify_cap->cap.bar;
@@ -214,7 +215,7 @@ volatile uint32_t *virtio_notify_register(volatile VirtioDevice *device) {
     debugf("Notify cap bar=%d offset=%x, (len=%d)\n", bar_num, offset, device->notify_cap->cap.length);
     debugf("BAR at %x, offset=%x, queue_notify_off=%x, notify_off_mult=%x\n", bar, offset, queue_notify_off, notify_off_multiplier);
 
-    uint32_t *notify = bar + BAR_NOTIFY_CAP(offset, queue_notify_off, notify_off_multiplier);
+    uint16_t *notify = (uint16_t*)(bar + BAR_NOTIFY_CAP(offset, queue_notify_off, notify_off_multiplier));
     return notify;
 }
 
@@ -223,7 +224,7 @@ volatile uint32_t *virtio_notify_register(volatile VirtioDevice *device) {
  * @param viodev - virtio device to notify for
  * @param which_queue - queue number to notify
  */
-void virtio_notify(volatile VirtioDevice *viodev, uint16_t which_queue)
+void virtio_notify(VirtioDevice *viodev, uint16_t which_queue)
 {
     uint16_t num_queues = viodev->common_cfg->num_queues;
 
@@ -242,21 +243,21 @@ void virtio_notify(volatile VirtioDevice *viodev, uint16_t which_queue)
 }
 
 // Select the queue and get its size
-uint64_t virtio_set_queue_and_get_size(volatile VirtioDevice *device, uint16_t which_queue) {
+uint64_t virtio_set_queue_and_get_size(VirtioDevice *device, uint16_t which_queue) {
     if (device->common_cfg->queue_select != which_queue) {
         device->common_cfg->queue_select = which_queue;
     }
     uint16_t num_queues = device->common_cfg->num_queues;
 
     if (which_queue >= num_queues) {
-        fatalf(LOG_ERROR, "virtio_notify: Provided queue number %d is too big (num_queues=%d)...\n", which_queue, num_queues);
+        fatalf("virtio_notify: Provided queue number %d is too big (num_queues=%d)...\n", which_queue, num_queues);
         return -1ULL;
     }
 
     return device->common_cfg->queue_size;
 }
 
-void virtio_send_descriptor(volatile VirtioDevice *device, uint16_t which_queue, VirtioDescriptor descriptor, bool notify_device_when_done) {
+void virtio_send_descriptor(VirtioDevice *device, uint16_t which_queue, VirtioDescriptor descriptor, bool notify_device_when_done) {
     // Confirm the device is ready
     if (!device->ready) {
         fatalf("device is not ready\n");
@@ -302,7 +303,7 @@ void virtio_send_descriptor(volatile VirtioDevice *device, uint16_t which_queue,
 }
 
 
-void virtio_send_descriptor_chain(volatile VirtioDevice *device, uint16_t which_queue, VirtioDescriptor *descriptors, uint16_t num_descriptors, bool notify_device_when_done) {
+void virtio_send_descriptor_chain(VirtioDevice *device, uint16_t which_queue, VirtioDescriptor *descriptors, uint16_t num_descriptors, bool notify_device_when_done) {
     // Confirm the device is ready
     if (!device->ready) {
         fatalf("device is not ready\n");
@@ -366,17 +367,17 @@ void virtio_send_descriptor_chain(volatile VirtioDevice *device, uint16_t which_
 
 
 
-VirtioDescriptor *virtio_receive_descriptor(volatile VirtioDevice *device, uint16_t which_queue, uint32_t *id, uint32_t *len) {
+volatile VirtioDescriptor *virtio_receive_descriptor(VirtioDevice *device, uint16_t which_queue, uint32_t *id, uint32_t *len) {
     uint64_t queue_size = virtio_set_queue_and_get_size(device, which_queue);
     uint64_t descriptor_index = device->device_idx;
-    VirtioDescriptor *descriptor = &device->desc[descriptor_index];
+    volatile VirtioDescriptor *descriptor = (volatile VirtioDescriptor*)&device->desc[descriptor_index];
     *id = device->device->ring[device->device_idx % queue_size].id;
     *len = device->device->ring[device->device_idx % queue_size].len;
     device->device_idx = (device->device_idx + 1) % queue_size;
     return descriptor;
 }
 
-uint64_t virtio_count_received_descriptors(volatile VirtioDevice *device, uint16_t which_queue) {
+uint64_t virtio_count_received_descriptors(VirtioDevice *device, uint16_t which_queue) {
     uint64_t queue_size = virtio_set_queue_and_get_size(device, which_queue);
     uint64_t device_idx = device->device_idx;
     uint64_t driver_idx = device->driver_idx;
