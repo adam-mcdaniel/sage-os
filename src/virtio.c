@@ -113,6 +113,7 @@ void virtio_init(void) {
         
         // Is this a virtio device?
         if (pci_is_virtio_device(pcidevice)) { // Access through ecam_header
+
             // Create a new bookkeeping structure for the virtio device
             volatile VirtioDevice viodev;
             // Add the PCI device to the bookkeeping structure
@@ -121,6 +122,11 @@ void virtio_init(void) {
             viodev.common_cfg = pci_get_virtio_common_config(pcidevice);
             viodev.notify_cap = pci_get_virtio_notify_capability(pcidevice);
             viodev.isr = pci_get_virtio_isr_status(pcidevice);
+            if (virtio_is_rng_device(&viodev)) {
+                debugf("Setting up RNG device\n");
+            } else if (virtio_is_block_device(&viodev)) {
+                debugf("Setting up block device\n");
+            }
 
             debugf("Common config at 0x%08x\n", viodev.common_cfg);
             debugf("Notify config at 0x%08x\n", viodev.notify_cap);
@@ -133,6 +139,12 @@ void virtio_init(void) {
             debugf("Status: %x\n", viodev.common_cfg->device_status);
             viodev.common_cfg->device_status |= VIRTIO_F_DRIVER;
             debugf("Status: %x\n", viodev.common_cfg->device_status);
+            if (viodev.common_cfg->device_feature & VIRTIO_F_IN_ORDER) {
+                debugf("Device supports in-order\n");
+                viodev.common_cfg->driver_feature |= VIRTIO_F_IN_ORDER;
+            } else {
+                debugf("Device does not support in-order\n");
+            }
             viodev.common_cfg->device_status |= VIRTIO_F_FEATURES_OK;
             if (!(viodev.common_cfg->device_status & VIRTIO_F_FEATURES_OK)) {
                 debugf("Device does not accept features\n");
@@ -319,17 +331,16 @@ void virtio_send_descriptor_chain(volatile VirtioDevice *device, uint16_t which_
         uint64_t driver_index = (device->driver_idx + i) % queue_size;
         debugf("Writing descriptor %d to queue %d\n", descriptor_index, which_queue);
         VirtioDescriptor descriptor = descriptors[i];
+        descriptor.next = (descriptor_index + 1) % queue_size;
         if (i < num_descriptors - 1) {
             descriptor.flags |= VIRTQ_DESC_F_NEXT;
-            descriptor.next = (descriptor_index + 1) % queue_size;
         } else {
             descriptor.flags &= ~VIRTQ_DESC_F_NEXT;
-            descriptor.next = 0;
         }
-        debugf("Descriptor addr: %x\n", descriptor.addr);
-        debugf("Descriptor len: %x\n", descriptor.len);
-        debugf("Descriptor flags: %x\n", descriptor.flags);
-        debugf("Descriptor next: %x\n", descriptor.next);
+        debugf("Descriptor addr: %p\n", descriptor.addr);
+        debugf("Descriptor len: 0x%x = %d\n", descriptor.len, descriptor.len);
+        debugf("Descriptor flags: 0x%x = %d\n", descriptor.flags, descriptor.flags);
+        debugf("Descriptor next: 0x%x = %d\n", descriptor.next, descriptor.next);
         // Put the descriptor in the descriptor table
         device->desc[descriptor_index] = descriptor;
         // Put the descriptor into the driver ring
@@ -340,6 +351,9 @@ void virtio_send_descriptor_chain(volatile VirtioDevice *device, uint16_t which_
     device->desc_idx += num_descriptors;
     device->driver_idx += num_descriptors;
     device->driver->idx += num_descriptors;
+
+    device->desc_idx %= queue_size;
+    device->driver_idx %= queue_size;
 
     debugf("Driver index: %d\n", device->driver->idx);
     debugf("Descriptor index: %d\n", device->desc_idx);
