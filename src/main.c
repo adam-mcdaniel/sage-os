@@ -142,25 +142,6 @@ static void init_systems(void)
     for (int i=0; i<sizeof(sector)/sizeof(sector[i]); i++) {
         sector[i] = i;
     }
-
-    for (int i=0; i<sizeof(sector)/sizeof(sector[i])/8; i++) {
-        debugf("%d %d %d %d %d %d %d %d\n",
-            sector[i], sector[i+1], sector[i+2], sector[i+3],
-            sector[i+4], sector[i+5], sector[i+6], sector[i+7]);
-    }
-
-    block_device_write_sector(0, sector);
-
-    for (int i=0; i<sizeof(sector)/sizeof(sector[i]); i++) {
-        sector[i] = 0;
-    }
-
-    for (int i=0; i<sizeof(sector)/sizeof(sector[i])/8; i++) {
-        debugf("%d %d %d %d %d %d %d %d\n",
-            sector[i], sector[i+1], sector[i+2], sector[i+3],
-            sector[i+4], sector[i+5], sector[i+6], sector[i+7]);
-    }
-
     block_device_read_sector(0, sector);
 
     for (int i=0; i<sizeof(sector)/sizeof(sector[i])/8; i++) {
@@ -168,6 +149,26 @@ static void init_systems(void)
             sector[i], sector[i+1], sector[i+2], sector[i+3],
             sector[i+4], sector[i+5], sector[i+6], sector[i+7]);
     }
+
+    // block_device_write_sector(0, sector);
+
+    // for (int i=0; i<sizeof(sector)/sizeof(sector[i]); i++) {
+    //     sector[i] = 0;
+    // }
+
+    // for (int i=0; i<sizeof(sector)/sizeof(sector[i])/8; i++) {
+    //     debugf("%d %d %d %d %d %d %d %d\n",
+    //         sector[i], sector[i+1], sector[i+2], sector[i+3],
+    //         sector[i+4], sector[i+5], sector[i+6], sector[i+7]);
+    // }
+
+    // block_device_read_sector(0, sector);
+
+    // for (int i=0; i<sizeof(sector)/sizeof(sector[i])/8; i++) {
+    //     debugf("%d %d %d %d %d %d %d %d\n",
+    //         sector[i], sector[i+1], sector[i+2], sector[i+3],
+    //         sector[i+4], sector[i+5], sector[i+6], sector[i+7]);
+    // }
     
     
     // debugf("\n");char bytes[5] = {0};
