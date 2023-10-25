@@ -69,10 +69,10 @@ uintptr_t mmu_translate(const struct page_table *tab,
 uintptr_t kernel_mmu_translate(uintptr_t vaddr);
 
 bool mmu_map(struct page_table *tab, 
-             unsigned long vaddr, 
-             unsigned long paddr, 
+             uintptr_t vaddr, 
+             uintptr_t paddr, 
              unsigned char lvl, 
-             unsigned long bits);
+             uintptr_t bits);
 void mmu_free(struct page_table *tab);
 
 void debug_page_table(struct page_table *tab, uint8_t lvl);
