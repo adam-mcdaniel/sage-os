@@ -44,6 +44,7 @@ void block_device_send_request(BlockRequestPacket *packet) {
     data.addr = kernel_mmu_translate(packet->data);
     if (packet->type == VIRTIO_BLK_T_IN)
         data.flags = VIRTQ_DESC_F_WRITE;
+    data.flags |= VIRTQ_DESC_F_NEXT;
     data.len = packet->sector_count * 512;
 
     // The third descriptor is the status
@@ -59,9 +60,6 @@ void block_device_send_request(BlockRequestPacket *packet) {
     chain[2] = status;
 
     // Create the chain
-    // virtio_send_descriptor(block_device, 0, header, false);
-    // virtio_send_descriptor(block_device, 0, data, false);
-    // virtio_send_descriptor(block_device, 0, status, true);
     debugf("Status before: %d\n", packet->status);
     virtio_send_descriptor_chain(block_device, 0, chain, 3, true);
 
@@ -73,7 +71,6 @@ void block_device_read_sector(uint64_t sector, uint8_t *data) {
     debugf("Reading sector %d\n", sector);
     BlockRequestPacket packet;
     packet.type = VIRTIO_BLK_T_IN;
-    packet.reserved = 0;
     packet.sector = sector;
     packet.data = data;
     packet.sector_count = 1;
@@ -86,7 +83,6 @@ void block_device_write_sector(uint64_t sector, uint8_t *data) {
     debugf("Writing sector %d\n", sector);
     BlockRequestPacket packet;
     packet.type = VIRTIO_BLK_T_OUT;
-    packet.reserved = 0;
     packet.sector = sector;
     packet.data = data;
     packet.sector_count = 1;
