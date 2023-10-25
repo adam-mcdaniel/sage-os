@@ -97,11 +97,6 @@ void block_device_write_sector(uint64_t sector, uint8_t *data) {
 }
 
 void block_device_read_sectors(uint64_t sector, uint8_t *data, uint64_t count) {
-    // uint64_t sector_size = block_device_get_sector_size();
-    // for (uint64_t i=0; i<count; i++) {
-    //     block_device_read_sector(sector + i, data + i * sector_size);
-    // }
-
     debugf("Read sectors %d\n", sector);
     BlockRequestPacket packet;
     packet.type = VIRTIO_BLK_T_IN;
@@ -114,11 +109,6 @@ void block_device_read_sectors(uint64_t sector, uint8_t *data, uint64_t count) {
 }
 
 void block_device_write_sectors(uint64_t sector, uint8_t *data, uint64_t count) {
-    // uint64_t sector_size = block_device_get_sector_size();
-    // debugf("Writing %d sectors (size=%d)\n", count, sector_size);
-    // for (uint64_t i=0; i<count; i++) {
-    //     block_device_write_sector(sector + i, data + i * sector_size);
-    // }
     debugf("Writing sectors %d\n", sector);
     BlockRequestPacket packet;
     packet.type = VIRTIO_BLK_T_OUT;
