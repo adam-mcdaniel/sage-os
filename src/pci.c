@@ -512,10 +512,16 @@ void pci_dispatch_irq(int irq)
         
         if (virtio_is_rng_device(virtdevice)) {
             debugf("RNG sent interrupt!\n");
+            VirtioDescriptor descriptors[16];
+            uint16_t received = virtio_receive_descriptor_chain(virtdevice, 0, descriptors, 16, true);
+            debugf("Received %d descriptors\n", received);
         }
 
         if (virtio_is_block_device(virtdevice)) {
             debugf("Block device sent interrupt!\n");
+            VirtioDescriptor descriptors[16];
+            uint16_t received = virtio_receive_descriptor_chain(virtdevice, 0, descriptors, 16, true);
+            debugf("Received %d descriptors\n", received);
         }
     }
 
