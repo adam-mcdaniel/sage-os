@@ -210,20 +210,27 @@ PCIDevice *pci_find_device_by_irq(uint8_t irq) {
     debugf("No device found with IRQ %d\n", irq);
     return NULL;
 }
+
+
+// Get the common configuration capability for the given virtio device.
+volatile void *pci_get_device_specific_config(PCIDevice *device) {
+    struct VirtioCapability *vio_cap = pci_get_virtio_capability(device, VIRTIO_PCI_CAP_DEVICE_CFG);
+    debugf("Getting device specific config from bar #%d = %p + 0x%x\n", vio_cap->bar, ((uint64_t)device->ecam_header->type0.bar[vio_cap->bar] & ~0xf), (uint64_t)vio_cap->offset);
+    return (volatile void*)(((uint64_t)device->ecam_header->type0.bar[vio_cap->bar] & ~0xf) + (uint64_t)vio_cap->offset);
+}
+
 // Get the common configuration capability for the given virtio device.
 volatile struct VirtioPciCommonCfg *pci_get_virtio_common_config(PCIDevice *device) {
     struct VirtioCapability *vio_cap = pci_get_virtio_capability(device, VIRTIO_PCI_CAP_COMMON_CFG);
     debugf("Getting common capability from bar #%d = %p + 0x%x\n", vio_cap->bar, ((uint64_t)device->ecam_header->type0.bar[vio_cap->bar] & ~0xf), (uint64_t)vio_cap->offset);
     return (volatile struct VirtioPciCommonCfg *)(((uint64_t)device->ecam_header->type0.bar[vio_cap->bar] & ~0xf) + (uint64_t)vio_cap->offset);
-    // return vio_cap;
 }
+
 // Get the notify capability for the given virtio device.
 volatile struct VirtioPciNotifyCfg *pci_get_virtio_notify_capability(PCIDevice *device) {
     struct VirtioCapability *vio_cap = pci_get_virtio_capability(device, VIRTIO_PCI_CAP_NOTIFY_CFG);
     debugf("Cap at %p\n", vio_cap);
     debugf("Getting notify capability from bar #%d = %p + 0x%x (len=%d) %d\n", vio_cap->bar, ((uint64_t)device->ecam_header->type0.bar[vio_cap->bar] & ~0xf), (uint64_t)vio_cap->offset, vio_cap->len, sizeof(VirtioPciNotifyCfg));
-
-    // return (volatile struct VirtioPciNotifyCfg *)(((uint64_t)device->ecam_header->type0.bar[vio_cap->bar] & ~0xf) + (uint64_t)vio_cap->offset);
     return vio_cap;
 }
 
@@ -504,9 +511,9 @@ void pci_dispatch_irq(int irq)
         VirtioDevice *virtdevice = virtio_get_by_device(pcidevice);
         debugf("Virtio device! %p\n", virtdevice->pcidev->ecam_header);
         
-        // if (virtio_is_rng_device(virtdevice)) {
-        //     debugf("RNG sent interrupt!\n");
-        // }
+        if (virtio_is_rng_device(virtdevice)) {
+            debugf("RNG sent interrupt!\n");
+        }
     }
 
     debugf("Leaving dispatch IRQ\n");
