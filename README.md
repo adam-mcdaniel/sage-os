@@ -18,6 +18,8 @@ Sort your entries in descending order (newest entries at the top).
 
 - `amcdan23`: Got RNG working! Added SRETs to trap handler to return correctly instead of instruction faults, added catches for important causes, and changed PLIC threshold to properly catch these. Fixed issue where RNG device was using the descriptor index for the queue to notify in successive queries.
 
+- `ttahmid`: Implemented all the functions for block device, `virtio_setup_block_request`, `block_read`, `block_write`. `virtio_submit_and_wait` needs to worked on. Testing needs to be done after RNG is working properly.
+
 # 23-October-2023
 
 - `amcdan23`: Fixed notify register address calculations, fixed how bars were stored in bookkeeping. Successfully got the ISR to change for our RNG device, but now PC gets zeroed when we write here. Fixed issue where notification did not trigger trap handler; now trap handler is triggered when we notify a device.
