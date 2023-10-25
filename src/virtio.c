@@ -319,7 +319,7 @@ void virtio_send_descriptor_chain(volatile VirtioDevice *device, uint16_t which_
         uint64_t driver_index = (device->driver_idx + i) % queue_size;
         debugf("Writing descriptor %d to queue %d\n", descriptor_index, which_queue);
         VirtioDescriptor descriptor = descriptors[i];
-        if (i == num_descriptors - 1) {
+        if (i < num_descriptors - 1) {
             descriptor.flags |= VIRTQ_DESC_F_NEXT;
             descriptor.next = (descriptor_index + 1) % queue_size;
         } else {
