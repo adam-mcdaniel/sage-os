@@ -16,7 +16,7 @@ Sort your entries in descending order (newest entries at the top).
 
 # 25-October-2023
 
-- `amcdan23`: Added functions for block device initialization, sending request packets, writing to and reading from sectors. Added function for chaining virtio descriptors. Fixed all the warnings!
+- `amcdan23`: Got block device working! Added functions for block device initialization, sending request packets, writing to and reading from sectors. Added function for chaining virtio descriptors. Fixed all the warnings!
 
 # 24-October-2023
 
