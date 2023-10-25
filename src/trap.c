@@ -26,7 +26,6 @@ void os_trap_handler(void)
     CSR_READ(epc, "sepc");
     CSR_READ(tval, "stval");
     CSR_READ(sie, "sie");
-    CSR_CLEAR("sie");
 
     // __asm__ volatile ("savegp");
     // __asm__ volatile ("savefp");
