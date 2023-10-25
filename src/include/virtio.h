@@ -240,7 +240,9 @@ void virtio_send_descriptor(VirtioDevice *device, uint16_t which_queue, VirtioDe
 
 volatile VirtioDescriptor *virtio_receive_descriptor(VirtioDevice *device, uint16_t which_queue, uint32_t *id, uint32_t *len);
 
-uint64_t virtio_count_received_descriptors(VirtioDevice *device, uint16_t which_queue);
+bool virtio_has_received_descriptor(VirtioDevice *device, uint16_t which_queue);
+
+uint16_t virtio_receive_descriptor_chain(VirtioDevice *device, uint16_t which_queue, VirtioDescriptor *descriptors, uint16_t num_descriptors, bool wait_for_descriptor);
 
 void virtio_send_descriptor_chain(VirtioDevice *device, uint16_t which_queue, VirtioDescriptor *descriptors, uint16_t num_descriptors, bool notify_device_when_done);
 

@@ -193,6 +193,7 @@ void virtio_init(void) {
             debugf("Set up tables for virtio device\n");
             viodev.common_cfg->queue_enable = 1;
             viodev.common_cfg->device_status |= VIRTIO_F_DRIVER_OK;
+            viodev.device->flags = 0;
             // Add to vector using vector_push
             virtio_save_device(viodev);
         }
@@ -362,24 +363,64 @@ void virtio_send_descriptor_chain(VirtioDevice *device, uint16_t which_queue, Vi
 }
 
 
-
-volatile VirtioDescriptor *virtio_receive_descriptor(VirtioDevice *device, uint16_t which_queue, uint32_t *id, uint32_t *len) {
+uint16_t virtio_receive_descriptor_chain(VirtioDevice *device, uint16_t which_queue, VirtioDescriptor *received, uint16_t num_descriptors, bool wait_for_descriptor) {
     uint64_t queue_size = virtio_set_queue_and_get_size(device, which_queue);
-    uint64_t descriptor_index = device->device_idx;
+    if (wait_for_descriptor) {
+        virtio_wait_for_descriptor(device, which_queue);
+    }
+
+    if (!virtio_has_received_descriptor(device, which_queue)) {
+        debugf("No descriptor received\n");
+        return 0;
+    }
+    
+
+    // Get the descriptor index from the device ring
+    uint64_t descriptor_index = device->device->ring[device->device_idx % queue_size].id;
+    // Get the length of the descriptor
+    uint64_t len = device->device->ring[device->device_idx % queue_size].len;
     volatile VirtioDescriptor *descriptor = (volatile VirtioDescriptor*)&device->desc[descriptor_index];
-    *id = device->device->ring[device->device_idx % queue_size].id;
-    *len = device->device->ring[device->device_idx % queue_size].len;
-    device->device_idx = (device->device_idx + 1) % queue_size;
-    return descriptor;
+
+    uint16_t i = 0;
+    while (descriptor->flags & VIRTQ_DESC_F_NEXT) {
+        received[i++] = *descriptor;
+        debugf("Reading descriptor %d from queue %d\n", descriptor_index, which_queue);
+        debugf("Descriptor addr: %p\n", descriptor->addr);
+        debugf("Descriptor len: 0x%x = %d\n", descriptor->len, descriptor->len);
+        debugf("Descriptor flags: 0x%x = %d\n", descriptor->flags, descriptor->flags);
+        debugf("Descriptor next: 0x%x = %d\n", descriptor->next, descriptor->next);
+        descriptor_index = descriptor->next;
+        descriptor = (volatile VirtioDescriptor*)&device->desc[descriptor_index];
+    }
+
+    received[i] = *descriptor;
+    debugf("Reading descriptor %d from queue %d\n", i, which_queue);
+    debugf("Descriptor addr: %p\n", descriptor->addr);
+    debugf("Descriptor len: 0x%x = %d\n", descriptor->len, descriptor->len);
+    debugf("Descriptor flags: 0x%x = %d\n", descriptor->flags, descriptor->flags);
+    debugf("Descriptor next: 0x%x = %d\n", descriptor->next, descriptor->next);
+    i++;
+    device->device_idx = device->device->idx;
+    return i;
 }
 
-uint64_t virtio_count_received_descriptors(VirtioDevice *device, uint16_t which_queue) {
+VirtioDescriptor virtio_get_descriptor(VirtioDevice *device, uint16_t which_queue, uint16_t idx) {
     uint64_t queue_size = virtio_set_queue_and_get_size(device, which_queue);
-    uint64_t device_idx = device->device_idx;
-    uint64_t driver_idx = device->driver_idx;
-    uint64_t result = driver_idx - device_idx;
-    if (device_idx > driver_idx) {
-        result += queue_size;
+    uint64_t descriptor_index = idx % queue_size;
+    return device->desc[descriptor_index];
+}
+
+bool virtio_has_received_descriptor(VirtioDevice *device, uint16_t which_queue) {
+    virtio_set_queue_and_get_size(device, which_queue);
+    if (device->device_idx == device->device->idx) {
+        return false;
     }
-    return result;
+    return true;
+}
+
+void virtio_wait_for_descriptor(VirtioDevice *device, uint16_t which_queue) {
+    while (!virtio_has_received_descriptor(device, which_queue)) {
+        debugf("Blocking on descriptor\n");
+        // Do nothing
+    }
 }

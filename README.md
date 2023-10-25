@@ -16,7 +16,7 @@ Sort your entries in descending order (newest entries at the top).
 
 # 25-October-2023
 
-- `amcdan23`: Got working implementation block device working! Added functions for block device initialization, setting up and sending request packets, writing to and reading from sectors. Added function for chaining virtio descriptors which performs the packet request. Fixed all the warnings! Wrote `block_device_init`, `block_device_send_request`, `block_device_read_sector`, `block_device_write_sector`, `block_device_read_sectors`, `block_device_write_sectors`, `virtio_send_descriptor_chain`, and `virtio_send_descriptor`.
+- `amcdan23`: Got implementation of block device working! Added functions for block device initialization, setting up and sending request packets, writing to and reading from sectors. Added function for chaining virtio descriptors which performs the packet request. Fixed all the warnings! Wrote `block_device_init`, `block_device_send_request`, `block_device_read_sector`, `block_device_write_sector`, `block_device_read_sectors`, `block_device_write_sectors`, `virtio_send_descriptor_chain`, and `virtio_send_descriptor`.
 
 # 24-October-2023
 
