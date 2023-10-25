@@ -62,10 +62,11 @@ void block_device_send_request(BlockRequestPacket *packet) {
     // virtio_send_descriptor(block_device, 0, header, false);
     // virtio_send_descriptor(block_device, 0, data, false);
     // virtio_send_descriptor(block_device, 0, status, true);
+    debugf("Status before: %d\n", packet->status);
     virtio_send_descriptor_chain(block_device, 0, chain, 3, true);
 
     // Check the status
-    debugf("Status: %d\n", packet->status);
+    debugf("Status after: %d\n", packet->status);
 }
 
 void block_device_read_sector(uint64_t sector, uint8_t *data) {
