@@ -12,8 +12,8 @@
 #include <block.h>
 
 //use this like a queue
-volatile static Vector *device_active_jobs;
-volatile static VirtioDevice *block_device;
+static Vector *device_active_jobs;
+static VirtioDevice *block_device;
 
 void block_device_init() {
     device_active_jobs = vector_new();
@@ -21,7 +21,7 @@ void block_device_init() {
     debugf("Block device init done for device at %p\n", block_device->pcidev->ecam_header);
     block_device->ready = true;
 
-    VirtioBlockConfig *config = virtio_get_block_config(block_device);
+    volatile VirtioBlockConfig *config = virtio_get_block_config(block_device);
 
     debugf("Block device has %d segments\n", config->seg_max);
     debugf("Block device has %d max size\n", config->size_max);
@@ -41,7 +41,7 @@ void block_device_send_request(BlockRequestPacket *packet) {
 
     // Second descriptor is the data
     VirtioDescriptor data;
-    data.addr = kernel_mmu_translate(packet->data);
+    data.addr = kernel_mmu_translate((uint64_t)packet->data);
     if (packet->type == VIRTIO_BLK_T_IN)
         data.flags = VIRTQ_DESC_F_WRITE;
     data.flags |= VIRTQ_DESC_F_NEXT;

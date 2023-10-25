@@ -4,7 +4,7 @@
 #include <virtio.h>
 #include <kmalloc.h>
 #include <csr.h>
-#include "include/pci.h"
+#include <util.h>
 
 // These contain pointers to the common configurations for each device.
 // The `all_pci_devices` vector contains all devices, while the
@@ -171,7 +171,7 @@ PCIDevice *pci_find_device_by_irq(uint8_t irq) {
     // Check all devices in the vector
     for (uint32_t i=0; i<vector_size(irq_pci_devices[vector_idx]); i++) {
         // Get the nth PCI device listening for the IRQ
-        volatile PCIDevice *device = NULL;
+        PCIDevice *device = NULL;
         vector_get_ptr(irq_pci_devices[vector_idx], i, &device);
         debugf("Device: %p\n", device->ecam_header);
         // If the device is a Virtio device, check the Virtio ISR status
@@ -214,37 +214,36 @@ PCIDevice *pci_find_device_by_irq(uint8_t irq) {
 
 // Get the common configuration capability for the given virtio device.
 volatile void *pci_get_device_specific_config(PCIDevice *device) {
-    struct VirtioCapability *vio_cap = pci_get_virtio_capability(device, VIRTIO_PCI_CAP_DEVICE_CFG);
+    volatile struct VirtioCapability *vio_cap = pci_get_virtio_capability(device, VIRTIO_PCI_CAP_DEVICE_CFG);
     debugf("Getting device specific config from bar #%d = %p + 0x%x\n", vio_cap->bar, ((uint64_t)device->ecam_header->type0.bar[vio_cap->bar] & ~0xf), (uint64_t)vio_cap->offset);
-    return (volatile void*)(((uint64_t)device->ecam_header->type0.bar[vio_cap->bar] & ~0xf) + (uint64_t)vio_cap->offset);
+    return (volatile void*)(((uintptr_t)device->ecam_header->type0.bar[vio_cap->bar] & ~0xf) + (uintptr_t)vio_cap->offset);
 }
 
 // Get the common configuration capability for the given virtio device.
 volatile struct VirtioPciCommonCfg *pci_get_virtio_common_config(PCIDevice *device) {
-    struct VirtioCapability *vio_cap = pci_get_virtio_capability(device, VIRTIO_PCI_CAP_COMMON_CFG);
-    debugf("Getting common capability from bar #%d = %p + 0x%x\n", vio_cap->bar, ((uint64_t)device->ecam_header->type0.bar[vio_cap->bar] & ~0xf), (uint64_t)vio_cap->offset);
-    return (volatile struct VirtioPciCommonCfg *)(((uint64_t)device->ecam_header->type0.bar[vio_cap->bar] & ~0xf) + (uint64_t)vio_cap->offset);
+    volatile struct VirtioCapability *vio_cap = pci_get_virtio_capability(device, VIRTIO_PCI_CAP_COMMON_CFG);
+    debugf("Getting common capability from bar #%d = %p + 0x%x\n", vio_cap->bar, ((uintptr_t)device->ecam_header->type0.bar[vio_cap->bar] & ~0xf), (uintptr_t)vio_cap->offset);
+    return (volatile struct VirtioPciCommonCfg *)(((uintptr_t)device->ecam_header->type0.bar[vio_cap->bar] & ~0xf) + (uintptr_t)vio_cap->offset);
 }
 
 // Get the notify capability for the given virtio device.
 volatile struct VirtioPciNotifyCfg *pci_get_virtio_notify_capability(PCIDevice *device) {
-    struct VirtioCapability *vio_cap = pci_get_virtio_capability(device, VIRTIO_PCI_CAP_NOTIFY_CFG);
+    volatile struct VirtioCapability *vio_cap = pci_get_virtio_capability(device, VIRTIO_PCI_CAP_NOTIFY_CFG);
     debugf("Cap at %p\n", vio_cap);
-    debugf("Getting notify capability from bar #%d = %p + 0x%x (len=%d) %d\n", vio_cap->bar, ((uint64_t)device->ecam_header->type0.bar[vio_cap->bar] & ~0xf), (uint64_t)vio_cap->offset, vio_cap->len, sizeof(VirtioPciNotifyCfg));
-    return vio_cap;
+    debugf("Getting notify capability from bar #%d = %p + 0x%x (len=%d) %d\n", vio_cap->bar, ((uintptr_t)device->ecam_header->type0.bar[vio_cap->bar] & ~0xf), (uintptr_t)vio_cap->offset, vio_cap->len, sizeof(VirtioPciNotifyCfg));
+    return (volatile struct VirtioPciNotifyCfg*)vio_cap;
 }
 
 volatile uint8_t *pci_get_device_bar(PCIDevice *device, uint8_t bar_num) {
-    return device->ecam_header->type0.bar[bar_num] & ~0xf;
+    return (volatile uint8_t*)(uintptr_t)(device->ecam_header->type0.bar[bar_num] & ~0xf);
 }
 
 
 // Get the ISR capability for the given virtio device.
 volatile struct VirtioPciIsrCfg *pci_get_virtio_isr_status(PCIDevice *device) {
-    struct VirtioCapability *vio_cap = pci_get_virtio_capability(device, VIRTIO_PCI_CAP_ISR_CFG);
-    debugf("Getting ISR capability from bar #%d = %p + 0x%x\n", vio_cap->bar, ((uint64_t)device->ecam_header->type0.bar[vio_cap->bar] & ~0xf), (uint64_t)vio_cap->offset);
-    return (volatile struct VirtioPciIsrCfg *)(((uint64_t)device->ecam_header->type0.bar[vio_cap->bar] & ~0xf) + (uint64_t)vio_cap->offset);
-    // return vio_cap;
+    volatile struct VirtioCapability *vio_cap = pci_get_virtio_capability(device, VIRTIO_PCI_CAP_ISR_CFG);
+    debugf("Getting ISR capability from bar #%d = %p + 0x%x\n", vio_cap->bar, ((uintptr_t)device->ecam_header->type0.bar[vio_cap->bar] & ~0xf), (uintptr_t)vio_cap->offset);
+    return (volatile struct VirtioPciIsrCfg *)(((uintptr_t)device->ecam_header->type0.bar[vio_cap->bar] & ~0xf) + (uintptr_t)vio_cap->offset);
 }
 
 static void pci_configure_device(volatile struct pci_ecam *device, uint8_t bus_no, uint8_t device_no);
@@ -389,7 +388,7 @@ static void pci_configure_device(volatile struct pci_ecam *device, uint8_t bus_n
             addr += size;
             device->type0.bar[i] = addr;
             device->type0.bar[i+1] = 0;
-            pcidev.bars[i] = device->type0.bar[i] & ~0xf;
+            pcidev.bars[i] = (volatile void*)(uint64_t)(device->type0.bar[i] & ~0xf);
             pcidev.bars[i+1] = 0;
             // pcidev.bars[i+1] = 0;
             debugf("    device->type0.bar[i] == 0x%08x\n", device->type0.bar[i]);
@@ -403,7 +402,7 @@ static void pci_configure_device(volatile struct pci_ecam *device, uint8_t bus_n
             debugf("    size == %016llx\n", size);
             addr += size;
             device->type0.bar[i] = addr;
-            pcidev.bars[i] = addr & ~0xf;
+            pcidev.bars[i] = (volatile void*)(uint64_t)(addr & ~0xf);
         }
     }
 
@@ -416,7 +415,7 @@ static void pci_configure_device(volatile struct pci_ecam *device, uint8_t bus_n
 void print_vendor_specific_capabilities(PCIDevice *pcidevice)
 {
     if (!pci_is_virtio_device(pcidevice)) return;
-    struct pci_ecam *header = pcidevice->ecam_header;
+    volatile struct pci_ecam *header = pcidevice->ecam_header;
 
     uint8_t cap_pointer = header->type0.capes_pointer;
     debugf("Vendor specific capabilities with offset 0x%02x\n", cap_pointer);
@@ -508,7 +507,7 @@ void pci_dispatch_irq(int irq)
     // Is this a virtio device?
     if (pci_is_virtio_device(pcidevice)) { 
         // Access through ecam_header
-        VirtioDevice *virtdevice = virtio_get_by_device(pcidevice);
+        VirtioDevice *virtdevice = virtio_from_pci_device(pcidevice);
         debugf("Virtio device! %p\n", virtdevice->pcidev->ecam_header);
         
         if (virtio_is_rng_device(virtdevice)) {

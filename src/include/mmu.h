@@ -64,9 +64,9 @@ unsigned long mmu_map_range(struct page_table *tab,
                        unsigned long start_phys,
                        unsigned char lvl, 
                        unsigned long bits);
-unsigned long mmu_translate(const struct page_table *tab, 
-                            unsigned long vaddr);
-unsigned long kernel_mmu_translate(unsigned long vaddr);
+uintptr_t mmu_translate(const struct page_table *tab, 
+                            uintptr_t vaddr);
+uintptr_t kernel_mmu_translate(uintptr_t vaddr);
 
 bool mmu_map(struct page_table *tab, 
              unsigned long vaddr, 
