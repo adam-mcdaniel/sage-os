@@ -514,6 +514,10 @@ void pci_dispatch_irq(int irq)
         if (virtio_is_rng_device(virtdevice)) {
             debugf("RNG sent interrupt!\n");
         }
+
+        if (virtio_is_block_device(virtdevice)) {
+            debugf("Block device sent interrupt!\n");
+        }
     }
 
     debugf("Leaving dispatch IRQ\n");
