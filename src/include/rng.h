@@ -14,4 +14,4 @@
 void rng_init(void);
 
 //tells the number generator to fill a buffer with numbers
-bool rng_fill(void *buffer, uint16_t size);
+void rng_fill(void *buffer, uint16_t size);
