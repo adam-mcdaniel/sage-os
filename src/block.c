@@ -22,8 +22,6 @@ void block_device_init() {
     block_device->ready = true;
 }
 
-
-
 void block_device_send_request(BlockRequestPacket *packet) {
     // First descriptor is the header
     VirtioDescriptor header;
