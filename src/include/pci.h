@@ -131,6 +131,7 @@ uint64_t pci_count_irq_listeners(uint8_t irq);
 // is not found, then NULL is returned.
 volatile struct pci_cape* pci_get_capability(PCIDevice *dev, uint8_t type, uint8_t nth);
 
+
 /// Get a virtio capability for a given PCI device by the virtio capability's type.
 /// If this is zero, it will get the common configuration capability. If this is
 /// one, it will get the notify capability. If this is two, it will get the ISR
@@ -142,6 +143,8 @@ volatile struct VirtioPciCommonCfg *pci_get_virtio_common_config(PCIDevice *devi
 volatile struct VirtioPciNotifyCfg *pci_get_virtio_notify_capability(PCIDevice *device);
 /// Get the interrupt service routine structure for a given virtio device connected to PCI.
 volatile struct VirtioPciIsrCfg *pci_get_virtio_isr_status(PCIDevice *device);
+/// Get the device specific configuration structure for a given virtio device connected to PCI.
+volatile void *pci_get_device_specific_config(PCIDevice *dev);
 
 volatile uint8_t *pci_get_device_bar(PCIDevice *device, uint8_t bar_num);
 
