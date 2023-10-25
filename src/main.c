@@ -139,34 +139,26 @@ static void init_systems(void)
     }
 
 
-    uint8_t sector[512];
+    uint32_t sector[256];
     for (uint64_t i=0; i<sizeof(sector)/sizeof(sector[i]); i++) {
         sector[i] = i;
     }
-    block_device_write_sector(0, sector);
+    block_device_write_sectors(0, sector, 2);
     debugf("Wrote sector:\n");
 
-    for (uint64_t i=0; i<sizeof(sector)/sizeof(sector[i])/8; i+=8) {
+    for (uint64_t i=0; i<sizeof(sector)/sizeof(sector[i]); i+=8) {
         debugf("%d %d %d %d %d %d %d %d\n",
             sector[i], sector[i+1], sector[i+2], sector[i+3],
             sector[i+4], sector[i+5], sector[i+6], sector[i+7]);
     }
-
-
     for (uint64_t i=0; i<sizeof(sector)/sizeof(sector[i]); i++) {
         sector[i] = 0;
     }
-    
-    for (uint64_t i=0; i<sizeof(sector)/sizeof(sector[i])/8; i+=8) {
-        debugf("%d %d %d %d %d %d %d %d\n",
-            sector[i], sector[i+1], sector[i+2], sector[i+3],
-            sector[i+4], sector[i+5], sector[i+6], sector[i+7]);
-    }
 
+    block_device_read_sectors(0, sector, 2);
+    debugf("Read sector:\n");
 
-    block_device_read_sector(0, sector);
-
-    for (uint64_t i=0; i<sizeof(sector)/sizeof(sector[i])/8; i+=8) {
+    for (uint64_t i=0; i<sizeof(sector)/sizeof(sector[i]); i+=8) {
         debugf("%d %d %d %d %d %d %d %d\n",
             sector[i], sector[i+1], sector[i+2], sector[i+3],
             sector[i+4], sector[i+5], sector[i+6], sector[i+7]);

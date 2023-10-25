@@ -31,6 +31,11 @@ void block_device_init() {
     debugf("Block device has %d heads\n", config->geometry.heads);
 }
 
+uint64_t block_device_get_sector_size(void) {
+    volatile VirtioBlockConfig *config = virtio_get_block_config(block_device);
+    return config->blk_size;
+}
+
 void block_device_send_request(BlockRequestPacket *packet) {
     debugf("Sending block request\n");
     // First descriptor is the header
@@ -91,6 +96,36 @@ void block_device_write_sector(uint64_t sector, uint8_t *data) {
     block_device_send_request(&packet);
 }
 
-void block_device_read_sectors(uint64_t sector, uint8_t *data, uint64_t count);
+void block_device_read_sectors(uint64_t sector, uint8_t *data, uint64_t count) {
+    // uint64_t sector_size = block_device_get_sector_size();
+    // for (uint64_t i=0; i<count; i++) {
+    //     block_device_read_sector(sector + i, data + i * sector_size);
+    // }
 
-void block_device_write_sectors(uint64_t sector, uint8_t *data, uint64_t count);
+    debugf("Read sectors %d\n", sector);
+    BlockRequestPacket packet;
+    packet.type = VIRTIO_BLK_T_IN;
+    packet.sector = sector;
+    packet.data = data;
+    packet.sector_count = count;
+    packet.status = 0xf;
+
+    block_device_send_request(&packet);
+}
+
+void block_device_write_sectors(uint64_t sector, uint8_t *data, uint64_t count) {
+    // uint64_t sector_size = block_device_get_sector_size();
+    // debugf("Writing %d sectors (size=%d)\n", count, sector_size);
+    // for (uint64_t i=0; i<count; i++) {
+    //     block_device_write_sector(sector + i, data + i * sector_size);
+    // }
+    debugf("Writing sectors %d\n", sector);
+    BlockRequestPacket packet;
+    packet.type = VIRTIO_BLK_T_OUT;
+    packet.sector = sector;
+    packet.data = data;
+    packet.sector_count = count;
+    packet.status = 0xf;
+
+    block_device_send_request(&packet);
+}
