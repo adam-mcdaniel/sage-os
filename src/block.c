@@ -23,34 +23,44 @@ void block_device_init() {
 }
 
 void block_device_send_request(BlockRequestPacket *packet) {
+    debugf("Sending block request\n");
     // First descriptor is the header
     VirtioDescriptor header;
     header.addr = kernel_mmu_translate(packet);
     header.flags = VIRTQ_DESC_F_NEXT;
     header.len = sizeof(BlockRequestPacket);
-    header.next = 1;
 
     // Second descriptor is the data
     VirtioDescriptor data;
     data.addr = kernel_mmu_translate(packet->data);
-    data.flags = VIRTQ_DESC_F_NEXT | VIRTQ_DESC_F_WRITE;
+    if (packet->type == VIRTIO_BLK_T_IN)
+        data.flags = VIRTQ_DESC_F_WRITE;
+    else
+        data.flags = 0;
+    data.flags |= VIRTQ_DESC_F_NEXT;
     data.len = packet->sector_count * 512;
-    data.next = 1;
 
     // The third descriptor is the status
     VirtioDescriptor status;
     status.addr = kernel_mmu_translate((uint64_t)&packet->status);
     status.flags = VIRTQ_DESC_F_WRITE;
     status.len = sizeof(packet->status);
-    status.next = 0;
+
+
+    VirtioDescriptor chain[3];
+    chain[0] = header;
+    chain[1] = data;
+    chain[2] = status;
 
     // Create the chain
-    virtio_send_descriptor(block_device, 0, header, false);
-    virtio_send_descriptor(block_device, 0, data, false);
-    virtio_send_descriptor(block_device, 0, status, true);
+    // virtio_send_descriptor(block_device, 0, header, false);
+    // virtio_send_descriptor(block_device, 0, data, false);
+    // virtio_send_descriptor(block_device, 0, status, true);
+    virtio_send_descriptor_chain(block_device, 0, chain, 3, true);
 }
 
 void block_device_read_sector(uint64_t sector, uint8_t *data) {
+    debugf("Reading sector %d\n", sector);
     BlockRequestPacket packet;
     packet.type = VIRTIO_BLK_T_IN;
     packet.reserved = 0;
@@ -63,6 +73,7 @@ void block_device_read_sector(uint64_t sector, uint8_t *data) {
 }
 
 void block_device_write_sector(uint64_t sector, uint8_t *data) {
+    debugf("Writing sector %d\n", sector);
     BlockRequestPacket packet;
     packet.type = VIRTIO_BLK_T_OUT;
     packet.reserved = 0;

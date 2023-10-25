@@ -187,7 +187,6 @@ typedef struct VirtioDevice {
     uint16_t driver_idx;
     uint16_t device_idx;
 
-    // uint16_t notifymult;
     bool ready;
 } VirtioDevice;
 
