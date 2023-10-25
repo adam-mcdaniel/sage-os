@@ -7,6 +7,7 @@
 #include <syscall.h>
 #include <compiler.h>
 #include <trap.h>
+#include <sbi.h>
 
 // From src/syscall.c
 void syscall_handle(int hart, uint64_t epc, int64_t *scratch);
@@ -116,7 +117,7 @@ void os_trap_handler(void)
                 WFI_LOOP();
                 break;
         }
-        CSR_WRITE("sepc", epc + 4);
+        // CSR_WRITE("sepc", epc + 4);
     }
     // debugf("Jumping to %p...\n", epc + 4);
     // CSR_WRITE("pc", epc + 4);
@@ -126,6 +127,7 @@ void os_trap_handler(void)
     // __asm__ volatile ("csrr t0, sscratch");
     // __asm__ volatile ("savefp");
     // __asm__ volatile ("savegp");
-    SRET();
+
+    // SRET();
     // fatalf("Could not return from trap\n");
 }

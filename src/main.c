@@ -10,6 +10,7 @@
 #include <debug.h>
 #include <mmu.h>
 #include <page.h>
+#include <csr.h>
 #include <trap.h>
 
 // Global MMU table for the kernel. This is used throughout
@@ -29,6 +30,7 @@ static void init_systems(void)
 #ifdef USE_MMU
     struct page_table *pt = mmu_table_create();
     kernel_mmu_table = pt;
+
     debugf("Kernel page table at %p\n", pt);
     // Map memory segments for our kernel
     debugf("Mapping kernel segments\n");
@@ -58,6 +60,7 @@ static void init_systems(void)
     CSR_WRITE("satp", SATP_KERNEL); 
     SFENCE_ALL();
     debugf("MMU enabled\n");
+
 #endif
 
 #ifdef USE_HEAP
@@ -85,10 +88,38 @@ static void init_systems(void)
 #endif
 #ifdef USE_VIRTIO
     virtio_init();
-    uint64_t stvec = _spawn_kthread;
+    uint64_t stvec = trampoline_trap_start;
+    
+	// # 0    - gpregs
+    // # 256  - fpregs
+    // # 512  - sepc
+    // # 520  - sstatus
+    // # 528  - sie
+    // # 536  - satp
+    // # 544  - sscratch
+    // # 552  - stvec
+    // # 560  - trap_satp
+    // # 568  - trap_stack
+    // trampoline_thread_start();
+
     stvec &= ~0x3;
-    CSR_WRITE("stvec", stvec);
-    debugf("STVEC: 0x%p, 0x%p\n", stvec, _spawn_kthread);
+    CSR_WRITE("stvec", trampoline_trap_start);
+    debugf("STVEC: 0x%p, 0x%p\n", stvec, trampoline_trap_start);
+
+    Trapframe *sscratch = kzalloc(sizeof(Trapframe) * 0x1000);
+    
+    CSR_READ(sscratch->sepc, "sepc");
+    CSR_READ(sscratch->sstatus, "sstatus");
+    CSR_READ(sscratch->sie, "sie");
+    CSR_READ(sscratch->satp, "satp");
+    CSR_READ(sscratch->stvec, "stvec");
+    CSR_READ(sscratch->trap_satp, "satp");
+    sscratch->trap_stack = (uint64_t)kmalloc(0x4000);
+    CSR_WRITE("sscratch", sscratch);
+
+    void (*f)() = trampoline_trap_start;
+    // f();
+    
 
     uint8_t buffer[16] = {0};
     debugf("RNG State Before:");
