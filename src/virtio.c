@@ -327,6 +327,7 @@ void virtio_send_descriptor_chain(VirtioDevice *device, uint16_t which_queue, Vi
     uint16_t    flags;
     uint16_t    next;*/
     device->driver_idx = device->driver->idx;
+    uint64_t head_descriptor_index = device->desc_idx;
     for (int i=0; i<num_descriptors; i++) {
         uint64_t descriptor_index = (device->desc_idx + i) % queue_size;
         uint64_t driver_index = (device->driver_idx + i) % queue_size;
@@ -344,17 +345,13 @@ void virtio_send_descriptor_chain(VirtioDevice *device, uint16_t which_queue, Vi
         debugf("Descriptor next: 0x%x = %d\n", descriptor.next, descriptor.next);
         // Put the descriptor in the descriptor table
         device->desc[descriptor_index] = descriptor;
-        // Put the descriptor into the driver ring
-        device->driver->ring[driver_index] = descriptor_index;
     }
-
+    // Put the descriptor into the driver ring
+    device->driver->ring[device->driver->idx % queue_size] = head_descriptor_index;
     // Increment the index to make it "visible" to the device
-    device->desc_idx += num_descriptors;
-    device->driver_idx += num_descriptors;
-    device->driver->idx += num_descriptors;
-
-    device->desc_idx %= queue_size;
-    device->driver_idx %= queue_size;
+    device->driver->idx++;
+    // Update the descriptor index for our bookkeeping
+    device->desc_idx = (device->desc_idx + num_descriptors) % queue_size;
 
     debugf("Driver index: %d\n", device->driver->idx);
     debugf("Descriptor index: %d\n", device->desc_idx);

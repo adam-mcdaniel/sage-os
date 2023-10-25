@@ -156,13 +156,21 @@ static void init_systems(void)
     for (uint64_t i=0; i<sizeof(sector)/sizeof(sector[i]); i++) {
         sector[i] = 0;
     }
-    // block_device_read_sector(0, sector);
+    
+    for (uint64_t i=0; i<sizeof(sector)/sizeof(sector[i])/8; i+=8) {
+        debugf("%d %d %d %d %d %d %d %d\n",
+            sector[i], sector[i+1], sector[i+2], sector[i+3],
+            sector[i+4], sector[i+5], sector[i+6], sector[i+7]);
+    }
 
-    // for (int i=0; i<sizeof(sector)/sizeof(sector[i])/8; i++) {
-    //     debugf("%d %d %d %d %d %d %d %d\n",
-    //         sector[i], sector[i+1], sector[i+2], sector[i+3],
-    //         sector[i+4], sector[i+5], sector[i+6], sector[i+7]);
-    // }
+
+    block_device_read_sector(0, sector);
+
+    for (uint64_t i=0; i<sizeof(sector)/sizeof(sector[i])/8; i+=8) {
+        debugf("%d %d %d %d %d %d %d %d\n",
+            sector[i], sector[i+1], sector[i+2], sector[i+3],
+            sector[i+4], sector[i+5], sector[i+6], sector[i+7]);
+    }
 
     // block_device_read_sector(0, sector);
 
