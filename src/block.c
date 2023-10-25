@@ -36,6 +36,16 @@ uint64_t block_device_get_sector_size(void) {
     return config->blk_size;
 }
 
+uint64_t block_device_get_sector_count(void) {
+    volatile VirtioBlockConfig *config = virtio_get_block_config(block_device);
+    return config->capacity;
+}
+
+uint64_t block_device_get_bytes(void) {
+    volatile VirtioBlockConfig *config = virtio_get_block_config(block_device);
+    return config->capacity * config->blk_size;
+}
+
 void block_device_send_request(BlockRequestPacket *packet) {
     debugf("Sending block request\n");
     // First descriptor is the header
@@ -118,4 +128,36 @@ void block_device_write_sectors(uint64_t sector, uint8_t *data, uint64_t count) 
     packet.status = 0xf;
 
     block_device_send_request(&packet);
+}
+
+
+void block_device_read_bytes(uint64_t byte, uint8_t *data, uint64_t bytes) {
+    uint64_t sectors = bytes / 512 + (bytes % 512 == 0 ? 0 : 1);
+    uint64_t sector = byte / 512;
+    uint8_t buffer[sectors][512];
+
+    block_device_read_sectors(sector, (uint8_t *)buffer, sectors);
+
+    uint64_t alignment_offset = byte % 512;
+
+    // Copy the data with the correct offset
+    for (uint64_t i = 0; i < bytes; i++) {
+        data[i] = buffer[i / 512][(alignment_offset + i) % 512];
+    }
+}
+
+
+void block_device_write_bytes(uint64_t byte, uint8_t *data, uint64_t bytes) {
+    uint64_t sectors = bytes / 512 + (bytes % 512 == 0 ? 0 : 1);
+    uint64_t sector = byte / 512;
+    uint8_t buffer[sectors][512];
+
+    uint64_t alignment_offset = byte % 512;
+    block_device_read_sectors(sector, (uint8_t *)buffer, sectors);
+    // Copy the data with the correct offset
+    for (uint64_t i = 0; i < bytes; i++) {
+        buffer[i / 512][(alignment_offset + i) % 512] = data[i];
+    }
+
+    block_device_write_sectors(sector, (uint8_t *)buffer, sectors);
 }

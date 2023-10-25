@@ -164,6 +164,17 @@ static void init_systems(void)
             sector[i+4], sector[i+5], sector[i+6], sector[i+7]);
     }
 
+    uint32_t buf[64] = {0};
+    memset(buf, 0xFF, sizeof(buf));
+    block_device_write_bytes(sizeof(uint32_t) * 3, buf, sizeof(uint32_t) * 4);
+    memset(buf, 5, sizeof(buf));
+    block_device_read_bytes(0, buf, sizeof(uint32_t) * 9);
+
+    for (uint64_t i=0; i<sizeof(buf)/sizeof(buf[i]); i+=8) {
+        debugf("%d %d %d %d %d %d %d %d\n",
+            buf[i], buf[i+1], buf[i+2], buf[i+3],
+            buf[i+4], buf[i+5], buf[i+6], buf[i+7]);
+    }
     // block_device_read_sector(0, sector);
 
     // for (int i=0; i<sizeof(sector)/sizeof(sector[i])/8; i++) {
