@@ -20,6 +20,15 @@ void block_device_init() {
     block_device = virtio_get_block_device();
     debugf("Block device init done for device at %p\n", block_device->pcidev->ecam_header);
     block_device->ready = true;
+
+    VirtioBlockConfig *config = virtio_get_block_config(block_device);
+
+    debugf("Block device has %d segments\n", config->seg_max);
+    debugf("Block device has %d max size\n", config->size_max);
+    debugf("Block device has block size of %d\n", config->blk_size);
+    debugf("Block device has %d capacity\n", config->capacity);
+    debugf("Block device has %d cylinders\n", config->geometry.cylinders);
+    debugf("Block device has %d heads\n", config->geometry.heads);
 }
 
 void block_device_send_request(BlockRequestPacket *packet) {
@@ -35,9 +44,6 @@ void block_device_send_request(BlockRequestPacket *packet) {
     data.addr = kernel_mmu_translate(packet->data);
     if (packet->type == VIRTIO_BLK_T_IN)
         data.flags = VIRTQ_DESC_F_WRITE;
-    else
-        data.flags = 0;
-    data.flags |= VIRTQ_DESC_F_NEXT;
     data.len = packet->sector_count * 512;
 
     // The third descriptor is the status
@@ -57,6 +63,9 @@ void block_device_send_request(BlockRequestPacket *packet) {
     // virtio_send_descriptor(block_device, 0, data, false);
     // virtio_send_descriptor(block_device, 0, status, true);
     virtio_send_descriptor_chain(block_device, 0, chain, 3, true);
+
+    // Check the status
+    debugf("Status: %d\n", packet->status);
 }
 
 void block_device_read_sector(uint64_t sector, uint8_t *data) {
@@ -67,7 +76,7 @@ void block_device_read_sector(uint64_t sector, uint8_t *data) {
     packet.sector = sector;
     packet.data = data;
     packet.sector_count = 1;
-    packet.status = 0;
+    packet.status = 0xf;
 
     block_device_send_request(&packet);
 }
@@ -80,7 +89,7 @@ void block_device_write_sector(uint64_t sector, uint8_t *data) {
     packet.sector = sector;
     packet.data = data;
     packet.sector_count = 1;
-    packet.status = 0;
+    packet.status = 0xf;
 
     block_device_send_request(&packet);
 }
