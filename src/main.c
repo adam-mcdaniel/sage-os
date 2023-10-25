@@ -117,10 +117,6 @@ static void init_systems(void)
     sscratch->trap_stack = (uint64_t)kmalloc(0x4000);
     CSR_WRITE("sscratch", sscratch);
 
-    void (*f)() = trampoline_trap_start;
-    // f();
-    
-
     uint8_t buffer[16] = {0};
     debugf("RNG State Before:");
     for (int i=0; i<sizeof(buffer)/sizeof(buffer[0]); i++) {
