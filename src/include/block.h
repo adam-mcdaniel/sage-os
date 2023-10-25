@@ -1,48 +1,48 @@
+/*
+* Random Number Generator Driver header
+*/
+#pragma once
+
 #include <stdint.h>
+#include <pci.h>
+#include <virtio.h>
+#include <stdbool.h>
+#include <debug.h>
+#include <mmu.h>
+#include <kmalloc.h>
 
-struct VirtioBlkConfig {
-    uint64_t capacity;
-    uint32_t size_max;
-    uint32_t seg_max;
-    struct VirtioBlkGeometry {
-        uint16_t cylinders;
-        uint8_t  heads;
-        uint8_t  sectors;
-    } geometry;
-    uint32_t blk_size;
-    struct VirtioBlkTopology {
-        // # of logical blocks per physical block (log2)
-        uint8_t  physical_block_exp;
-        // offset of first aligned logical block
-        uint8_t  alignment_offset;
-        // suggested minimum I/O size in blocks
-        uint16_t min_io_size;
-        // optimal (suggested maximum) I/O size in blocks
-        uint32_t opt_io_size;
-    } topology;
-    uint8_t  writeback;
-    uint8_t  unused0[3];
-    uint32_t max_discard_sectors;
-    uint32_t max_discard_seg;
-    uint32_t discard_sector_alignment;
-    uint32_t max_write_zeroes_sectors;
-    uint32_t max_write_zeroes_seg;
-    uint8_t  write_zeroes_may_unmap;
-    uint8_t  unused1[3];
-};
-
-#define SECTOR_SIZE        512
-
-#define VIRTIO_BLK_T_IN    0
-#define VIRTIO_BLK_T_OUT   1
+#define VIRTIO_BLK_T_IN 0
+#define VIRTIO_BLK_T_OUT 1
 #define VIRTIO_BLK_T_FLUSH 4
+#define VIRTIO_BLK_T_DISCARD 11
+#define VIRTIO_BLK_T_WRITE_ZEROES 13
 
-struct BlockHeader {
-    uint32_t type;
+#define VIRTIO_BLK_S_OK 0
+#define VIRTIO_BLK_S_IOERR 1
+#define VIRTIO_BLK_S_UNSUPP 2
+
+void block_device_init(void);
+
+typedef struct BlockRequestPacket {
+    // First descriptor
+    uint32_t type;      // IN/OUT
     uint32_t reserved;
-    uint64_t sector;
-};
+    uint64_t sector;    // start sector (LBA / cfg->blk_size)
+    // Second descriptor
+    // Multiple of cfg->blk_size
+    // which will be 512.
+    uint8_t *data;
+    uint8_t sector_count; // Number of sectors to read/write
+    // Third descriptor
+    uint8_t status;
+} BlockRequestPacket;
 
-#define VIRTIO_BLK_S_OK      0
-#define VIRTIO_BLK_S_IOERR   1
-#define VIRTIO_BLK_S_UNSUPP  2
+void block_device_send_request(BlockRequestPacket *packet);
+
+void block_device_read_sector(uint64_t sector, uint8_t *data);
+
+void block_device_write_sector(uint64_t sector, uint8_t *data);
+
+void block_device_read_sectors(uint64_t sector, uint8_t *data, uint64_t count);
+
+void block_device_write_sectors(uint64_t sector, uint8_t *data, uint64_t count);
