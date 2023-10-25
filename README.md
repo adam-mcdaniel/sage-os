@@ -16,7 +16,7 @@ Sort your entries in descending order (newest entries at the top).
 
 # 24-October-2023
 
-- `amcdan23`: Got RNG working! Added SRETs to trap handler to return correctly instead of instruction faults, added catches for important causes, and changed PLIC threshold to properly catch these. (<--- this was another bug I introduced which I caught later today) Fixed issue where RNG device was using the descriptor index for the queue to notify in successive queries. Added fix where `sscratch` did not point to kernel trap frame; set that up. Then, called the trampolines stvec handler instead of `os_trap_handler`. This fixed the instruction page faults and the trap handler sees that the RNG sent the interrupt every time!
+- `amcdan23`: Got RNG working! Added SRETs to trap handler to return correctly instead of instruction faults, added catches for important causes, and changed PLIC threshold to properly catch these. (<--- this was another bug I introduced which I caught later today) Fixed issue where RNG device was using the descriptor index for the queue to notify in successive queries. Added fix where `sscratch` did not point to kernel trap frame; set that up. Then, called the trampolines stvec handler instead of `os_trap_handler`. This fixed the instruction page faults and the trap handler sees that the RNG sent the interrupt every time! Added abstractions for interracting with all the different devices, getting device specific configurations, and sending / receiving descriptors with a device without interacting with the rings directly.
 
 # 23-October-2023
 
