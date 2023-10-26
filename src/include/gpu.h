@@ -11,29 +11,39 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define VIRTIO_GPU_EVENT_DISPLAY (1 << 0)
-typedef struct virtio_gpu_config {
-    uint32_t events_read;
-    uint32_t events_clear;
-    uint32_t num_scanouts;
-    uint32_t reserved;
-};
+/* drawings */
+typedef struct Rectangle {
+    uint32_t x;
+    uint32_t y;
+    uint32_t width;
+    uint32_t height;
+} Rectangle;
 
-typedef struct virtio_gpu_ctrl_hdr {
-    uint32_t type;
+typedef struct Pixel {
+    uint8_t r;
+    uint8_t g;
+    uint8_t b;
+    uint8_t a;
+} Pixel;
+
+#define VIRTIO_GPU_EVENT_DISPLAY (1 << 0) // Reread display info
+
+typedef struct VirtioGpuConfig {
+    uint32_t events_read; // Read-only, number of events driver needs to read
+    uint32_t events_clear; // Write-to-clear, mirrors events_read
+    uint32_t num_scanouts; // Number of display outputs device supports
+    uint32_t reserved;
+} VirtioGpuConfig;
+
+typedef struct VirtioGpuCtrlHdr {
+    uint32_t control_type;
     uint32_t flags;
     uint64_t fence_id;
-    uint32_t ctx_id;
+    uint32_t context_id;
     uint32_t padding;
-};
+} VirtioGpuCtrlHdr;
 
-typedef struct virtio_gpu_mem_entry {
-    uint64_t addr;
-    uint32_t length;
-    uint32_t padding;
-};
-
-enum virtio_gpu_ctrl_type {
+enum VirtioGpuCtrlType {
     /* 2d commands */
     VIRTIO_GPU_CMD_GET_DISPLAY_INFO = 0x0100,
     VIRTIO_GPU_CMD_RESOURCE_CREATE_2D,
@@ -65,14 +75,14 @@ enum virtio_gpu_ctrl_type {
 };
 
 #define VIRTIO_GPU_MAX_SCANOUTS 16
-typedef struct DisplayInfoResponse {
-   virtio_gpu_ctrl_hdr hdr;  /* VIRTIO_GPU_RESP_OK_DISPLAY_INFO */
+typedef struct VirtioGpuDispInfoResp {
+   VirtioGpuCtrlHdr ctrl_header;  /* VIRTIO_GPU_RESP_OK_DISPLAY_INFO */
    struct GpuDisplay {
-       struct Rectangle rect;
+       Rectangle rect;
        uint32_t enabled;
        uint32_t flags;
    } displays[VIRTIO_GPU_MAX_SCANOUTS];
-};
+} VirtioGpuDispInfoResp;
 
 enum GpuFormats {
    B8G8R8A8_UNORM = 1,
@@ -84,55 +94,44 @@ enum GpuFormats {
    A8B8G8R8_UNORM = 121,
    R8G8B8X8_UNORM = 134,
 };
-struct virtio_gpu_resource_create_2d {
-    struct virtio_gpu_ctrl_hdr hdr;
+
+typedef struct VirtioGpuResCreate2d {
+    VirtioGpuCtrlHdr ctrl_header;
     uint32_t resource_id;
     uint32_t format;
     uint32_t width;
     uint32_t height;
-};
+} VirtioGpuResCreate2d;
 
-struct virtio_gpu_set_scanout {
-    struct virtio_gpu_ctrl_hdr hdr;
-    struct Rectangle rect;
+typedef struct VirtioGpuSetScanout {
+    VirtioGpuCtrlHdr ctrl_header;
+    Rectangle rect;
     uint32_t scanout_id;
     uint32_t resource_id;
-};
+} VirtioGpuSetScanout;
 
-struct virtio_gpu_resource_attach_backing {
-    struct virtio_gpu_ctrl_hdr hdr;
+typedef struct VirtioGpuResourceAttachBacking {
+    struct VirtioGpuCtrlHdr ctrl_header;
     uint32_t resource_id;
     uint32_t nr_entries;
-};
+} VirtioGpuResourceAttachBacking;
 
-struct virtio_gpu_mem_entry {
+typedef struct VirtioGpuMemEntry {
     uint64_t addr;
     uint32_t length;
     uint32_t padding;
-};
-
-/* drawings */
-typedef struct Rectangle {
-    uint32_t x;
-    uint32_t y;
-    uint32_t width;
-    uint32_t height;
-};
-
-typedef struct Pixel {
-    uint8_t r;
-    uint8_t g;
-    uint8_t b;
-    uint8_t a;
-};
+} VirtioGpuMemEntry;
 
 /* methods */
-void fill_rect(uint32_t screen_width,
-               uint32_t screen_height,
-               struct pixel *buffer,
-               const struct rectangle *rect,
-               const struct pixel *fill_color);
+void gpu_test();
+bool gpu_init(VirtioDevice *gpu_device); 
 
-void stroke_rect(uint32_t screen_width, uint32_t screen_height,
-                 struct Pixel *buffer, struct Rectangle *rect,
-                 struct Pixel *line_color, uint32_t line_size);
+// void fill_rect(uint32_t screen_width,
+//                uint32_t screen_height,
+//                struct pixel *buffer,
+//                const struct rectangle *rect,
+//                const struct pixel *fill_color);
+
+// void stroke_rect(uint32_t screen_width, uint32_t screen_height,
+//                  struct Pixel *buffer, struct Rectangle *rect,
+//                  struct Pixel *line_color, uint32_t line_size);

@@ -10,6 +10,7 @@
  */
 #pragma once
 
+#include <lock.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <pci.h>
@@ -188,6 +189,7 @@ typedef struct VirtioDevice {
     uint16_t device_idx;
 
     bool ready;
+    Mutex lock;
 } VirtioDevice;
 
 #define VIRTIO_F_RESET         0

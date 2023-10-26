@@ -185,6 +185,9 @@ static void init_systems(void)
     // bytes[2], 
     // bytes[3], 
     // bytes[4]);
+
+    // TEST GPU
+    gpu_test();
 #endif
 }
 

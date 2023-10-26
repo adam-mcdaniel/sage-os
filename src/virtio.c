@@ -14,12 +14,17 @@
 #include <compiler.h>
 #include <block.h>
 #include <rng.h>
+#include <gpu.h>
 
 
 static Vector *virtio_devices = NULL;
 
 volatile struct VirtioBlockConfig *virtio_get_block_config(VirtioDevice *device) {
     return (volatile struct VirtioBlockConfig *)pci_get_device_specific_config(device->pcidev);
+}
+
+volatile struct VirtioGpuConfig *virtio_get_gpu_config(VirtioDevice *device) {
+    return (volatile struct VirtioGpuConfig *)pci_get_device_specific_config(device->pcidev);
 }
 
 uint16_t virtio_get_device_id(VirtioDevice *dev) {
@@ -32,6 +37,10 @@ bool virtio_is_rng_device(VirtioDevice *dev) {
 
 bool virtio_is_block_device(VirtioDevice *dev) {
     return virtio_get_device_id(dev) == VIRTIO_PCI_DEVICE_ID(VIRTIO_PCI_DEVICE_BLOCK);
+}
+
+bool virtio_is_gpu_device(VirtioDevice *dev) {
+    return virtio_get_device_id(dev) == VIRTIO_PCI_DEVICE_ID(VIRTIO_PCI_DEVICE_GPU);
 }
 
 VirtioDevice *virtio_get_device(uint16_t device_type) {
@@ -200,6 +209,7 @@ void virtio_init(void) {
     }
     rng_device_init();
     block_device_init();
+    gpu_device_init();
     debugf("virtio_init: Done initializing virtio system\n");
 }
 
@@ -265,6 +275,9 @@ void virtio_send_descriptor(VirtioDevice *device, uint16_t which_queue, VirtioDe
         return;
     }
 
+    // IRQ_OFF();
+    // mutex_spinlock(&device->lock);
+
     // Select the queue we're using
     if (which_queue >= device->common_cfg->num_queues) {
         fatalf("queue number %d is too big (num_queues=%d)\n", which_queue, device->common_cfg->num_queues);
@@ -297,6 +310,9 @@ void virtio_send_descriptor(VirtioDevice *device, uint16_t which_queue, VirtioDe
     // Update the descriptor index for our bookkeeping
     device->desc_idx = (device->desc_idx + 1) % queue_size;
 
+    // mutex_unlock(&device->lock);
+    // IRQ_ON();
+
     // Notify the device if we're ready to do so
     if (notify_device_when_done) {
         virtio_notify(device, which_queue);
@@ -310,6 +326,9 @@ void virtio_send_descriptor_chain(VirtioDevice *device, uint16_t which_queue, Vi
         fatalf("device is not ready\n");
         return;
     }
+
+    // IRQ_OFF();
+    // mutex_spinlock(&device->lock);
 
     // Select the queue we're using
     if (which_queue >= device->common_cfg->num_queues) {
@@ -355,6 +374,9 @@ void virtio_send_descriptor_chain(VirtioDevice *device, uint16_t which_queue, Vi
 
     debugf("Driver index: %d\n", device->driver->idx);
     debugf("Descriptor index: %d\n", device->desc_idx);
+    
+    // mutex_unlock(&device->lock);
+    // IRQ_ON();
 
     // Notify the device if we're ready to do so
     if (notify_device_when_done) {
