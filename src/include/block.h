@@ -46,3 +46,5 @@ void block_device_write_sector(uint64_t sector, uint8_t *data);
 void block_device_read_sectors(uint64_t sector, uint8_t *data, uint64_t count);
 
 void block_device_write_sectors(uint64_t sector, uint8_t *data, uint64_t count);
+
+uint64_t block_device_get_sector_size(void);

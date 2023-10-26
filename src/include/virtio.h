@@ -165,7 +165,7 @@ typedef struct VirtioDevice {
     // This is used by the OS to track useful information about
     // the PCIDevice, and as a useful interface for configuring
     // the device.
-    volatile struct PCIDevice *pcidev;
+    struct PCIDevice *pcidev;
     // The common configuration for the device.
     volatile struct VirtioPciCommonCfg *common_cfg;
     // The notify configuration for the device.
@@ -187,7 +187,6 @@ typedef struct VirtioDevice {
     uint16_t driver_idx;
     uint16_t device_idx;
 
-    // uint16_t notifymult;
     bool ready;
 } VirtioDevice;
 
@@ -206,15 +205,19 @@ typedef struct VirtioDevice {
 #define VIRTIO_DEVICE_TABLE_BYTES(qsize)       (6 + 8 * (qsize))
 
 void virtio_init(void);
-void virtio_notify(volatile VirtioDevice *viodev, uint16_t which_queue);
+void virtio_notify(VirtioDevice *viodev, uint16_t which_queue);
 
 // Find a saved device by its index.
 VirtioDevice *virtio_get_nth_saved_device(uint16_t n);
 
 // Get the RNG device from the list of virtio devices.
 VirtioDevice *virtio_get_rng_device();
+// Get the Block device from the list of virtio devices.
+VirtioDevice *virtio_get_block_device();
 // Is this an RNG device?
 bool virtio_is_rng_device(VirtioDevice *dev);
+// Is this an RNG device?
+bool virtio_is_block_device(VirtioDevice *dev);
 
 // Save the Virtio device for later use.
 void virtio_save_device(VirtioDevice device);
@@ -226,19 +229,22 @@ uint64_t virtio_count_saved_devices(void);
 // If this is zero, it will get the common configuration capability. If this is
 // one, it will get the notify capability. If this is two, it will get the ISR
 // capability. Etc.
-volatile VirtioCapability *virtio_get_capability(volatile VirtioDevice *dev, uint8_t type);
+volatile VirtioCapability *virtio_get_capability(VirtioDevice *dev, uint8_t type);
 
 //get a virtio device by using a pcidevice pointer
-volatile VirtioDevice *virtio_get_by_device(volatile PCIDevice *pcidevice);
+VirtioDevice *virtio_from_pci_device(PCIDevice *pcidevice);
 
-volatile uint32_t *virtio_notify_register(volatile VirtioDevice *device);
+volatile uint16_t *virtio_notify_register(VirtioDevice *device);
 
+void virtio_send_descriptor(VirtioDevice *device, uint16_t which_queue, VirtioDescriptor descriptor, bool notify_device_when_done);
 
-void virtio_send_descriptor(volatile VirtioDevice *device, uint16_t which_queue, VirtioDescriptor descriptor, bool notify_device_when_done);
+volatile VirtioDescriptor *virtio_receive_descriptor(VirtioDevice *device, uint16_t which_queue, uint32_t *id, uint32_t *len);
 
-VirtioDescriptor *virtio_receive_descriptor(volatile VirtioDevice *device, uint16_t which_queue, uint32_t *id, uint32_t *len);
+bool virtio_has_received_descriptor(VirtioDevice *device, uint16_t which_queue);
 
-uint64_t virtio_count_received_descriptors(volatile VirtioDevice *device, uint16_t which_queue);
+uint16_t virtio_receive_descriptor_chain(VirtioDevice *device, uint16_t which_queue, VirtioDescriptor *descriptors, uint16_t num_descriptors, bool wait_for_descriptor);
+
+void virtio_send_descriptor_chain(VirtioDevice *device, uint16_t which_queue, VirtioDescriptor *descriptors, uint16_t num_descriptors, bool notify_device_when_done);
 
 
 typedef struct VirtioBlockConfig {

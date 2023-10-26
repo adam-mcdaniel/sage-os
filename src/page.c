@@ -20,7 +20,6 @@ Mutex page_lock;
 #define BK_SIZE_IN_PAGES (BK_SIZE_IN_BYTES / PAGE_SIZE)
 
 static uint8_t *bookkeeping;  // Pointer to the bookkeeping area
-static void *heap_start;
 
 // For some reason, the macros didn't work for me, so I used the static functions like Marz said and it works.
 static void set_taken(uint64_t index)
@@ -164,7 +163,7 @@ void *page_nalloc(int n)
 
                 mutex_unlock(&page_lock);
                 // debugf("Found free %d pages at #%d, %d\n", n, start, i);
-                void *result = ((uint64_t)bookkeeping + ((uint64_t)start * PAGE_SIZE));
+                void *result = (void*)((uint64_t)bookkeeping + ((uint64_t)start * PAGE_SIZE));
 
                 debugf("Found %d free pages at %p\n", n, result);
                 return result;
