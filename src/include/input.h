@@ -55,5 +55,6 @@ typedef struct InputDevice {
     int tail;
 } InputDevice;
 
-void input_device_init(InputDevice *input_dev, VirtioDevice *virtio_dev);
-int input_device_read_event(InputDevice *input_dev, struct virtio_input_event *event);
+void input_device_init(void);
+
+int input_device_read_event(InputDevice *input_device, struct virtio_input_event *event);

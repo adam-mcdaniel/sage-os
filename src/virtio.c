@@ -14,6 +14,7 @@
 #include <compiler.h>
 #include <block.h>
 #include <rng.h>
+#include <input.h>
 
 
 static Vector *virtio_devices = NULL;
@@ -34,6 +35,10 @@ bool virtio_is_block_device(VirtioDevice *dev) {
     return virtio_get_device_id(dev) == VIRTIO_PCI_DEVICE_ID(VIRTIO_PCI_DEVICE_BLOCK);
 }
 
+bool virtio_is_input_device(VirtioDevice *dev) {
+    return virtio_get_device_id(dev) == VIRTIO_PCI_DEVICE_ID(VIRTIO_PCI_DEVICE_INPUT);
+}
+
 VirtioDevice *virtio_get_device(uint16_t device_type) {
     for (uint16_t i=0; i<virtio_count_saved_devices(); i++) {
         VirtioDevice *dev = virtio_get_nth_saved_device(i);
@@ -52,6 +57,10 @@ VirtioDevice *virtio_get_rng_device(void) {
 
 VirtioDevice *virtio_get_block_device(void) {
     return virtio_get_device(VIRTIO_PCI_DEVICE_BLOCK);
+}
+
+VirtioDevice *virtio_get_input_device(void) {
+    return virtio_get_device(VIRTIO_PCI_DEVICE_INPUT);
 }
 
 VirtioDevice *virtio_get_gpu_device(void) {
@@ -127,6 +136,8 @@ void virtio_init(void) {
                 debugf("Setting up RNG device\n");
             } else if (virtio_is_block_device(&viodev)) {
                 debugf("Setting up block device\n");
+            } else if (virtio_is_input_device(&viodev)) {
+                debugf("Setting up input device\n");
             }
 
             debugf("Common config at 0x%08x\n", viodev.common_cfg);
@@ -200,6 +211,7 @@ void virtio_init(void) {
     }
     rng_device_init();
     block_device_init();
+    input_device_init();
     debugf("virtio_init: Done initializing virtio system\n");
 }
 
