@@ -214,10 +214,14 @@ VirtioDevice *virtio_get_nth_saved_device(uint16_t n);
 VirtioDevice *virtio_get_rng_device();
 // Get the Block device from the list of virtio devices.
 VirtioDevice *virtio_get_block_device();
+// Get the Input device from the list of virtio devices.
+VirtioDevice *virtio_get_input_device();
 // Is this an RNG device?
 bool virtio_is_rng_device(VirtioDevice *dev);
-// Is this an RNG device?
+// Is this a BLOCK device?
 bool virtio_is_block_device(VirtioDevice *dev);
+// Is this an INPUT device?
+bool virtio_is_input_device(VirtioDevice *dev);
 
 // Save the Virtio device for later use.
 void virtio_save_device(VirtioDevice device);
