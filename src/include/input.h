@@ -53,8 +53,13 @@ typedef struct InputDevice {
     struct virtio_input_event event_buffer[INPUT_EVENT_BUFFER_SIZE];
     int head;
     int tail;
+    int size;
 } InputDevice;
 
 void input_device_init(void);
 
 int input_device_read_event(InputDevice *input_device, struct virtio_input_event *event);
+
+void input_device_interrupt_handler(void);
+
+InputDevice *get_input_device(void);
