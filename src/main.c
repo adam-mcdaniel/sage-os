@@ -12,6 +12,8 @@
 #include <page.h>
 #include <csr.h>
 #include <trap.h>
+#include <block.h>
+#include <rng.h>
 
 // Global MMU table for the kernel. This is used throughout
 // the kernel.
@@ -119,7 +121,7 @@ static void init_systems(void)
 
     uint8_t buffer[16] = {0};
     debugf("RNG State Before:");
-    for (int i=0; i<sizeof(buffer)/sizeof(buffer[0]); i++) {
+    for (uint64_t i=0; i<sizeof(buffer)/sizeof(buffer[0]); i++) {
         debugf(" %d ", buffer[i]);
     }
     debugf("\n");
@@ -127,14 +129,49 @@ static void init_systems(void)
     debugf("RNG init done; about to fill\n");
     rng_fill(buffer, 16);
     debugf("RNG State After:");
-    for (int i=0; i<sizeof(buffer)/sizeof(buffer[0]); i++) {
+    for (uint64_t i=0; i<sizeof(buffer)/sizeof(buffer[0]); i++) {
         debugf(" %d ", buffer[i]);
     }
     
     rng_fill(buffer, 16);
-    for (int i=0; i<sizeof(buffer)/sizeof(buffer[0]); i++) {
+    for (uint64_t i=0; i<sizeof(buffer)/sizeof(buffer[0]); i++) {
         debugf(" %d ", buffer[i]);
     }
+
+
+    uint32_t sector[256];
+    for (uint64_t i=0; i<sizeof(sector)/sizeof(sector[i]); i++) {
+        sector[i] = i;
+    }
+    block_device_write_sectors(0, sector, 2);
+    debugf("Wrote sector:\n");
+
+    for (uint64_t i=0; i<sizeof(sector)/sizeof(sector[i]); i+=8) {
+        debugf("%d %d %d %d %d %d %d %d\n",
+            sector[i], sector[i+1], sector[i+2], sector[i+3],
+            sector[i+4], sector[i+5], sector[i+6], sector[i+7]);
+    }
+    for (uint64_t i=0; i<sizeof(sector)/sizeof(sector[i]); i++) {
+        sector[i] = 0;
+    }
+
+    block_device_read_sectors(0, sector, 2);
+    debugf("Read sector:\n");
+
+    for (uint64_t i=0; i<sizeof(sector)/sizeof(sector[i]); i+=8) {
+        debugf("%d %d %d %d %d %d %d %d\n",
+            sector[i], sector[i+1], sector[i+2], sector[i+3],
+            sector[i+4], sector[i+5], sector[i+6], sector[i+7]);
+    }
+
+    // block_device_read_sector(0, sector);
+
+    // for (int i=0; i<sizeof(sector)/sizeof(sector[i])/8; i++) {
+    //     debugf("%d %d %d %d %d %d %d %d\n",
+    //         sector[i], sector[i+1], sector[i+2], sector[i+3],
+    //         sector[i+4], sector[i+5], sector[i+6], sector[i+7]);
+    // }
+    
     
     // debugf("\n");char bytes[5] = {0};
     // char bytes[5] = {0};
