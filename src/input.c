@@ -21,6 +21,7 @@ void input_device_init() {
 }
 
 
+
 void input_device_interrupt_handler(void) {
     if (input_device == NULL) {
         debugf("Input device not initialized\n");
@@ -37,6 +38,17 @@ void input_device_interrupt_handler(void) {
         if (len != sizeof(struct virtio_input_event)) {
             debugf("Received invalid input event size: %d\n", len);
             continue;
+        }
+
+        // Copy event to local buffer
+        InputDevice *input_dev = get_input_device();
+        if (input_dev->size < INPUT_EVENT_BUFFER_SIZE) {
+            memcpy(&input_dev->event_buffer[input_dev->tail], event_ptr, sizeof(struct virtio_input_event));
+            input_dev->tail = (input_dev->tail + 1) % INPUT_EVENT_BUFFER_SIZE;
+            input_dev->size++;
+            debugf("Input event received: type=%d, code=%d, value=%d\n", event_ptr->type, event_ptr->code, event_ptr->value);
+        } else {
+            debugf("Input event buffer full, event dropped\n");
         }
 
         // Send the descriptor back to the device
