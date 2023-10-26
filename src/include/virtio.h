@@ -282,5 +282,33 @@ typedef struct VirtioBlockConfig {
    uint8_t unused1[3];
 } VirtioBlockConfig;
 
+struct virtio_input_absinfo {
+    uint32_t min;
+    uint32_t max;
+    uint32_t fuzz;
+    uint32_t flat;
+    uint32_t res;
+};
+
+struct virtio_input_devids {
+    uint16_t bustype;
+    uint16_t vendor;
+    uint16_t product;
+    uint16_t version;
+};
+
+typedef struct VirtioInputConfig {
+    uint8_t select;
+    uint8_t subsel;
+    uint8_t size;
+    uint8_t reserved[5];
+    union {
+        char string[128];
+        uint8_t bitmap[128];
+        struct virtio_input_absinfo abs;
+        struct virtio_input_devids ids;
+    };
+} VirtioInputConfig;
 
 volatile struct VirtioBlockConfig *virtio_get_block_config(VirtioDevice *device);
+volatile struct VirtioInputConfig *virtio_get_input_config(VirtioDevice *device);

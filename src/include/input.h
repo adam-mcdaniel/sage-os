@@ -14,34 +14,6 @@ enum virtio_input_config_select {
     VIRTIO_INPUT_CFG_ABS_INFO  = 0x12,
 };
 
-struct virtio_input_absinfo {
-    uint32_t min;
-    uint32_t max;
-    uint32_t fuzz;
-    uint32_t flat;
-    uint32_t res;
-};
-
-struct virtio_input_devids {
-    uint16_t bustype;
-    uint16_t vendor;
-    uint16_t product;
-    uint16_t version;
-};
-
-struct virtio_input_config {
-    uint8_t select;
-    uint8_t subsel;
-    uint8_t size;
-    uint8_t reserved[5];
-    union {
-        char string[128];
-        uint8_t bitmap[128];
-        struct virtio_input_absinfo abs;
-        struct virtio_input_devids ids;
-    };
-};
-
 struct virtio_input_event {
     uint16_t type;
     uint16_t code;

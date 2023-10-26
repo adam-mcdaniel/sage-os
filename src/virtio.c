@@ -23,6 +23,10 @@ volatile struct VirtioBlockConfig *virtio_get_block_config(VirtioDevice *device)
     return (volatile struct VirtioBlockConfig *)pci_get_device_specific_config(device->pcidev);
 }
 
+volatile struct VirtioInputConfig *virtio_get_input_config(VirtioDevice *device) {
+    return (volatile struct VirtioInputConfig *)pci_get_device_specific_config(device->pcidev);
+}
+
 uint16_t virtio_get_device_id(VirtioDevice *dev) {
     return dev->pcidev->ecam_header->device_id;
 }

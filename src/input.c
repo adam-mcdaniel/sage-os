@@ -17,10 +17,14 @@ void input_device_init() {
     input_device = virtio_get_input_device();
     debugf("Input device init done for device at %p\n", input_device->pcidev->ecam_header);
     input_device->ready = true;
+    volatile VirtioInputConfig *config = virtio_get_input_config(input_device);
     debugf("Input device initialized\n");
 }
 
-
+uint8_t input_device_get_size(void) {
+    volatile VirtioInputConfig *config = virtio_get_input_config(input_device);
+    return config->size;
+}
 
 void input_device_interrupt_handler(void) {
     if (input_device == NULL) {
