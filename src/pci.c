@@ -526,11 +526,11 @@ void pci_dispatch_irq(int irq)
 
         if (virtio_is_gpu_device(virtdevice)) {
             debugf("GPU device sent interrupt!\n");
-            // VirtioDescriptor descriptors[16];
-            // uint16_t received = virtio_receive_descriptor_chain(virtdevice, 0, descriptors, 16, true);
-            // debugf("Received %d descriptors\n", received);
+            VirtioDescriptor descriptors[16];
+            uint16_t received = virtio_receive_descriptor_chain(virtdevice, 0, descriptors, 16, true);
+            debugf("Received %d descriptors\n", received);
 
-            debugf("Recevied descriptors\n", virtio_has_received_descriptor(virtdevice, 0));
+            // debugf("Recevied descriptors\n", virtio_has_received_descriptor(virtdevice, 0));
             
         }
     }

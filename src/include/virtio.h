@@ -216,10 +216,15 @@ VirtioDevice *virtio_get_nth_saved_device(uint16_t n);
 VirtioDevice *virtio_get_rng_device();
 // Get the Block device from the list of virtio devices.
 VirtioDevice *virtio_get_block_device();
+// Get the GPU device from the list of virtio devices.
+VirtioDevice *virtio_get_gpu_device();
+
 // Is this an RNG device?
 bool virtio_is_rng_device(VirtioDevice *dev);
-// Is this an RNG device?
+// Is this an block device?
 bool virtio_is_block_device(VirtioDevice *dev);
+// Is this an GPU device?
+bool virtio_is_gpu_device(VirtioDevice *dev);
 
 // Save the Virtio device for later use.
 void virtio_save_device(VirtioDevice device);
@@ -248,6 +253,7 @@ uint16_t virtio_receive_descriptor_chain(VirtioDevice *device, uint16_t which_qu
 
 void virtio_send_descriptor_chain(VirtioDevice *device, uint16_t which_queue, VirtioDescriptor *descriptors, uint16_t num_descriptors, bool notify_device_when_done);
 
+void virtio_wait_for_descriptor(VirtioDevice *device, uint16_t which_queue);
 
 typedef struct VirtioBlockConfig {
    uint64_t capacity;
@@ -282,3 +288,4 @@ typedef struct VirtioBlockConfig {
 
 
 volatile struct VirtioBlockConfig *virtio_get_block_config(VirtioDevice *device);
+volatile struct VirtioGpuConfig *virtio_get_gpu_config(VirtioDevice *device);

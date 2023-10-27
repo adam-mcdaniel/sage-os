@@ -10,6 +10,13 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <virtio.h>
+
+typedef struct Console {
+    uint32_t width;
+    uint32_t height;
+    void* frame_buf; // Pointer to heap allocated frame buffer
+} Console;
 
 /* drawings */
 typedef struct Rectangle {
@@ -36,7 +43,7 @@ typedef struct VirtioGpuConfig {
 } VirtioGpuConfig;
 
 typedef struct VirtioGpuCtrlHdr {
-    uint32_t control_type;
+    uint32_t type;
     uint32_t flags;
     uint64_t fence_id;
     uint32_t context_id;
@@ -76,7 +83,7 @@ enum VirtioGpuCtrlType {
 
 #define VIRTIO_GPU_MAX_SCANOUTS 16
 typedef struct VirtioGpuDispInfoResp {
-   VirtioGpuCtrlHdr ctrl_header;  /* VIRTIO_GPU_RESP_OK_DISPLAY_INFO */
+   VirtioGpuCtrlHdr hdr;  /* VIRTIO_GPU_RESP_OK_DISPLAY_INFO */
    struct GpuDisplay {
        Rectangle rect;
        uint32_t enabled;
@@ -96,7 +103,7 @@ enum GpuFormats {
 };
 
 typedef struct VirtioGpuResCreate2d {
-    VirtioGpuCtrlHdr ctrl_header;
+    VirtioGpuCtrlHdr hdr;
     uint32_t resource_id;
     uint32_t format;
     uint32_t width;
@@ -104,14 +111,14 @@ typedef struct VirtioGpuResCreate2d {
 } VirtioGpuResCreate2d;
 
 typedef struct VirtioGpuSetScanout {
-    VirtioGpuCtrlHdr ctrl_header;
+    VirtioGpuCtrlHdr hdr;
     Rectangle rect;
     uint32_t scanout_id;
     uint32_t resource_id;
 } VirtioGpuSetScanout;
 
 typedef struct VirtioGpuResourceAttachBacking {
-    struct VirtioGpuCtrlHdr ctrl_header;
+    struct VirtioGpuCtrlHdr hdr;
     uint32_t resource_id;
     uint32_t nr_entries;
 } VirtioGpuResourceAttachBacking;
@@ -124,7 +131,17 @@ typedef struct VirtioGpuMemEntry {
 
 /* methods */
 void gpu_test();
-bool gpu_init(VirtioDevice *gpu_device); 
+void gpu_device_init();
+bool gpu_init(VirtioDevice *gpu_device);
+void gpu_send_command(VirtioDevice *gpu_device,
+                      uint16_t which_queue,
+                      void *cmd,
+                      size_t cmd_size,
+                      void *resp0,
+                      size_t resp0_size,
+                      void *resp1,
+                      size_t resp1_size);
+bool gpu_get_display_info(VirtioDevice *gpu_device, VirtioGpuDispInfoResp *disp_resp);
 
 // void fill_rect(uint32_t screen_width,
 //                uint32_t screen_height,
