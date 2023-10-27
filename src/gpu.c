@@ -23,8 +23,8 @@ static Vector *device_active_jobs;
 static VirtioDevice *gpu_device;
 static Console console; // NOTE: Figure how this is supposed to be interfaced, allocate appropriately
 
-void gpu_test() {
-    gpu_init(gpu_device);
+bool gpu_test() {
+    return gpu_init(gpu_device);
 }
 
 void gpu_device_init() {
@@ -62,9 +62,9 @@ bool gpu_init(VirtioDevice *gpu_device) {
     gpu_send_command(gpu_device, 0, &res2d, sizeof(res2d), NULL, 0, &resp_hdr, sizeof(resp_hdr));
 
     if (resp_hdr.type == VIRTIO_GPU_RESP_OK_NODATA)
-        debugf("gpu_init: VIRTIO_GPU_RESP_OK_NODATA\n");
+        debugf("gpu_init: Create 2D resource OK\n");
     else
-        return 0;
+        return false;
 
     // Attach resource 2D
     VirtioGpuResourceAttachBacking attach_backing;
@@ -81,9 +81,9 @@ bool gpu_init(VirtioDevice *gpu_device) {
     gpu_send_command(gpu_device, 0, &attach_backing, sizeof(attach_backing), &mem, sizeof(mem), &resp_hdr, sizeof(resp_hdr));
 
     if (resp_hdr.type == VIRTIO_GPU_RESP_OK_NODATA)
-        debugf("gpu_init: VIRTIO_GPU_RESP_OK_NODATA\n");
+        debugf("gpu_init: Attach backing OK\n");
     else
-        return 0;
+        return false;
     debugf("type: 0x%x\n", resp_hdr.type);
 
     VirtioGpuSetScanout scan;
@@ -104,9 +104,9 @@ bool gpu_init(VirtioDevice *gpu_device) {
     Pixel p2 = {50, 0, 255, 255};
 
     if (resp_hdr.type == VIRTIO_GPU_RESP_OK_NODATA)
-        debugf("gpu_init: VIRTIO_GPU_RESP_OK_NODATA\n");
+        debugf("gpu_init: Set scanout OK\n");
     else
-        return 0;
+        return false;
     debugf("type: 0x%x\n", resp_hdr.type);
 
     fill_rect(console.width, console.height, console.frame_buf, &r1, &p1);
@@ -124,9 +124,9 @@ bool gpu_init(VirtioDevice *gpu_device) {
 
     gpu_send_command(gpu_device, 0, &tx, sizeof(tx), NULL, 0, &resp_hdr, sizeof(resp_hdr));
     if (resp_hdr.type == VIRTIO_GPU_RESP_OK_NODATA)
-        debugf("gpu_init: VIRTIO_GPU_RESP_OK_NODATA\n");
+        debugf("gpu_init: Transfer OK\n");
     else
-        return 0;
+        return false;
     debugf("type: 0x%x\n", resp_hdr.type);
 
     VirtioGpuResourceFlush flush;
@@ -140,21 +140,10 @@ bool gpu_init(VirtioDevice *gpu_device) {
     resp_hdr.type = 0;
     gpu_send_command(gpu_device, 0, &flush, sizeof(flush), NULL, 0, &resp_hdr, sizeof(resp_hdr));
     if (resp_hdr.type == VIRTIO_GPU_RESP_OK_NODATA)
-        debugf("gpu_init: VIRTIO_GPU_RESP_OK_NODATA\n");
+        debugf("gpu_init: Flush OK\n");
     else
-        return 0;
+        return false;
     debugf("type: 0x%x\n", resp_hdr.type);
-
-
-    // // 6. Flush the resource to draw to the screen.
-    // memset(&flush, 0, sizeof(flush));
-    // flush.hdr.type = VIRTIO_GPU_CMD_RESOURCE_FLUSH;
-    // flush.rect.width = gdev->width;
-    // flush.rect.height = gdev->height;
-    // flush.resource_id = 1;
-    // memset(&ctrl, 0, sizeof(ctrl));
-    // gpu_send(gdev, &flush, sizeof(flush), &ctrl, sizeof(ctrl));
-    // gpu_wait_for_response(gdev);
     return true;
 }
 

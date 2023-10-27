@@ -146,7 +146,7 @@ typedef struct VirtioGpuMemEntry {
 } VirtioGpuMemEntry;
 
 /* methods */
-void gpu_test();
+bool gpu_test();
 void gpu_device_init();
 bool gpu_init(VirtioDevice *gpu_device);
 void gpu_send_command(VirtioDevice *gpu_device,
