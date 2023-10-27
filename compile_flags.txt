@@ -1,0 +1,2 @@
+-I/home/jpark78/cosc562_fa23_4/src/include
+-I/home/jpark78/cosc562_fa23_4/util/include
