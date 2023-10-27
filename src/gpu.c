@@ -68,7 +68,9 @@ bool gpu_init(VirtioDevice *gpu_device) {
     gpu_send_command(gpu_device, 0, &res2d, sizeof(res2d), NULL, 0, &resp_hdr, sizeof(resp_hdr));
 
     if (resp_hdr.type == VIRTIO_GPU_RESP_OK_NODATA)
-        debugf("gpu_init: GOOD!\n");
+        debugf("gpu_init: VIRTIO_GPU_RESP_OK_NODATA\n");
+    else
+        return 0;
 
     // Attach resource 2D
     VirtioGpuResourceAttachBacking attach_backing;
@@ -91,21 +93,11 @@ bool gpu_init(VirtioDevice *gpu_device) {
     gpu_send_command(gpu_device, 0, &attach_backing, sizeof(attach_backing), &mem, sizeof(mem), &resp_hdr, sizeof(resp_hdr));
 
     if (resp_hdr.type == VIRTIO_GPU_RESP_OK_NODATA)
-        debugf("gpu_init: GOOD!\n");
+        debugf("gpu_init: VIRTIO_GPU_RESP_OK_NODATA\n");
     else
-        debugf("gpu_init: BAD!\n");
+        return 0;
+    debugf("type: 0x%x\n", resp_hdr.type);
 
-    // // 3. Attach resource 2D.
-    // memset(&attach, 0, sizeof(attach));
-    // attach.nr_entries = 1;
-    // attach.resource_id = 1;
-    // attach.hdr.type = VIRTIO_GPU_CMD_RESOURCE_ATTACH_BACKING;
-    // mem.addr = mmu_translate(kernel_mmu_table, (uint64_t)gdev->framebuffer);
-    // mem.length = sizeof(PixelRGBA) * gdev->width * gdev->height;
-    // mem.padding = 0;
-    // memset(&ctrl, 0, sizeof(ctrl));
-    // gpu_send_3(gdev, &attach, sizeof(attach), &mem, sizeof(mem), &ctrl, sizeof(ctrl));
-    // gpu_wait_for_response(gdev);
     // // 4. Set scanout and connect it to the resource.
     // memset(&scan, 0, sizeof(scan));
     // scan.hdr.type = VIRTIO_GPU_CMD_SET_SCANOUT;
@@ -160,7 +152,7 @@ void gpu_send_command(VirtioDevice *gpu_device,
     VirtioDescriptor resp0_desc;
     resp0_desc.addr = kernel_mmu_translate((uintptr_t)resp0);
     resp0_desc.len = resp0_size;
-    resp0_desc.flags = VIRTQ_DESC_F_WRITE | VIRTQ_DESC_F_NEXT;
+    resp0_desc.flags = VIRTQ_DESC_F_NEXT;
     
     VirtioDescriptor resp1_desc;
     resp1_desc.addr = kernel_mmu_translate((uintptr_t)resp1);
