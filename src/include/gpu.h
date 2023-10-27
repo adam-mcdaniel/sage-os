@@ -12,12 +12,6 @@
 #include <stdbool.h>
 #include <virtio.h>
 
-typedef struct Console {
-    uint32_t width;
-    uint32_t height;
-    void* frame_buf; // Pointer to heap allocated frame buffer
-} Console;
-
 /* drawings */
 typedef struct Rectangle {
     uint32_t x;
@@ -32,6 +26,12 @@ typedef struct Pixel {
     uint8_t b;
     uint8_t a;
 } Pixel;
+
+typedef struct Console {
+    uint32_t width;
+    uint32_t height;
+    Pixel *frame_buf; // Pointer to heap allocated frame buffer
+} Console;
 
 #define VIRTIO_GPU_EVENT_DISPLAY (1 << 0) // Reread display info
 
@@ -117,6 +117,22 @@ typedef struct VirtioGpuSetScanout {
     uint32_t resource_id;
 } VirtioGpuSetScanout;
 
+typedef struct VirtioGpuResourceFlush {
+    VirtioGpuCtrlHdr hdr;
+    Rectangle rect;
+    uint32_t resource_id;
+    uint32_t padding;
+} VirtioGpuResourceFlush;
+
+// Response type is VIRTIO_GPU_RESP_OK_NODATA
+typedef struct VirtioGpuTransferToHost2d {
+    VirtioGpuCtrlHdr hdr;
+    Rectangle rect;
+    uint64_t offset; // Destination offset into the resource
+    uint32_t resource_id;
+    uint32_t padding;
+} VirtioGpuTransferToHost2d;
+
 typedef struct VirtioGpuResourceAttachBacking {
     struct VirtioGpuCtrlHdr hdr;
     uint32_t resource_id;
@@ -142,13 +158,19 @@ void gpu_send_command(VirtioDevice *gpu_device,
                       void *resp1,
                       size_t resp1_size);
 bool gpu_get_display_info(VirtioDevice *gpu_device, VirtioGpuDispInfoResp *disp_resp);
-
-// void fill_rect(uint32_t screen_width,
-//                uint32_t screen_height,
-//                struct pixel *buffer,
-//                const struct rectangle *rect,
-//                const struct pixel *fill_color);
-
-// void stroke_rect(uint32_t screen_width, uint32_t screen_height,
-//                  struct Pixel *buffer, struct Rectangle *rect,
-//                  struct Pixel *line_color, uint32_t line_size);
+void fill_rect(uint32_t screen_width,
+               uint32_t screen_height,
+               Pixel *frame_buf,
+               const Rectangle *rect,
+               const Pixel *fill_color);
+static inline void RVALS(Rectangle *r,
+                         uint32_t x,
+                         uint32_t y,
+                         uint32_t width,
+                         uint32_t height);
+void stroke_rect(uint32_t screen_width,
+                 uint32_t screen_height,
+                 Pixel *frame_buf,
+                 const Rectangle *rect,
+                 const Pixel *line_color,
+                 uint32_t line_size);
