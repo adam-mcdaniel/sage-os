@@ -26,7 +26,7 @@ Sort your entries in descending order (newest entries at the top).
 
 # 23-October-2023
 
-- `amcdan23`: Fixed notify register address calculations, fixed how bars were stored in bookkeeping. Successfully got the ISR to change for our RNG device, but now PC gets zeroed when we write here. Fixed issue where notification did not trigger trap handler; now trap handler is triggered when we notify a device.
+- `amcdan23`: Fixed notify register address calculations, fixed how bars were stored in bookkeeping. Successfully got the ISR to change for our RNG device, but now PC gets zeroed when we write here. Fixed issue where notification did not trigger trap handler (fixed the PC getting zeroed); now trap handler is triggered when we notify a device.
 
 # 18-October-2023
 - `amcdan23`: Added bar pointers directly to the PCI bookkeeping structures, and the virtio bookkeeping structures. Changed how bookkeeping structures were copied so we can add new fields without breaking the implementation. Added reporting for the enumerated PCI device's bookkeeping. Fixed bug where wrong virtio device was being used for the RNG requests.
