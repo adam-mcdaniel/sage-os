@@ -10,13 +10,18 @@
 
 #include <debug.h>
 #include <csr.h>
-#include <virtio.h>
 #include <gpu.h>
 #include <kmalloc.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <vector.h>
+#include <mmu.h>
+#include "virtio.h"
 
 static Vector *device_active_jobs;
 static VirtioDevice *gpu_device;
+static Console console; // NOTE: Figure how this is supposed to be interfaced, allocate appropriately
 
 void gpu_test() {
     gpu_init(gpu_device);
@@ -33,31 +38,68 @@ void gpu_device_init() {
 }
 
 bool gpu_init(VirtioDevice *gpu_device) {
-    // DisplayInfoResponse disp;
     // VirtioGpuCtrlHdr ctrl;
-    // ResourceCreate2dRequest res2d;
     // GpuResourceAttachBacking attach;
     // SetScanoutRequest scan;
     // GpuMemEntry mem;
     // GpuResourceFlush flush;
     // GpuTransferToHost2d tx;
 
-    gpu_set_display_info(gpu_device);
+    VirtioGpuDispInfoResp disp_info;
+    gpu_get_display_info(gpu_device, &disp_info);
+    
+    // Allocate memory for frame buffer
+    console.width = disp_info.displays[0].rect.width;
+    console.height = disp_info.displays[0].rect.height;
+    console.frame_buf = kcalloc(console.width * console.height, sizeof(Pixel));
+    debugf("gpu_init: Allocated frame buffer of (%d * %d) bytes at %p\n",
+           sizeof(Pixel), console.width * console.height, console.frame_buf);
 
-    // // 2. Create a resource 2D.
-    // memset(&res2d, 0, sizeof(res2d));
-    // res2d.format = R8G8B8A8_UNORM;
-    // res2d.height = gdev->height;
-    // res2d.width = gdev->width;
-    // res2d.resource_id = 1;
-    // res2d.hdr.control_type = VIRTIO_GPU_CMD_RESOURCE_CREATE_2D;
-    // gpu_send(gdev, &res2d, sizeof(res2d), &ctrl, sizeof(ctrl));
-    // gpu_wait_for_response(gdev);
+    VirtioGpuResCreate2d res2d;
+    res2d.hdr.type = VIRTIO_GPU_CMD_RESOURCE_CREATE_2D;
+    res2d.resource_id = 1; // Give an arbitrary unique number
+    res2d.format = R8G8B8A8_UNORM;
+    res2d.width = console.width;
+    res2d.height = console.height;
+
+    VirtioGpuCtrlHdr resp_hdr;
+    resp_hdr.type = 0;
+
+    gpu_send_command(gpu_device, 0, &res2d, sizeof(res2d), NULL, 0, &resp_hdr, sizeof(resp_hdr));
+
+    if (resp_hdr.type == VIRTIO_GPU_RESP_OK_NODATA)
+        debugf("gpu_init: GOOD!\n");
+
+    // Attach resource 2D
+    VirtioGpuResourceAttachBacking attach_backing;
+    attach_backing.hdr.type = VIRTIO_GPU_CMD_RESOURCE_ATTACH_BACKING;
+    attach_backing.resource_id = 1;
+    attach_backing.nr_entries = 1;
+
+    VirtioGpuMemEntry mem;
+    // mem.addr = kernel_mmu_translate((uintptr_t)console.frame_buf
+    mem.addr = kernel_mmu_translate((uintptr_t)console.frame_buf);
+    mem.length = console.width * console.width * sizeof(Pixel);
+    mem.padding = 0;
+    
+    resp_hdr.type = 0;
+
+    debugf("size %d\n", sizeof(attach_backing));
+    debugf("size %d\n", sizeof(mem));
+    debugf("size %d\n", sizeof(resp_hdr));
+    
+    gpu_send_command(gpu_device, 0, &attach_backing, sizeof(attach_backing), &mem, sizeof(mem), &resp_hdr, sizeof(resp_hdr));
+
+    if (resp_hdr.type == VIRTIO_GPU_RESP_OK_NODATA)
+        debugf("gpu_init: GOOD!\n");
+    else
+        debugf("gpu_init: BAD!\n");
+
     // // 3. Attach resource 2D.
     // memset(&attach, 0, sizeof(attach));
     // attach.nr_entries = 1;
     // attach.resource_id = 1;
-    // attach.hdr.control_type = VIRTIO_GPU_CMD_RESOURCE_ATTACH_BACKING;
+    // attach.hdr.type = VIRTIO_GPU_CMD_RESOURCE_ATTACH_BACKING;
     // mem.addr = mmu_translate(kernel_mmu_table, (uint64_t)gdev->framebuffer);
     // mem.length = sizeof(PixelRGBA) * gdev->width * gdev->height;
     // mem.padding = 0;
@@ -66,7 +108,7 @@ bool gpu_init(VirtioDevice *gpu_device) {
     // gpu_wait_for_response(gdev);
     // // 4. Set scanout and connect it to the resource.
     // memset(&scan, 0, sizeof(scan));
-    // scan.hdr.control_type = VIRTIO_GPU_CMD_SET_SCANOUT;
+    // scan.hdr.type = VIRTIO_GPU_CMD_SET_SCANOUT;
     // scan.rect.width = gdev->width;
     // scan.rect.height = gdev->height;
     // scan.resource_id = 1;
@@ -83,7 +125,7 @@ bool gpu_init(VirtioDevice *gpu_device) {
     // fb_stroke_rect(gdev->width, gdev->height, gdev->framebuffer, &r2, &z2, 10);
     // // 5. Transfer the framebuffer to the host 2d.
     // memset(&tx, 0, sizeof(tx));
-    // tx.hdr.control_type = VIRTIO_GPU_CMD_TRANSFER_TO_HOST_2D;
+    // tx.hdr.type = VIRTIO_GPU_CMD_TRANSFER_TO_HOST_2D;
     // tx.rect.width = gdev->width;
     // tx.rect.height = gdev->height;
     // tx.resource_id = 1;
@@ -92,7 +134,7 @@ bool gpu_init(VirtioDevice *gpu_device) {
     // gpu_wait_for_response(gdev);
     // // 6. Flush the resource to draw to the screen.
     // memset(&flush, 0, sizeof(flush));
-    // flush.hdr.control_type = VIRTIO_GPU_CMD_RESOURCE_FLUSH;
+    // flush.hdr.type = VIRTIO_GPU_CMD_RESOURCE_FLUSH;
     // flush.rect.width = gdev->width;
     // flush.rect.height = gdev->height;
     // flush.resource_id = 1;
@@ -102,33 +144,60 @@ bool gpu_init(VirtioDevice *gpu_device) {
     return true;
 }
 
-void gpu_set_display_info(VirtioDevice *gpu_device) {
-    VirtioGpuCtrlHdr ctrl_header;
-    ctrl_header.control_type = VIRTIO_GPU_CMD_GET_DISPLAY_INFO;
-    ctrl_header.flags = 0;
-    ctrl_header.fence_id = 0;
-    ctrl_header.context_id = 0;
-    ctrl_header.padding = 0;
+void gpu_send_command(VirtioDevice *gpu_device,
+                     uint16_t which_queue,
+                     void *cmd,
+                     size_t cmd_size,
+                     void *resp0,
+                     size_t resp0_size,
+                     void *resp1,
+                     size_t resp1_size) {
+    VirtioDescriptor cmd_desc;
+    cmd_desc.addr = kernel_mmu_translate((uintptr_t)cmd);
+    cmd_desc.len = cmd_size;
+    cmd_desc.flags = VIRTQ_DESC_F_NEXT;
 
-    VirtioDescriptor ctrl_header_desc;
-    ctrl_header_desc.addr = kernel_mmu_translate(&ctrl_header);
-    ctrl_header_desc.len = sizeof(ctrl_header);
-    ctrl_header_desc.flags = VIRTQ_DESC_F_NEXT;
+    VirtioDescriptor resp0_desc;
+    resp0_desc.addr = kernel_mmu_translate((uintptr_t)resp0);
+    resp0_desc.len = resp0_size;
+    resp0_desc.flags = VIRTQ_DESC_F_WRITE | VIRTQ_DESC_F_NEXT;
+    
+    VirtioDescriptor resp1_desc;
+    resp1_desc.addr = kernel_mmu_translate((uintptr_t)resp1);
+    resp1_desc.len = resp1_size;
+    resp1_desc.flags = VIRTQ_DESC_F_WRITE;
 
-    VirtioGpuDispInfoResp disp_resp;
+    VirtioDescriptor chain0[2] = {cmd_desc, resp1_desc};
+    VirtioDescriptor chain1[3] = {cmd_desc, resp0_desc, resp1_desc};
+    VirtioDescriptor *chain = resp0 == NULL ? chain0 : chain1;
+    unsigned num_descriptors = resp0 == NULL ? 2 : 3;
+    virtio_send_descriptor_chain(gpu_device, which_queue, chain, num_descriptors, true);
+}
+
+// Get display info and set frame buffer's info.
+// Return true if display is enabled. Return false if not.
+bool gpu_get_display_info(VirtioDevice *gpu_device,
+                          VirtioGpuDispInfoResp *disp_resp) {
+    VirtioGpuCtrlHdr hdr;
+    hdr.type = VIRTIO_GPU_CMD_GET_DISPLAY_INFO;
+    hdr.flags = 0;
+    hdr.fence_id = 0;
+    hdr.context_id = 0;
+    hdr.padding = 0;
+
+    VirtioDescriptor hdr_desc;
+    hdr_desc.addr = kernel_mmu_translate((uintptr_t)&hdr);
+    hdr_desc.len = sizeof(hdr);
+    hdr_desc.flags = VIRTQ_DESC_F_NEXT;
+
     VirtioDescriptor disp_resp_desc;
-    disp_resp_desc.addr = kernel_mmu_translate(&disp_resp);
-    disp_resp_desc.len = sizeof(disp_resp);
+    disp_resp_desc.addr = kernel_mmu_translate((uintptr_t)disp_resp);
+    disp_resp_desc.len = sizeof(VirtioGpuDispInfoResp);
     disp_resp_desc.flags = VIRTQ_DESC_F_WRITE;
 
-    VirtioDescriptor chain[2] = {ctrl_header_desc, disp_resp_desc};
+    VirtioDescriptor chain[2] = {hdr_desc, disp_resp_desc};
 
     virtio_send_descriptor_chain(gpu_device, 0, chain, 2, true);
-
-    // TODO
-    while (gpu_device->device_idx != gpu_device->device->idx) {
-        ++gpu_device->device_idx;
-    }
 
     debugf("Internal desc_idx: %d\n", gpu_device->desc_idx);
     debugf("Internal driver_idx: %d\n", gpu_device->driver_idx);
@@ -137,16 +206,18 @@ void gpu_set_display_info(VirtioDevice *gpu_device) {
     debugf("Device ring index: %d\n", gpu_device->device->idx);
 
     debugf("used element id: %d\n", gpu_device->device->ring[0].id);
-    debugf("used element id: %d\n", gpu_device->device->ring[0].len);
+    debugf("used element len: %d\n", gpu_device->device->ring[0].len);
     debugf("used element id: %d\n", gpu_device->device->ring[1].id);
-    debugf("used element id: %d\n", gpu_device->device->ring[1].len);
+    debugf("used element len: %d\n", gpu_device->device->ring[1].len);
 
-    if (disp_resp.ctrl_header.control_type == VIRTIO_GPU_RESP_OK_DISPLAY_INFO)
-        debugf("gpu_set_display_info: Received display info\n");
+    if (disp_resp->hdr.type == VIRTIO_GPU_RESP_OK_DISPLAY_INFO)
+        debugf("gpu_get_display_info: Received display info\n");
 
-    if (!disp_resp.displays[0].enabled)
+    if (!disp_resp->displays[0].enabled)
         return false;
-    debugf("gpu_set_display_info: Display 0 enabled\n");
+    debugf("gpu_get_display_info: Display 0 enabled\n");
+
+    return true;
 }
 
 // void fill_rect(uint32_t screen_width,
