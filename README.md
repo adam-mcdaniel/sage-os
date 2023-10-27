@@ -16,6 +16,8 @@ Sort your entries in descending order (newest entries at the top).
 
 # 25-October-2023
 
+- `gmorale1`: created the basic layout for the GPU driver. Still need to configure init method to properly configure the device. Many of the structs in the notes and in the assignment do the same thing but have different names. I'm pretty sure I've found and removed duplicates, and also fixed some of the names, but the init script still needs a pass through to fix all the names.
+
 - `amcdan23`: Got implementation of block device working! Added functions for block device initialization, setting up and sending request packets, writing to and reading from sectors. Added function for chaining virtio descriptors which performs the packet request. Fixed all the warnings! Wrote `block_device_init`, `block_device_send_request`, `block_device_read_sector`, `block_device_write_sector`, `block_device_read_sectors`, `block_device_write_sectors`, `virtio_send_descriptor_chain`, and `virtio_send_descriptor`. Added basic skeleton for filesystem. Went back and added `virtio_receive_descriptor_chain` + related functions for reading linked list of descriptors from device into a buffer.
 
 # 24-October-2023
