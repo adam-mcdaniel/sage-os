@@ -30,8 +30,10 @@ typedef struct InputDevice {
 
 void input_device_init(void);
 
-int input_device_read_event(InputDevice *input_device, struct virtio_input_event *event);
+
 
 void input_device_interrupt_handler(void);
+
+void set_input_device_config(uint8_t select, uint8_t subsel, uint8_t size);
 
 InputDevice *get_input_device(void);
