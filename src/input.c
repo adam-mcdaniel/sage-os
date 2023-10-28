@@ -2,7 +2,7 @@
 #include <virtio.h>
 #include <debug.h>
 #include <kmalloc.h>
-#include <sched.h>
+#include <string.h>
 #include <syscall.h>
 #include <compiler.h>
 
@@ -21,9 +21,11 @@ void input_device_init() {
     debugf("Input device initialized\n");
 }
 
-uint8_t input_device_get_size(void) {
+void set_input_device_config(uint8_t select, uint8_t subsel, uint8_t size) {
     volatile VirtioInputConfig *config = virtio_get_input_config(input_device);
-    return config->size;
+    config->select = select;
+    config->subsel = subsel;
+    config->size   = size;
 }
 
 void input_device_interrupt_handler(void) {
