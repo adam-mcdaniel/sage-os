@@ -26,10 +26,11 @@ void input_device_init(VirtioDevice *device) {
     volatile VirtioInputConfig *config = virtio_get_input_config(device);
     debugf("Input device initialized\n");
 
+    //extra stuff just to see if we can see the input type
     debugf("Reading input config\n");
-    // set_input_device_config(device,VIRTIO_INPUT_CFG_ID_NAME,0,8);
-    // debugf("%.128s", config->string);
-    // set_input_device_config(device,VIRTIO_INPUT_CFG_ID_NAME,0,8);
+    set_input_device_config(device,VIRTIO_INPUT_CFG_ID_NAME,0,8);
+    debugf("%.128s", config->string);
+    set_input_device_config(device,VIRTIO_INPUT_CFG_ID_NAME,0,8);
     if (config->ids.product == EV_KEY) {
         debugf("Found keyboard input device.\n");
     }
