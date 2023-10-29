@@ -215,7 +215,19 @@ void virtio_init(void) {
     }
     rng_device_init();
     block_device_init();
-    input_device_init();
+    
+    /*
+    loop over every virtio device and initialize based on type
+    */
+
+    for (uint16_t i=0; i<virtio_count_saved_devices(); i++) {
+        VirtioDevice *dev = virtio_get_nth_saved_device(i);
+        if(virtio_get_device_id(dev) == VIRTIO_PCI_DEVICE_ID(VIRTIO_PCI_DEVICE_INPUT)){
+            input_device_init(dev);
+        }
+    }
+
+
     debugf("virtio_init: Done initializing virtio system\n");
 }
 
