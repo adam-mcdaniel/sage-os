@@ -117,21 +117,21 @@ typedef struct VirtioGpuSetScanout {
     uint32_t resource_id;
 } VirtioGpuSetScanout;
 
+// Response type is VIRTIO_GPU_RESP_OK_NODATA
+typedef struct VirtioGpuTransferToHost2d {
+    VirtioGpuCtrlHdr hdr;
+    Rectangle rect;
+    uint64_t offset; // The start point of transfer
+    uint32_t resource_id;
+    uint32_t padding;
+} VirtioGpuTransferToHost2d;
+
 typedef struct VirtioGpuResourceFlush {
     VirtioGpuCtrlHdr hdr;
     Rectangle rect;
     uint32_t resource_id;
     uint32_t padding;
 } VirtioGpuResourceFlush;
-
-// Response type is VIRTIO_GPU_RESP_OK_NODATA
-typedef struct VirtioGpuTransferToHost2d {
-    VirtioGpuCtrlHdr hdr;
-    Rectangle rect;
-    uint64_t offset; // Destination offset into the resource
-    uint32_t resource_id;
-    uint32_t padding;
-} VirtioGpuTransferToHost2d;
 
 typedef struct VirtioGpuResourceAttachBacking {
     struct VirtioGpuCtrlHdr hdr;
