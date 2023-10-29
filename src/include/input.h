@@ -1,6 +1,7 @@
 #pragma once
 
 #include "virtio.h"
+#include <input-event-codes.h>
 
 #define INPUT_EVENT_BUFFER_SIZE 64
 
@@ -28,12 +29,10 @@ typedef struct InputDevice {
     int size;
 } InputDevice;
 
-void input_device_init(void);
+void input_device_init(VirtioDevice *device);
 
+void input_device_interrupt_handler(VirtioDevice *device);
 
+void set_input_device_config(VirtioDevice *device, uint8_t select, uint8_t subsel, uint8_t size);
 
-void input_device_interrupt_handler(void);
-
-void set_input_device_config(uint8_t select, uint8_t subsel, uint8_t size);
-
-InputDevice *get_input_device(void);
+// InputDevice *get_input_device(void);
