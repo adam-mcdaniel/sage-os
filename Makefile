@@ -34,7 +34,8 @@ QEMU_CPU=rv64 #,h=true,v=true,vext_spec=v1.0
 QEMU_CPUS=4
 QEMU_MEM=128M
 QEMU_KERNEL=$(KERNEL)
-# QEMU_OPTIONS= -nographic
+QEMU_OPTIONS= -nographic
+QEMU_OPTIONS+= -display sdl
 # QEMU_OPTIONS+= -trace virtio*
 QEMU_OPTIONS+= -serial mon:stdio 
 QEMU_DEVICES+= -device pcie-root-port,id=bridge1,multifunction=off,chassis=0,slot=1,bus=pcie.0,addr=01.0
