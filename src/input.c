@@ -20,22 +20,23 @@ void input_device_init() {
 
     // volatile virtio_input_config *ic = (virtio_input_config *)input_device->common_cfg;
     volatile struct virtio_input_config *ic = get_input_config(input_device);
+    debugf("Reading input config\n");
     ic->select = VIRTIO_INPUT_CFG_ID_NAME;
     ic->subsel = 0;
-    printf("%.128s", ic->string);
+    debugf("%.128s", ic->string);
     ic->select = VIRTIO_INPUT_CFG_ID_DEVIDS;
     ic->subsel = 0;
     if (ic->ids.product == EV_KEY) {
-    printf("Found keyboard input device.\n");
-    input_device_keyboard = input_device;
+        debugf("Found keyboard input device.\n");
+        input_device_keyboard = input_device;
     }
     else if (ic->ids.product = EV_ABS) {
-    printf("Found tablet input device.\n");
-    input_device_tablet = input_device;
+        debugf("Found tablet input device.\n");
+        input_device_tablet = input_device;
     }
     else {
-    printf("Found an input device product id %d\n", ic->ids.product);
-}
+        debugf("Found an input device product id %d\n", ic->ids.product);
+    }   
 }
 
 /*
@@ -67,3 +68,7 @@ uint32_t input_handle(VirtioDevice *dev)
 
     return ;
 }
+
+volatile struct virtio_input_config *get_input_config(VirtioDevice *device) {
+    return (volatile struct virtio_input_config *)pci_get_device_specific_config(device->pcidev);
+};
