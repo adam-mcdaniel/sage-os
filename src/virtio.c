@@ -34,6 +34,10 @@ bool virtio_is_block_device(VirtioDevice *dev) {
     return virtio_get_device_id(dev) == VIRTIO_PCI_DEVICE_ID(VIRTIO_PCI_DEVICE_BLOCK);
 }
 
+bool virtio_is_input_device(VirtioDevice *dev) {
+    return virtio_get_device_id(dev) == VIRTIO_PCI_DEVICE_ID(VIRTIO_PCI_DEVICE_INPUT);
+}
+
 VirtioDevice *virtio_get_device(uint16_t device_type) {
     for (uint16_t i=0; i<virtio_count_saved_devices(); i++) {
         VirtioDevice *dev = virtio_get_nth_saved_device(i);
@@ -52,6 +56,10 @@ VirtioDevice *virtio_get_rng_device(void) {
 
 VirtioDevice *virtio_get_block_device(void) {
     return virtio_get_device(VIRTIO_PCI_DEVICE_BLOCK);
+}
+
+VirtioDevice *virtio_get_input_device(void) {
+    return virtio_get_device(VIRTIO_PCI_DEVICE_INPUT);
 }
 
 VirtioDevice *virtio_get_gpu_device(void) {
