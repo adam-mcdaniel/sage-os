@@ -89,7 +89,6 @@ static void init_systems(void)
     pci_init();
 #endif
 #ifdef USE_VIRTIO
-    virtio_init();
     uint64_t stvec = trampoline_trap_start;
     
 	// # 0    - gpregs
@@ -119,6 +118,7 @@ static void init_systems(void)
     sscratch->trap_stack = (uint64_t)kmalloc(0x4000);
     CSR_WRITE("sscratch", sscratch);
 
+    virtio_init();
     uint8_t buffer[16] = {0};
     debugf("RNG State Before:");
     for (uint64_t i=0; i<sizeof(buffer)/sizeof(buffer[0]); i++) {
