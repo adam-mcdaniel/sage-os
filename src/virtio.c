@@ -13,6 +13,7 @@
 #include <syscall.h>
 #include <compiler.h>
 #include <block.h>
+#include <input.h>
 #include <rng.h>
 
 
@@ -136,6 +137,9 @@ void virtio_init(void) {
             } else if (virtio_is_block_device(&viodev)) {
                 debugf("Setting up block device\n");
             }
+            else if (virtio_is_input_device(&viodev)) {
+                debugf("Setting up input device\n");
+            }
 
             debugf("Common config at 0x%08x\n", viodev.common_cfg);
             debugf("Notify config at 0x%08x\n", viodev.notify_cap);
@@ -208,6 +212,7 @@ void virtio_init(void) {
     }
     rng_device_init();
     block_device_init();
+    input_device_init();
     debugf("virtio_init: Done initializing virtio system\n");
 }
 

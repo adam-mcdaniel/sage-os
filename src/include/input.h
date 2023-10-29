@@ -55,6 +55,6 @@ typedef struct virtio_input_event {
 }virtio_input_event;
 
 /* methods */
-volatile struct virtio_input_config *get_input_config(VirtioDevice *device){
-    return (volatile struct virtio_input_config *)pci_get_device_specific_config(device->pcidev);
-};
+volatile struct virtio_input_config *get_input_config(VirtioDevice *device);
+
+void input_device_init();
