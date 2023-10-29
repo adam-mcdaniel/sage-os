@@ -61,10 +61,12 @@ bool gpu_init(VirtioDevice *gpu_device) {
 
     gpu_send_command(gpu_device, 0, &res2d, sizeof(res2d), NULL, 0, &resp_hdr, sizeof(resp_hdr));
 
-    if (resp_hdr.type == VIRTIO_GPU_RESP_OK_NODATA)
+    if (resp_hdr.type == VIRTIO_GPU_RESP_OK_NODATA) {
         debugf("gpu_init: Create 2D resource OK\n");
-    else
+    } else {
+        debugf("gpu_init: Create 2D resource failed with %s\n", gpu_get_resp_string(resp_hdr.type));
         return false;
+    }
 
     // Attach resource 2D
     VirtioGpuResourceAttachBacking attach_backing;
@@ -80,11 +82,12 @@ bool gpu_init(VirtioDevice *gpu_device) {
     
     gpu_send_command(gpu_device, 0, &attach_backing, sizeof(attach_backing), &mem, sizeof(mem), &resp_hdr, sizeof(resp_hdr));
 
-    if (resp_hdr.type == VIRTIO_GPU_RESP_OK_NODATA)
+    if (resp_hdr.type == VIRTIO_GPU_RESP_OK_NODATA) {
         debugf("gpu_init: Attach backing OK\n");
-    else
+    } else {
+        debugf("gpu_init: Attach backing failed with %s\n", gpu_get_resp_string(resp_hdr.type));
         return false;
-    debugf("type: 0x%x\n", resp_hdr.type);
+    }
 
     VirtioGpuSetScanout scan;
     scan.hdr.type = VIRTIO_GPU_CMD_SET_SCANOUT;
@@ -103,11 +106,12 @@ bool gpu_init(VirtioDevice *gpu_device) {
     Pixel p1 = {255, 100, 50, 255};
     Pixel p2 = {88, 89, 91, 255};
 
-    if (resp_hdr.type == VIRTIO_GPU_RESP_OK_NODATA)
+    if (resp_hdr.type == VIRTIO_GPU_RESP_OK_NODATA) {
         debugf("gpu_init: Set scanout OK\n");
-    else
+    } else {
+        debugf("gpu_init: Set scanout failed with %s\n", gpu_get_resp_string(resp_hdr.type));
         return false;
-    debugf("type: 0x%x\n", resp_hdr.type);
+    }
 
     fill_rect(console.width, console.height, console.frame_buf, &r1, &p1);
     stroke_rect(console.width, console.height, console.frame_buf, &r2, &p2, 10);
@@ -124,11 +128,13 @@ bool gpu_init(VirtioDevice *gpu_device) {
     resp_hdr.type = 0;
 
     gpu_send_command(gpu_device, 0, &tx, sizeof(tx), NULL, 0, &resp_hdr, sizeof(resp_hdr));
-    if (resp_hdr.type == VIRTIO_GPU_RESP_OK_NODATA)
+    
+    if (resp_hdr.type == VIRTIO_GPU_RESP_OK_NODATA) {
         debugf("gpu_init: Transfer OK\n");
-    else
+    } else {
+        debugf("gpu_init: Transfer failed with %s\n", gpu_get_resp_string(resp_hdr.type));
         return false;
-    debugf("type: 0x%x\n", resp_hdr.type);
+    }
 
     VirtioGpuResourceFlush flush;
     flush.hdr.type = VIRTIO_GPU_CMD_RESOURCE_FLUSH;
@@ -140,11 +146,14 @@ bool gpu_init(VirtioDevice *gpu_device) {
     flush.padding = 0;
     resp_hdr.type = 0;
     gpu_send_command(gpu_device, 0, &flush, sizeof(flush), NULL, 0, &resp_hdr, sizeof(resp_hdr));
-    if (resp_hdr.type == VIRTIO_GPU_RESP_OK_NODATA)
+    
+    if (resp_hdr.type == VIRTIO_GPU_RESP_OK_NODATA) {
         debugf("gpu_init: Flush OK\n");
-    else
+    } else {
+        debugf("gpu_init: Flush failed with %s\n", gpu_get_resp_string(resp_hdr.type));
         return false;
-    debugf("type: 0x%x\n", resp_hdr.type);
+    }
+
     return true;
 }
 
@@ -294,4 +303,24 @@ void stroke_rect(uint32_t screen_width,
     RVALS(&r, rect->x + rect->width, rect->y,
               line_size, rect->height + line_size);
     fill_rect(screen_width, screen_height, frame_buf, &r, line_color);
+}
+
+// Return the respective response message string
+static char *gpu_get_resp_string(VirtioGpuCtrlType type) {
+    switch (type) {
+        // Success responses
+        case VIRTIO_GPU_RESP_OK_NODATA: return "VIRTIO_GPU_RESP_OK_NODATA";
+        case VIRTIO_GPU_RESP_OK_DISPLAY_INFO: return "VIRTIO_GPU_RESP_OK_DISPLAY_INFO";
+        case VIRTIO_GPU_RESP_OK_CAPSET_INFO: return "VIRTIO_GPU_RESP_OK_CAPSET_INFO";
+        case VIRTIO_GPU_RESP_OK_CAPSET: return "VIRTIO_GPU_RESP_OK_CAPSET";
+        case VIRTIO_GPU_RESP_OK_EDID: return "VIRTIO_GPU_RESP_OK_EDID";
+        // Error responses
+        case VIRTIO_GPU_RESP_ERR_UNSPEC: return "VIRTIO_GPU_RESP_ERR_UNSPEC";
+        case VIRTIO_GPU_RESP_ERR_OUT_OF_MEMORY: return "VIRTIO_GPU_RESP_ERR_OUT_OF_MEMORY";
+        case VIRTIO_GPU_RESP_ERR_INVALID_SCANOUT_ID: return "VIRTIO_GPU_RESP_ERR_INVALID_SCANOUT_ID";
+        case VIRTIO_GPU_RESP_ERR_INVALID_RESOURCE_ID: return "VIRTIO_GPU_RESP_ERR_INVALID_RESOURCE_ID";
+        case VIRTIO_GPU_RESP_ERR_INVALID_CONTEXT_ID: return "VIRTIO_GPU_RESP_ERR_INVALID_CONTEXT_ID";
+        case VIRTIO_GPU_RESP_ERR_INVALID_PARAMETER: return "VIRTIO_GPU_RESP_ERR_INVALID_PARAMETER";
+        default: return "Invalid type argument to gpu_get_resp_string"; break;
+    }
 }

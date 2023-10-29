@@ -50,7 +50,7 @@ typedef struct VirtioGpuCtrlHdr {
     uint32_t padding;
 } VirtioGpuCtrlHdr;
 
-enum VirtioGpuCtrlType {
+typedef enum VirtioGpuCtrlType {
     /* 2d commands */
     VIRTIO_GPU_CMD_GET_DISPLAY_INFO = 0x0100,
     VIRTIO_GPU_CMD_RESOURCE_CREATE_2D,
@@ -79,7 +79,7 @@ enum VirtioGpuCtrlType {
     VIRTIO_GPU_RESP_ERR_INVALID_RESOURCE_ID,
     VIRTIO_GPU_RESP_ERR_INVALID_CONTEXT_ID,
     VIRTIO_GPU_RESP_ERR_INVALID_PARAMETER,
-};
+} VirtioGpuCtrlType;
 
 #define VIRTIO_GPU_MAX_SCANOUTS 16
 typedef struct VirtioGpuDispInfoResp {
@@ -174,3 +174,4 @@ void stroke_rect(uint32_t screen_width,
                  const Rectangle *rect,
                  const Pixel *line_color,
                  uint32_t line_size);
+static char *gpu_get_resp_string(VirtioGpuCtrlType type);
