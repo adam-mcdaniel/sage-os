@@ -98,10 +98,10 @@ bool gpu_init(VirtioDevice *gpu_device) {
 
     gpu_send_command(gpu_device, 0, &scan, sizeof(scan), NULL, 0, &resp_hdr, sizeof(resp_hdr));
 
-    Rectangle r1 = {0, 0, console.width - 150, console.height - 150};
+    Rectangle r1 = {0, 0, console.width, console.height};
     Rectangle r2 = {100, 100, console.width - 150, console.height - 150};
     Pixel p1 = {255, 100, 50, 255};
-    Pixel p2 = {50, 0, 255, 255};
+    Pixel p2 = {88, 89, 91, 255};
 
     if (resp_hdr.type == VIRTIO_GPU_RESP_OK_NODATA)
         debugf("gpu_init: Set scanout OK\n");
@@ -118,6 +118,7 @@ bool gpu_init(VirtioDevice *gpu_device) {
     tx.rect.y = 0;
     tx.rect.width = console.width;
     tx.rect.height = console.height;
+    tx.offset = 0;
     tx.resource_id = 1;
     tx.padding = 0;
     resp_hdr.type = 0;
