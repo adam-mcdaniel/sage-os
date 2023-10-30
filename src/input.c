@@ -8,6 +8,7 @@
 #include <compiler.h>
 #include <ring.h>
 #include <list.h>
+#include <virtio.h>
 #include "input-event-codes.h"
 
 #define MAX_DESCRIPTORS 10
