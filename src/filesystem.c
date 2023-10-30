@@ -26,6 +26,7 @@ void filesystem_superblock_init(void) {
 SuperBlock filesystem_get_superblock() {
     // Get the superblock
     SuperBlock superblock;
+    // Superblock begins at bytes 1024
     block_device_read_bytes(1024, (uint8_t *)&superblock, sizeof(SuperBlock));
     return superblock;
 }
