@@ -15,63 +15,36 @@
 //use this like a queue
 
 static Vector *device_active_jobs;
-static VirtioDevice *keyboard_device;
-static VirtioDevice *tablet_device;
+// static VirtioDevice *keyboard_device;
+// static VirtioDevice *tablet_device;
 // static List *input_devices;  //we need to store multiple input devices
 // static Ring *input_events;  //TODO: use the ring to buffer input events and also limit the number of events
 // const int event_limit = 1000;   //limits number of events so we don't run out of memory
 
-void input_device_init() {
+void input_device_init(VirtioDevice *device) {
     // input_events = ring_new(event_limit);
     device_active_jobs = vector_new();
     // list_add(input_devices, device);
-    IRQ_OFF();
-    VirtioDevice *input_device[2] = { virtio_get_nth_saved_device(0), virtio_get_nth_saved_device(1) };
-    debugf("input_device_init: %d\n", virtio_is_input_device(input_device[0]));
-    debugf("input_device_init: %d\n", virtio_is_input_device(input_device[1]));
-    keyboard_device = input_device[0];
-    tablet_device = input_device[1];
-    keyboard_device->ready = true;
-    tablet_device->ready = true;
+    debugf("Input device init done for device at %p\n", device->pcidev->ecam_header);
+    device->ready = true;
+    volatile VirtioInputConfig *config = virtio_get_input_config(device);
+    debugf("Input device initialized\n");
 
-    volatile VirtioInputConfig *keyboard_config = virtio_get_input_config(keyboard_device);
-    volatile VirtioInputConfig *tablet_config = virtio_get_input_config(tablet_device);
-
-    debugf("input_device_init:\n");
-    debugf("  Keyboard\n");
-    keyboard_config->select = VIRTIO_INPUT_CFG_ID_NAME;
-    keyboard_config->subsel = 0;
-    if (keyboard_config->size != 0) {
-        debugf("    VIRTIO_INPUT_CFG_ID_NAME: %.128s\n", keyboard_config->string);
-    } else {
-        debugf("    VIRTIO_INPUT_CFG_ID_NAME: N/A\n");
+    //extra stuff just to see if we can see the input type
+    debugf("Reading input config\n");
+    get_input_device_config(device,VIRTIO_INPUT_CFG_ID_NAME,0,8);
+    debugf("%.128s", config->string);
+    get_input_device_config(device,VIRTIO_INPUT_CFG_ID_NAME,0,8);
+    if (config->ids.product == EV_KEY) {
+        debugf("Found keyboard input device.\n");
     }
-    keyboard_config->select = VIRTIO_INPUT_CFG_ID_DEVIDS;
-    keyboard_config->subsel = 0;
-    if (keyboard_config->ids.product == EV_KEY) {
-        debugf("    Product ID is EV_KEY\n");
-    } else {
-        debugf("    Product ID is %d\n", keyboard_config->ids.product);
+    else if (config->ids.product = EV_ABS) {
+        debugf("Found tablet input device.\n");
     }
+    else {
+        debugf("Found an input device product id %d\n", config->ids.product);
+    }  
 
-
-    debugf("  Tablet\n");
-    tablet_config->select = VIRTIO_INPUT_CFG_ID_NAME;
-    tablet_config->subsel = 0;
-    if (tablet_config->size != 0) {
-        debugf("    VIRTIO_INPUT_CFG_ID_NAME: %.128s\n", tablet_config->string);
-    } else {
-        debugf("    VIRTIO_INPUT_CFG_ID_NAME: N/A\n");
-    }
-    tablet_config->select = VIRTIO_INPUT_CFG_ID_DEVIDS;
-    tablet_config->subsel = 0;
-    if (tablet_config->ids.product == EV_ABS) {
-        debugf("    Product ID is EV_ABS\n");
-    } else {
-        debugf("    Product ID is %d\n", tablet_config->ids.product);
-    }
-
-    // IRQ_ON();
 }
 
 void get_input_device_config(VirtioDevice *device, uint8_t select, uint8_t subsel, uint8_t size) {
