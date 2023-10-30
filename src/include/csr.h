@@ -21,6 +21,20 @@
 // CSR_CLEAR("register"). Clears a register to 0. Must use quotes for the register name.
 #define CSR_CLEAR(csr)  asm volatile("csrw " csr ", zero");
 
+#define IRQ_OFF() \
+    do { \
+        unsigned long ___SST_REG_; \
+        CSR_READ(___SST_REG_, "sstatus"); \
+        CSR_WRITE("sstatus", ___SST_REG_ & ~SSTATUS_SIE); \
+    } while (0)
+
+#define IRQ_ON() \
+    do { \
+        unsigned long ___SST_REG_; \
+        CSR_READ(___SST_REG_, "sstatus"); \
+        CSR_WRITE("sstatus", ___SST_REG_ | SSTATUS_SIE); \
+    } while (0)
+
 // SFENCE for the SATP register (for MMU).
 // Flush the entire TLB
 #define SFENCE_ALL()          asm volatile("sfence.vma");
@@ -30,6 +44,20 @@
 #define SFENCE_VMA(x)         asm volatile("sfence.vma %0, zero" ::"r"(x))
 // Flush only TLB entries with the given ASID that match the given VMA
 #define SFENCE(vma, asid)     asm volatile("sfence.vma %0, %1" ::"r"(vma), "r"(asid))
+
+#define IRQ_OFF() \
+    do { \
+        unsigned long ___SST_REG_; \
+        CSR_READ(___SST_REG_, "sstatus"); \
+        CSR_WRITE("sstatus", ___SST_REG_ & ~SSTATUS_SIE); \
+    } while (0)
+
+#define IRQ_ON() \
+    do { \
+        unsigned long ___SST_REG_; \
+        CSR_READ(___SST_REG_, "sstatus"); \
+        CSR_WRITE("sstatus", ___SST_REG_ | SSTATUS_SIE); \
+    } while (0)
 
 // Return from trap (M = machine, S = supervisor)
 #define MRET()                asm volatile("mret")
@@ -53,9 +81,15 @@
 #define SSTATUS_SPP_SUPERVISOR             (1UL << SSTATUS_SPP_BIT)
 #define SSTATUS_SPP_USER                   (0UL << SSTATUS_SPP_BIT)
 
+#define SSTATUS_SIE_BIT                    1
+#define SSTATUS_SIE                        (1UL << SSTATUS_SIE_BIT)
+
 // STATUS Previous Interrupt Enable ([MS]PIE)
 #define MSTATUS_MPIE_BIT                   7
 #define MSTATUS_MPIE                       (1UL << MSTATUS_MPIE_BIT)
+
+#define SSTATUS_SIE_BIT                    1
+#define SSTATUS_SIE                        (1UL << SSTATUS_SIE_BIT)
 
 #define SSTATUS_SPIE_BIT                   5
 #define SSTATUS_SPIE                       (1UL << SSTATUS_SPIE_BIT)
