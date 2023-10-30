@@ -15,10 +15,10 @@ Every week, you will need to write entries in this journal. Include brief inform
 Sort your entries in descending order (newest entries at the top).
 
 # 29-October-2023
--`jpark78`: Fixed an issue where `gpu_init` had intermittent failures. Fixed it by turning off IRQ and spinlocking while sending the descriptor, by adding a while loop to wait for the device_idx to catch up, and by removing the error checking code. Even though this fixes a lot of the issues, we still want to figure out why the error checking code is causing it to fail. Also helped with input device initialization by making sure we are setting STVEC before `virtio_init`.
+- `jpark78`: Fixed an issue where `gpu_init` had intermittent failures. Fixed it by turning off IRQ and spinlocking while sending the descriptor, by adding a while loop to wait for the device_idx to catch up, and by removing the error checking code. Even though this fixes a lot of the issues, we still want to figure out why the error checking code is causing it to fail. Also helped with input device initialization by making sure we are setting STVEC before `virtio_init`.
 
 # 27-October-2023
--`jpark78`: Got a test graphics to draw succesfully on `gpu_init`. One of the issues was XQuartz not working well with the hydra machine. Another was not setting the offset correctly when trasnferring.
+- `jpark78`: Got a test graphics to draw succesfully on `gpu_init`. One of the issues was XQuartz not working well with the hydra machine. Another was not setting the offset correctly when trasnferring.
 
 # 26-October-2023
 - `jpark78`: Implemented GPU initialization along with helper functions `gpu_send_command` and `gpu_get_display_config`. Was able to get the correct size window.
