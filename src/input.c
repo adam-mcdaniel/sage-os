@@ -15,6 +15,7 @@
 //use this like a queue
 
 static Vector *device_active_jobs;
+static int init_counter = 0;
 // static VirtioDevice *keyboard_device;
 // static VirtioDevice *tablet_device;
 // static List *input_devices;  //we need to store multiple input devices
@@ -22,6 +23,7 @@ static Vector *device_active_jobs;
 // const int event_limit = 1000;   //limits number of events so we don't run out of memory
 
 void input_device_init(VirtioDevice *device) {
+    init_counter++;
     // input_events = ring_new(event_limit);
     device_active_jobs = vector_new();
     // list_add(input_devices, device);
@@ -45,6 +47,8 @@ void input_device_init(VirtioDevice *device) {
         debugf("Found an input device product id %d\n", config->ids.product);
     }  
 
+
+
 }
 
 void get_input_device_config(VirtioDevice *device, uint8_t select, uint8_t subsel, uint8_t size) {
@@ -60,6 +64,10 @@ void get_input_device_config(VirtioDevice *device, uint8_t select, uint8_t subse
 
 void input_device_interrupt_handler(VirtioDevice* dev) {
     InputDevice *input_dev = NULL;
+    if(init_counter != 0){//ignore first interrupts
+        init_counter--;
+        return;
+    }
     if (dev == NULL) {
         debugf("Input device not initialized\n");
         return;
