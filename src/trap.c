@@ -15,7 +15,7 @@ void syscall_handle(int hart, uint64_t epc, int64_t *scratch);
 // Called from asm/spawn.S: _spawn_kthread
 void os_trap_handler(void)
 {
-    debugf("Testing\n");
+    debugf("Entering OS trap handler\n");
     unsigned long cause;
     long *scratch;
     unsigned long epc;

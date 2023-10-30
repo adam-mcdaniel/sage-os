@@ -10,6 +10,7 @@
  */
 #pragma once
 
+#include <lock.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <pci.h>
@@ -188,6 +189,7 @@ typedef struct VirtioDevice {
     uint16_t device_idx;
 
     bool ready;
+    Mutex lock;
 } VirtioDevice;
 
 #define VIRTIO_F_RESET         0
@@ -216,12 +218,17 @@ VirtioDevice *virtio_get_rng_device();
 VirtioDevice *virtio_get_block_device();
 // Get the Input device from the list of virtio devices.
 VirtioDevice *virtio_get_input_device();
+// Get the GPU device from the list of virtio devices.
+VirtioDevice *virtio_get_gpu_device();
+
 // Is this an RNG device?
 bool virtio_is_rng_device(VirtioDevice *dev);
-// Is this a BLOCK device?
+// Is this an block device?
 bool virtio_is_block_device(VirtioDevice *dev);
 // Is this an INPUT device?
 bool virtio_is_input_device(VirtioDevice *dev);
+// Is this an GPU device?
+bool virtio_is_gpu_device(VirtioDevice *dev);
 
 // Save the Virtio device for later use.
 void virtio_save_device(VirtioDevice device);
@@ -250,6 +257,7 @@ uint16_t virtio_receive_descriptor_chain(VirtioDevice *device, uint16_t which_qu
 
 void virtio_send_descriptor_chain(VirtioDevice *device, uint16_t which_queue, VirtioDescriptor *descriptors, uint16_t num_descriptors, bool notify_device_when_done);
 
+void virtio_wait_for_descriptor(VirtioDevice *device, uint16_t which_queue);
 
 typedef struct VirtioBlockConfig {
    uint64_t capacity;
@@ -312,3 +320,4 @@ typedef struct VirtioInputConfig {
 
 volatile struct VirtioBlockConfig *virtio_get_block_config(VirtioDevice *device);
 volatile struct VirtioInputConfig *virtio_get_input_config(VirtioDevice *device);
+volatile struct VirtioGpuConfig *virtio_get_gpu_config(VirtioDevice *device);
