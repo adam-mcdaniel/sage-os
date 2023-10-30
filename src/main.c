@@ -1,6 +1,7 @@
 #include <compiler.h>
 #include <config.h>
 #include <csr.h>
+#include <gpu.h>
 #include <kmalloc.h>
 #include <list.h>
 #include <lock.h>
@@ -185,6 +186,9 @@ static void init_systems(void)
     // bytes[2], 
     // bytes[3], 
     // bytes[4]);
+
+    // TEST GPU
+    debugf("GPU init %s\n", gpu_test() ? "successful" : "failed");
 #endif
 }
 
