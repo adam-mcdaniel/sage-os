@@ -13,9 +13,9 @@ void filesystem_init(void)
     debugf("   zmap_blocks: %d\n", sb.zmap_blocks);
     debugf("   first_data_zone: %d\n", sb.first_data_zone);
     debugf("   log_zone_size: %d\n", sb.log_zone_size);
-    debugf("   max_size: %d\n", sb.max_size);
-    debugf("   num_zones: %d\n", sb.num_zones);
-    debugf("   magic: %d\n", sb.magic);
+    debugf("   max_size: 0x%x (%d)\n", sb.max_size, sb.max_size);
+    debugf("   num_zones: 0x%x (%d)\n", sb.num_zones, sb.num_zones);
+    debugf("   magic: 0x%x\n", sb.magic);
     debugf("   block_size: %d\n", sb.block_size);
     debugf("   disk_version: %d\n", sb.disk_version);
 }
