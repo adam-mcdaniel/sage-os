@@ -221,6 +221,8 @@ VirtioDevice *virtio_get_input_device();
 // Get the GPU device from the list of virtio devices.
 VirtioDevice *virtio_get_gpu_device();
 
+// Get the device ID from the given VirtioDevice
+uint16_t virtio_get_device_id(VirtioDevice *dev);
 // Is this an RNG device?
 bool virtio_is_rng_device(VirtioDevice *dev);
 // Is this an block device?
