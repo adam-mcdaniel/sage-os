@@ -247,9 +247,9 @@ VirtioDevice *virtio_from_pci_device(PCIDevice *pcidevice);
 
 volatile uint16_t *virtio_notify_register(VirtioDevice *device);
 
-void virtio_send_descriptor(VirtioDevice *device, uint16_t which_queue, VirtioDescriptor descriptor, bool notify_device_when_done);
+void virtio_send_one_descriptor(VirtioDevice *device, uint16_t which_queue, VirtioDescriptor descriptor, bool notify_device_when_done);
 
-volatile VirtioDescriptor *virtio_receive_descriptor(VirtioDevice *device, uint16_t which_queue, uint32_t *id, uint32_t *len);
+VirtioDescriptor virtio_receive_one_descriptor(VirtioDevice *device, uint16_t which_queue, bool wait_for_descriptor);
 
 bool virtio_has_received_descriptor(VirtioDevice *device, uint16_t which_queue);
 

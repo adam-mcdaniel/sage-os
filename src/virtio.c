@@ -296,55 +296,56 @@ uint64_t virtio_set_queue_and_get_size(VirtioDevice *device, uint16_t which_queu
     return device->common_cfg->queue_size;
 }
 
-void virtio_send_descriptor(VirtioDevice *device, uint16_t which_queue, VirtioDescriptor descriptor, bool notify_device_when_done) {
-    // Confirm the device is ready
-    if (!device->ready) {
-        fatalf("device is not ready\n");
-        return;
-    }
+void virtio_send_one_descriptor(VirtioDevice *device, uint16_t which_queue, VirtioDescriptor descriptor, bool notify_device_when_done) {
+    virtio_send_descriptor_chain(device, which_queue, &descriptor, 1, notify_device_when_done);
+//     // Confirm the device is ready
+//     if (!device->ready) {
+//         fatalf("device is not ready\n");
+//         return;
+//     }
 
-    IRQ_OFF();
-    mutex_spinlock(&device->lock);
+//     IRQ_OFF();
+//     mutex_spinlock(&device->lock);
 
-    // Select the queue we're using
-    if (which_queue >= device->common_cfg->num_queues) {
-        fatalf("queue number %d is too big (num_queues=%d)\n", which_queue, device->common_cfg->num_queues);
-        return;
-    }
+//     // Select the queue we're using
+//     if (which_queue >= device->common_cfg->num_queues) {
+//         fatalf("queue number %d is too big (num_queues=%d)\n", which_queue, device->common_cfg->num_queues);
+//         return;
+//     }
 
-    // The size of the queue we're using
-    uint64_t queue_size = virtio_set_queue_and_get_size(device, which_queue);
-    uint64_t descriptor_index = device->desc_idx;
-    debugf("Writing descriptor %d to queue %d\n", descriptor_index, which_queue);
-    /*
-    uint64_t    addr;
-    uint32_t    len;
-#define VIRTQ_DESC_F_NEXT 1
-#define VIRTQ_DESC_F_WRITE 2
-#define VIRTQ_DESC_F_INDIRECT 4
-    uint16_t    flags;
-    uint16_t    next;*/
-    debugf("Descriptor addr: %x\n", descriptor.addr);
-    debugf("Descriptor len: %x\n", descriptor.len);
-    debugf("Descriptor flags: %x\n", descriptor.flags);
-    debugf("Descriptor next: %x\n", descriptor.next);
+//     // The size of the queue we're using
+//     uint64_t queue_size = virtio_set_queue_and_get_size(device, which_queue);
+//     uint64_t descriptor_index = device->desc_idx;
+//     debugf("Writing descriptor %d to queue %d\n", descriptor_index, which_queue);
+//     /*
+//     uint64_t    addr;
+//     uint32_t    len;
+// #define VIRTQ_DESC_F_NEXT 1
+// #define VIRTQ_DESC_F_WRITE 2
+// #define VIRTQ_DESC_F_INDIRECT 4
+//     uint16_t    flags;
+//     uint16_t    next;*/
+//     debugf("Descriptor addr: %x\n", descriptor.addr);
+//     debugf("Descriptor len: %x\n", descriptor.len);
+//     debugf("Descriptor flags: %x\n", descriptor.flags);
+//     debugf("Descriptor next: %x\n", descriptor.next);
 
-    // Put the descriptor in the descriptor table
-    device->desc[descriptor_index] = descriptor;
-    // Put the descriptor into the driver ring
-    device->driver->ring[device->driver->idx % queue_size] = descriptor_index;
-    // Increment the index to make it "visible" to the device
-    device->driver->idx++;
-    // Update the descriptor index for our bookkeeping
-    device->desc_idx = (device->desc_idx + 1) % queue_size;
+//     // Put the descriptor in the descriptor table
+//     device->desc[descriptor_index] = descriptor;
+//     // Put the descriptor into the driver ring
+//     device->driver->ring[device->driver->idx % queue_size] = descriptor_index;
+//     // Increment the index to make it "visible" to the device
+//     device->driver->idx++;
+//     // Update the descriptor index for our bookkeeping
+//     device->desc_idx = (device->desc_idx + 1) % queue_size;
 
-    mutex_unlock(&device->lock);
-    IRQ_ON();
+//     mutex_unlock(&device->lock);
+//     IRQ_ON();
 
-    // Notify the device if we're ready to do so
-    if (notify_device_when_done) {
-        virtio_notify(device, which_queue);
-    }
+//     // Notify the device if we're ready to do so
+//     if (notify_device_when_done) {
+//         virtio_notify(device, which_queue);
+//     }
 }
 
 
@@ -428,7 +429,6 @@ uint16_t virtio_receive_descriptor_chain(VirtioDevice *device, uint16_t which_qu
     // Get the descriptor index from the device ring
     uint64_t descriptor_index = device->device->ring[device->device_idx % queue_size].id;
     // Get the length of the descriptor
-    uint64_t len = device->device->ring[device->device_idx % queue_size].len;
     volatile VirtioDescriptor *descriptor = (volatile VirtioDescriptor*)&device->desc[descriptor_index];
 
     uint16_t i = 0;
@@ -454,10 +454,10 @@ uint16_t virtio_receive_descriptor_chain(VirtioDevice *device, uint16_t which_qu
     return i;
 }
 
-VirtioDescriptor virtio_get_descriptor(VirtioDevice *device, uint16_t which_queue, uint16_t idx) {
-    uint64_t queue_size = virtio_set_queue_and_get_size(device, which_queue);
-    uint64_t descriptor_index = idx % queue_size;
-    return device->desc[descriptor_index];
+VirtioDescriptor virtio_receive_one_descriptor(VirtioDevice *device, uint16_t which_queue, bool wait_for_descriptor) {
+    VirtioDescriptor received;
+    virtio_receive_descriptor_chain(device, which_queue, &received, 1, wait_for_descriptor);
+    return received;
 }
 
 bool virtio_has_received_descriptor(VirtioDevice *device, uint16_t which_queue) {

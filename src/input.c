@@ -92,7 +92,7 @@ void input_device_interrupt_handler(VirtioDevice* dev) {
 
         if (len != sizeof(struct virtio_input_event)) {
             debugf("Received invalid input event size: %d\n", len);
-            virtio_send_descriptor(dev, 0, received_descriptors[i], true);
+            virtio_send_one_descriptor(dev, 0, received_descriptors[i], true);
             continue;
         }
 
@@ -107,7 +107,7 @@ void input_device_interrupt_handler(VirtioDevice* dev) {
         }
 
         // Send the descriptor back to the device
-        virtio_send_descriptor(dev, 0, received_descriptors[i], true);
+        virtio_send_one_descriptor(dev, 0, received_descriptors[i], true);
     }
 }
 

@@ -39,5 +39,5 @@ void rng_fill(void *virtual_buffer_address, uint16_t size) {
     desc.flags = VIRTQ_DESC_F_WRITE;
     desc.next = 0;
 
-    virtio_send_descriptor(rng_device, 0, desc, true);
+    virtio_send_one_descriptor(rng_device, 0, desc, true);
 }
