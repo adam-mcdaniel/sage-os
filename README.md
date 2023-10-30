@@ -17,6 +17,9 @@ Sort your entries in descending order (newest entries at the top).
 # 29-October-2023
 - `jpark78`: Fixed an issue where `gpu_init` had intermittent failures. Fixed it by turning off IRQ and spinlocking while sending the descriptor, by adding a while loop to wait for the device_idx to catch up, and by removing the error checking code. Even though this fixes a lot of the issues, we still want to figure out why the error checking code is causing it to fail. Also helped with input device initialization by making sure we are setting STVEC before `virtio_init`.
 
+# 28-October-2023
+- `ttahmid`: Wrote `set_input_device_config` function for setting up select and subsel. 
+
 # 27-October-2023
 - `jpark78`: Got a test graphics to draw succesfully on `gpu_init`. One of the issues was XQuartz not working well with the hydra machine. Another was not setting the offset correctly when trasnferring.
 
@@ -25,9 +28,9 @@ Sort your entries in descending order (newest entries at the top).
 
 # 25-October-2023
 
-- `gmorale1`: created the basic layout for the GPU driver. Still need to configure init method to properly configure the device. Many of the structs in the notes and in the assignment do the same thing but have different names. I'm pretty sure I've found and removed duplicates, and also fixed some of the names, but the init script still needs a pass through to fix all the names.
-
 - `amcdan23`: Got implementation of block device working! Added functions for block device initialization, setting up and sending request packets, writing to and reading from sectors. Added function for chaining virtio descriptors which performs the packet request. Fixed all the warnings! Wrote `block_device_init`, `block_device_send_request`, `block_device_read_sector`, `block_device_write_sector`, `block_device_read_sectors`, `block_device_write_sectors`, `virtio_send_descriptor_chain`, and `virtio_send_descriptor`. Added basic skeleton for filesystem. Went back and added `virtio_receive_descriptor_chain` + related functions for reading linked list of descriptors from device into a buffer.
+
+- `ttahmid`: Wrote `input.c` and `input.h`. Added functions for input device, `input_device_init`, `input_device_interrupt_handler`. Now, need to query the input device through device configuration registers using type 4 capability.
 
 # 24-October-2023
 
@@ -39,7 +42,7 @@ Sort your entries in descending order (newest entries at the top).
 
 # 23-October-2023
 
-- `amcdan23`: Fixed notify register address calculations, fixed how bars were stored in bookkeeping. Successfully got the ISR to change for our RNG device, but now PC gets zeroed when we write here. Fixed issue where notification did not trigger trap handler (fixed the PC getting zeroed); now trap handler is triggered when we notify a device.
+- `amcdan23`: Fixed notify register address calculations, fixed how bars were stored in bookkeeping. Successfully got the ISR to change for our RNG device, but now PC gets zeroed when we write here. Fixed issue where notification did not trigger trap handler; now trap handler is triggered when we notify a device.
 
 # 18-October-2023
 - `amcdan23`: Added bar pointers directly to the PCI bookkeeping structures, and the virtio bookkeeping structures. Changed how bookkeeping structures were copied so we can add new fields without breaking the implementation. Added reporting for the enumerated PCI device's bookkeeping. Fixed bug where wrong virtio device was being used for the RNG requests.

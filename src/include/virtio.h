@@ -216,6 +216,8 @@ VirtioDevice *virtio_get_nth_saved_device(uint16_t n);
 VirtioDevice *virtio_get_rng_device();
 // Get the Block device from the list of virtio devices.
 VirtioDevice *virtio_get_block_device();
+// Get the Input device from the list of virtio devices.
+VirtioDevice *virtio_get_input_device();
 // Get the GPU device from the list of virtio devices.
 VirtioDevice *virtio_get_gpu_device();
 
@@ -223,6 +225,8 @@ VirtioDevice *virtio_get_gpu_device();
 bool virtio_is_rng_device(VirtioDevice *dev);
 // Is this an block device?
 bool virtio_is_block_device(VirtioDevice *dev);
+// Is this an INPUT device?
+bool virtio_is_input_device(VirtioDevice *dev);
 // Is this an GPU device?
 bool virtio_is_gpu_device(VirtioDevice *dev);
 
@@ -286,6 +290,34 @@ typedef struct VirtioBlockConfig {
    uint8_t unused1[3];
 } VirtioBlockConfig;
 
+struct virtio_input_absinfo {
+    uint32_t min;
+    uint32_t max;
+    uint32_t fuzz;
+    uint32_t flat;
+    uint32_t res;
+};
+
+struct virtio_input_devids {
+    uint16_t bustype;
+    uint16_t vendor;
+    uint16_t product;
+    uint16_t version;
+};
+
+typedef struct VirtioInputConfig {
+    uint8_t select;
+    uint8_t subsel;
+    uint8_t size;
+    uint8_t reserved[5];
+    union {
+        char string[128];
+        uint8_t bitmap[128];
+        struct virtio_input_absinfo abs;
+        struct virtio_input_devids ids;
+    };
+} VirtioInputConfig;
 
 volatile struct VirtioBlockConfig *virtio_get_block_config(VirtioDevice *device);
+volatile struct VirtioInputConfig *virtio_get_input_config(VirtioDevice *device);
 volatile struct VirtioGpuConfig *virtio_get_gpu_config(VirtioDevice *device);
