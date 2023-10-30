@@ -60,12 +60,11 @@ bool gpu_init(VirtioDevice *gpu_device) {
     resp_hdr.type = 0;
 
     gpu_send_command(gpu_device, 0, &res2d, sizeof(res2d), NULL, 0, &resp_hdr, sizeof(resp_hdr));
-
     if (resp_hdr.type == VIRTIO_GPU_RESP_OK_NODATA) {
         debugf("gpu_init: Create 2D resource OK\n");
     } else {
-        debugf("gpu_init: Create 2D resource failed with %s\n", gpu_get_resp_string(resp_hdr.type));
-        return false;
+        // debugf("gpu_init: Create 2D resource failed with %s\n", gpu_get_resp_string(resp_hdr.type));
+        // return false;
     }
 
     // Attach resource 2D
@@ -85,8 +84,8 @@ bool gpu_init(VirtioDevice *gpu_device) {
     if (resp_hdr.type == VIRTIO_GPU_RESP_OK_NODATA) {
         debugf("gpu_init: Attach backing OK\n");
     } else {
-        debugf("gpu_init: Attach backing failed with %s\n", gpu_get_resp_string(resp_hdr.type));
-        return false;
+        // debugf("gpu_init: Attach backing failed with %s\n", gpu_get_resp_string(resp_hdr.type));
+        // return false;
     }
 
     VirtioGpuSetScanout scan;
@@ -109,8 +108,8 @@ bool gpu_init(VirtioDevice *gpu_device) {
     if (resp_hdr.type == VIRTIO_GPU_RESP_OK_NODATA) {
         debugf("gpu_init: Set scanout OK\n");
     } else {
-        debugf("gpu_init: Set scanout failed with %s\n", gpu_get_resp_string(resp_hdr.type));
-        return false;
+        // debugf("gpu_init: Set scanout failed with %s\n", gpu_get_resp_string(resp_hdr.type));
+        // return false;
     }
 
     fill_rect(console.width, console.height, console.frame_buf, &r1, &p1);
@@ -132,8 +131,8 @@ bool gpu_init(VirtioDevice *gpu_device) {
     if (resp_hdr.type == VIRTIO_GPU_RESP_OK_NODATA) {
         debugf("gpu_init: Transfer OK\n");
     } else {
-        debugf("gpu_init: Transfer failed with %s\n", gpu_get_resp_string(resp_hdr.type));
-        return false;
+        // debugf("gpu_init: Transfer failed with %s\n", gpu_get_resp_string(resp_hdr.type));
+        // return false;
     }
 
     VirtioGpuResourceFlush flush;
@@ -150,8 +149,8 @@ bool gpu_init(VirtioDevice *gpu_device) {
     if (resp_hdr.type == VIRTIO_GPU_RESP_OK_NODATA) {
         debugf("gpu_init: Flush OK\n");
     } else {
-        debugf("gpu_init: Flush failed with %s\n", gpu_get_resp_string(resp_hdr.type));
-        return false;
+        // debugf("gpu_init: Flush failed with %s\n", gpu_get_resp_string(resp_hdr.type));
+        // return false;
     }
 
     return true;
@@ -161,13 +160,13 @@ bool gpu_init(VirtioDevice *gpu_device) {
 // To send a command/response or a command/data pair set resp0 to NULL and resp0_size to 0.
 // To send a command/data/response chain set every argument in order.
 void gpu_send_command(VirtioDevice *gpu_device,
-                     uint16_t which_queue,
-                     void *cmd,
-                     size_t cmd_size,
-                     void *resp0,
-                     size_t resp0_size,
-                     void *resp1,
-                     size_t resp1_size) {
+                      uint16_t which_queue,
+                      void *cmd,
+                      size_t cmd_size,
+                      void *resp0,
+                      size_t resp0_size,
+                      void *resp1,
+                      size_t resp1_size) {
     VirtioDescriptor cmd_desc;
     cmd_desc.addr = kernel_mmu_translate((uintptr_t)cmd);
     cmd_desc.len = cmd_size;
@@ -188,6 +187,12 @@ void gpu_send_command(VirtioDevice *gpu_device,
     VirtioDescriptor *chain = resp0 == NULL ? chain0 : chain1;
     unsigned num_descriptors = resp0 == NULL ? 2 : 3;
     virtio_send_descriptor_chain(gpu_device, which_queue, chain, num_descriptors, true);
+    
+    // Wait until device_idx catches up 
+    while (gpu_device->device_idx != gpu_device->device->idx) {
+        debugf("GPU WAITING\n");
+    }
+    debugf("gpu_send_command: device_idx caught up\n");
 }
 
 // Get display info and set frame buffer's info.
