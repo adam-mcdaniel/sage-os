@@ -456,6 +456,10 @@ uint16_t virtio_receive_descriptor_chain(VirtioDevice *device, uint16_t which_qu
 
 VirtioDescriptor virtio_receive_one_descriptor(VirtioDevice *device, uint16_t which_queue, bool wait_for_descriptor) {
     VirtioDescriptor received;
+    received.addr = NULL;
+    received.flags = 0;
+    received.len = 0;
+    received.next = 0;
     virtio_receive_descriptor_chain(device, which_queue, &received, 1, wait_for_descriptor);
     return received;
 }

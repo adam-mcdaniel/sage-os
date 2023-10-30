@@ -245,18 +245,30 @@ volatile VirtioCapability *virtio_get_capability(VirtioDevice *dev, uint8_t type
 //get a virtio device by using a pcidevice pointer
 VirtioDevice *virtio_from_pci_device(PCIDevice *pcidevice);
 
+// Get the pointer to the virtio-device's notify-register
 volatile uint16_t *virtio_notify_register(VirtioDevice *device);
 
+// Send exactly one descriptor to the given device's queue, and optionally notify the device when done.
+// The descriptor must contain a physical address.
 void virtio_send_one_descriptor(VirtioDevice *device, uint16_t which_queue, VirtioDescriptor descriptor, bool notify_device_when_done);
 
+// Receive exactly one descriptor from the virtio-device's queue, and optionally block for it.
+// If we do not block, this function will bail out and all of the descriptor data will be zero'd.
+// The descriptor will contain a physical address.
 VirtioDescriptor virtio_receive_one_descriptor(VirtioDevice *device, uint16_t which_queue, bool wait_for_descriptor);
 
+// This checks if a device has sent us a descriptor on a given queue, ready to be received.
 bool virtio_has_received_descriptor(VirtioDevice *device, uint16_t which_queue);
 
+// Receive a chain of descriptors from the virtio-device's queue. This will write to the `descriptors` parameter.
+// This gives you back physical addresses in the descriptors.
 uint16_t virtio_receive_descriptor_chain(VirtioDevice *device, uint16_t which_queue, VirtioDescriptor *descriptors, uint16_t num_descriptors, bool wait_for_descriptor);
 
+// Send an array of descriptors to a given virtio-device's queue, and optionally notify it when finished. This will automatically set the `next`
+// and VIRTIO_F_NEXT field of the `flag` bits of the descriptors to setup the chain. These descriptors must use physical addresses.
 void virtio_send_descriptor_chain(VirtioDevice *device, uint16_t which_queue, VirtioDescriptor *descriptors, uint16_t num_descriptors, bool notify_device_when_done);
 
+// Wait for the given device's queue to update with a descriptor.
 void virtio_wait_for_descriptor(VirtioDevice *device, uint16_t which_queue);
 
 typedef struct VirtioBlockConfig {
