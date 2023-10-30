@@ -105,14 +105,15 @@ void filesystem_get_zone_bitmap(uint8_t *bitmap_buf);
 // Write the zone bitmap from the given buffer
 void filesystem_put_zone_bitmap(uint8_t *bitmap_buf);
 
-void filesystem_get_block(uint32_t block, uint8_t *data);
-void filesystem_put_block(uint32_t block, uint8_t *data);
+void filesystem_get_blocks(uint32_t block, uint8_t *data, uint16_t count);
+void filesystem_put_blocks(uint32_t block, uint8_t *data, uint16_t count);
 
 uint32_t filesystem_alloc_zone();
 void filesystem_free_zone(uint32_t zone);
 
-void filesystem_get_inode(uint32_t inode, Inode *data);
-void filesystem_put_inode(uint32_t inode, Inode *data);
+bool filesystem_has_inode(uint32_t inode);
+Inode filesystem_get_inode(uint32_t inode);
+void filesystem_put_inode(uint32_t inode, Inode data);
 uint32_t filesystem_alloc_inode(Inode *inode);
 void filesystem_free_inode(uint32_t inode);
 
