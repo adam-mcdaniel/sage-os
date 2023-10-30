@@ -15,7 +15,7 @@
 //use this like a queue
 
 static Vector *device_active_jobs;
-static int init_counter = 0;
+static int init_counter = 10;
 // static VirtioDevice *keyboard_device;
 // static VirtioDevice *tablet_device;
 // static List *input_devices;  //we need to store multiple input devices
@@ -23,7 +23,7 @@ static int init_counter = 0;
 // const int event_limit = 1000;   //limits number of events so we don't run out of memory
 
 void input_device_init(VirtioDevice *device) {
-    init_counter++;
+    // init_counter++;
     // input_events = ring_new(event_limit);
     device_active_jobs = vector_new();
     // list_add(input_devices, device);
@@ -65,6 +65,7 @@ void get_input_device_config(VirtioDevice *device, uint8_t select, uint8_t subse
 void input_device_interrupt_handler(VirtioDevice* dev) {
     InputDevice *input_dev = NULL;
     if(init_counter != 0){//ignore first interrupts
+        debugf("[INPUT HANDLER]ignore first interrupts!\n");
         init_counter--;
         return;
     }
@@ -73,7 +74,7 @@ void input_device_interrupt_handler(VirtioDevice* dev) {
         return;
     }
     if(!dev->ready){
-        debugf("[INPUT HANDLER]Device not ready!");
+        debugf("[INPUT HANDLER]Device not ready!\n");
     }
     if(virtio_get_device_id(dev) != VIRTIO_PCI_DEVICE_ID(VIRTIO_PCI_DEVICE_INPUT)){
         debugf("[INPUT HANDLER] Not an input device\n");
