@@ -2,10 +2,12 @@
 #include <block.h>
 
 
+static SuperBlock sb;
+
 void filesystem_init(void)
 {
     // Initialize the filesystem
-    SuperBlock sb = filesystem_get_superblock();
+    filesystem_get_superblock();
     debugf("Filesystem block size: %d\n", filesystem_get_block_size());
     debugf("Superblock:\n");
     debugf("   num_inodes: %d\n", sb.num_inodes);
@@ -18,6 +20,9 @@ void filesystem_init(void)
     debugf("   magic: 0x%x\n", sb.magic);
     debugf("   block_size: %d\n", sb.block_size);
     debugf("   disk_version: %d\n", sb.disk_version);
+    for (uint16_t i=0; i<sb.imap_blocks; i++) {
+        
+    }
 }
 
 // void filesystem_superblock_init(void) {
@@ -34,15 +39,17 @@ void filesystem_init(void)
 
 SuperBlock filesystem_get_superblock() {
     // Get the superblock
-    SuperBlock superblock;
+    // SuperBlock superblock;
     // Superblock begins at bytes 1024
-    block_device_read_bytes(1024, (uint8_t *)&superblock, sizeof(SuperBlock));
-    return superblock;
+    if (sb.magic != MINIX3_MAGIC) {
+        block_device_read_bytes(1024, (uint8_t *)&sb, sizeof(SuperBlock));
+    }
+    return sb;
 }
 
 void filesystem_put_superblock(SuperBlock superblock) {
     // Put the superblock
-    block_device_write_bytes(1024, (uint8_t *)&superblock, sizeof(SuperBlock));
+    block_device_write_bytes(1024, (uint8_t *)&sb, sizeof(SuperBlock));
 }
 
 
@@ -51,16 +58,30 @@ uint16_t filesystem_get_block_size(void) {
     return 1024 << superblock.log_zone_size;
 }
 
+uint16_t filesystem_sectors_per_block(void) {
+    return filesystem_get_block_size() / block_device_get_sector_size();
+}
+
 // Read the inode bitmap into the given buffer
 void filesystem_get_inode_bitmap(uint8_t *bitmap_buf) {
-    
+    SuperBlock sb = filesystem_get_superblock();
+    block_device_read_bytes(FS_IMAP_IDX * filesystem_get_block_size(), bitmap_buf, filesystem_get_block_size() * sb.imap_blocks);
 }
 // Write the inode bitmap from the given buffer
-void filesystem_put_inode_bitmap(uint8_t *bitmap_buf);
+void filesystem_put_inode_bitmap(uint8_t *bitmap_buf) {
+    SuperBlock sb = filesystem_get_superblock();
+    block_device_write_bytes(FS_IMAP_IDX * filesystem_get_block_size(), bitmap_buf, filesystem_get_block_size() * sb.imap_blocks);
+}
 // Read the zone bitmap into the given buffer
-void filesystem_get_zone_bitmap(uint8_t *bitmap_buf);
+void filesystem_get_zone_bitmap(uint8_t *bitmap_buf) {
+    SuperBlock sb = filesystem_get_superblock();
+    block_device_read_bytes((FS_IMAP_IDX + sb.imap_blocks) * filesystem_get_block_size(), bitmap_buf, filesystem_get_block_size() * sb.zmap_blocks);
+}
 // Write the zone bitmap from the given buffer
-void filesystem_put_zone_bitmap(uint8_t *bitmap_buf);
+void filesystem_put_zone_bitmap(uint8_t *bitmap_buf) {
+    SuperBlock sb = filesystem_get_superblock();
+    block_device_write_bytes((FS_IMAP_IDX + sb.imap_blocks) * filesystem_get_block_size(), bitmap_buf, filesystem_get_block_size() * sb.zmap_blocks);
+}
 
 void filesystem_get_block(uint32_t block, uint8_t *data);
 void filesystem_put_block(uint32_t block, uint8_t *data);
