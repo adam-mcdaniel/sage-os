@@ -275,8 +275,8 @@ void virtio_send_descriptor(VirtioDevice *device, uint16_t which_queue, VirtioDe
         return;
     }
 
-    // IRQ_OFF();
-    // mutex_spinlock(&device->lock);
+    IRQ_OFF();
+    mutex_spinlock(&device->lock);
 
     // Select the queue we're using
     if (which_queue >= device->common_cfg->num_queues) {
@@ -310,8 +310,8 @@ void virtio_send_descriptor(VirtioDevice *device, uint16_t which_queue, VirtioDe
     // Update the descriptor index for our bookkeeping
     device->desc_idx = (device->desc_idx + 1) % queue_size;
 
-    // mutex_unlock(&device->lock);
-    // IRQ_ON();
+    mutex_unlock(&device->lock);
+    IRQ_ON();
 
     // Notify the device if we're ready to do so
     if (notify_device_when_done) {
@@ -327,8 +327,8 @@ void virtio_send_descriptor_chain(VirtioDevice *device, uint16_t which_queue, Vi
         return;
     }
 
-    // IRQ_OFF();
-    // mutex_spinlock(&device->lock);
+    IRQ_OFF();
+    mutex_spinlock(&device->lock);
 
     // Select the queue we're using
     if (which_queue >= device->common_cfg->num_queues) {
@@ -375,8 +375,8 @@ void virtio_send_descriptor_chain(VirtioDevice *device, uint16_t which_queue, Vi
     debugf("Driver index: %d\n", device->driver->idx);
     debugf("Descriptor index: %d\n", device->desc_idx);
     
-    // mutex_unlock(&device->lock);
-    // IRQ_ON();
+    mutex_unlock(&device->lock);
+    IRQ_ON();
 
     // Notify the device if we're ready to do so
     if (notify_device_when_done) {
