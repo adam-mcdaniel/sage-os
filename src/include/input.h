@@ -33,6 +33,8 @@ void input_device_init();
 
 void input_device_interrupt_handler(VirtioDevice *device);
 
+InputDevice *get_input_device_by_vdev(VirtioDevice *vdev);
+
 // void set_input_device_config(VirtioDevice *device, uint8_t select, uint8_t subsel, uint8_t size);
 
 // InputDevice *get_input_device(void);

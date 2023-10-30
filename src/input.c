@@ -18,11 +18,15 @@ static Vector *device_active_jobs;
 static int init_counter = 10;
 // static VirtioDevice *keyboard_device;
 // static VirtioDevice *tablet_device;
-// static List *input_devices;  //we need to store multiple input devices
+static Vector *input_devices;  //we need to store multiple input devices
 // static Ring *input_events;  //TODO: use the ring to buffer input events and also limit the number of events
 // const int event_limit = 1000;   //limits number of events so we don't run out of memory
 
 void input_device_init(VirtioDevice *device) {
+    if(input_devices == NULL){
+       input_devices = vector_new();
+    }
+
     // init_counter++;
     // input_events = ring_new(event_limit);
     device_active_jobs = vector_new();
@@ -31,6 +35,11 @@ void input_device_init(VirtioDevice *device) {
     device->ready = true;
     volatile VirtioInputConfig *config = virtio_get_input_config(device);
     debugf("Input device initialized\n");
+
+    //Associate InputDevice with our VirtioDevice
+    InputDevice *new_device;
+    new_device->virtio_dev = device;
+    vector_push_ptr(input_devices,new_device);
 
     //extra stuff just to see if we can see the input type
     debugf("Reading input config\n");
@@ -47,8 +56,21 @@ void input_device_init(VirtioDevice *device) {
         debugf("Found an input device product id %d\n", config->ids.product);
     }  
 
+}
 
+//get an InputDevice, which holds the input events for that device
+InputDevice *get_input_device_by_vdev(VirtioDevice *vdev){
+    for(uint32_t i = 0; i < vector_size(input_devices);i++){
+        InputDevice *curr_in_device = NULL;
+        vector_get_ptr(input_devices, i, &curr_in_device);
+        if(curr_in_device->virtio_dev == vdev){
+            return curr_in_device;
+        }
 
+    }
+    
+    debugf("[Input] Input not found!");
+    return NULL;
 }
 
 void get_input_device_config(VirtioDevice *device, uint8_t select, uint8_t subsel, uint8_t size) {
@@ -81,11 +103,11 @@ void input_device_interrupt_handler(VirtioDevice* dev) {
         return;
     }
     else{
-        input_dev = (InputDevice *)dev;
+        input_dev = get_input_device_by_vdev(dev);
     }
 
     VirtioDescriptor received_descriptors[MAX_DESCRIPTORS];
-    uint16_t num_received = virtio_receive_descriptor_chain(input_dev, 0, received_descriptors, MAX_DESCRIPTORS, true);
+    uint16_t num_received = virtio_receive_descriptor_chain(dev, 0, received_descriptors, MAX_DESCRIPTORS, true);
     for (uint16_t i = 0; i < num_received; ++i) {
         volatile struct virtio_input_event *event_ptr = (volatile struct virtio_input_event *)received_descriptors[i].addr;
         uint32_t len = received_descriptors[i].len;
