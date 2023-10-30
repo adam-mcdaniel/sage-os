@@ -64,6 +64,9 @@ void input_device_interrupt_handler(VirtioDevice* dev) {
         debugf("Input device not initialized\n");
         return;
     }
+    if(!dev->ready){
+        debugf("[INPUT HANDLER]Device not ready!");
+    }
     if(virtio_get_device_id(dev) != VIRTIO_PCI_DEVICE_ID(VIRTIO_PCI_DEVICE_INPUT)){
         debugf("[INPUT HANDLER] Not an input device\n");
         return;
@@ -74,13 +77,13 @@ void input_device_interrupt_handler(VirtioDevice* dev) {
 
     VirtioDescriptor received_descriptors[MAX_DESCRIPTORS];
     uint16_t num_received = virtio_receive_descriptor_chain(input_dev, 0, received_descriptors, MAX_DESCRIPTORS, true);
-
     for (uint16_t i = 0; i < num_received; ++i) {
         volatile struct virtio_input_event *event_ptr = (volatile struct virtio_input_event *)received_descriptors[i].addr;
         uint32_t len = received_descriptors[i].len;
 
         if (len != sizeof(struct virtio_input_event)) {
             debugf("Received invalid input event size: %d\n", len);
+            virtio_send_descriptor(dev, 0, received_descriptors[i], true);
             continue;
         }
 
