@@ -14,13 +14,28 @@ Every week, you will need to write entries in this journal. Include brief inform
 
 Sort your entries in descending order (newest entries at the top).
 
+# 29-October-2023
+- `jpark78`: Fixed an issue where `gpu_init` had intermittent failures. Fixed it by turning off IRQ and spinlocking while sending the descriptor, by adding a while loop to wait for the device_idx to catch up, and by removing the error checking code. Even though this fixes a lot of the issues, we still want to figure out why the error checking code is causing it to fail. Also helped with input device initialization by making sure we are setting STVEC before `virtio_init`.
+
+# 28-October-2023
+- `ttahmid`: Wrote `set_input_device_config` function for setting up select and subsel. 
+
+# 27-October-2023
+- `jpark78`: Got a test graphics to draw succesfully on `gpu_init`. One of the issues was XQuartz not working well with the hydra machine. Another was not setting the offset correctly when trasnferring.
+
+# 26-October-2023
+- `jpark78`: Implemented GPU initialization along with helper functions `gpu_send_command` and `gpu_get_display_config`. Was able to get the correct size window.
+
 # 25-October-2023
 
 - `amcdan23`: Got implementation of block device working! Added functions for block device initialization, setting up and sending request packets, writing to and reading from sectors. Added function for chaining virtio descriptors which performs the packet request. Fixed all the warnings! Wrote `block_device_init`, `block_device_send_request`, `block_device_read_sector`, `block_device_write_sector`, `block_device_read_sectors`, `block_device_write_sectors`, `virtio_send_descriptor_chain`, and `virtio_send_descriptor`. Added basic skeleton for filesystem. Went back and added `virtio_receive_descriptor_chain` + related functions for reading linked list of descriptors from device into a buffer.
+- `ttahmid`: Wrote `input.c` and `input.h`. Added functions for input device, `input_device_init`, `input_device_interrupt_handler`. Now, need to query the input device through device configuration registers using type 4 capability.
 
 # 24-October-2023
 
 - `amcdan23`: Got RNG working! Added SRETs to trap handler to return correctly instead of instruction faults, added catches for important causes, and changed PLIC threshold to properly catch these. (<--- this was another bug I introduced which I caught later today) Fixed issue where RNG device was using the descriptor index for the queue to notify in successive queries. Added fix where `sscratch` did not point to kernel trap frame; set that up. Then, called the trampolines stvec handler instead of `os_trap_handler`. This fixed the instruction page faults and the trap handler sees that the RNG sent the interrupt every time! Added abstractions for interracting with all the different devices, getting device specific configurations, and sending / receiving descriptors with a device without interacting with the rings directly.
+
+- `jpark78`: Helped with debugging the `os_trap_handler` issue.
 
 - `ttahmid`: Implemented all the functions for block device, `virtio_setup_block_request`, `block_read`, `block_write`. `virtio_submit_and_wait` needs to worked on. Testing needs to be done after RNG is working properly.
 
@@ -30,9 +45,11 @@ Sort your entries in descending order (newest entries at the top).
 
 # 18-October-2023
 - `amcdan23`: Added bar pointers directly to the PCI bookkeeping structures, and the virtio bookkeeping structures. Changed how bookkeeping structures were copied so we can add new fields without breaking the implementation. Added reporting for the enumerated PCI device's bookkeeping. Fixed bug where wrong virtio device was being used for the RNG requests.
+- `jpark78`: Fixed how we were retrieving the PCI common config, notification structure, and ISR status. We were not using the BAR number to to get those configs.
 
 # 17-October-2023
 - `amcdan23`: Fixed bug where bar calculations were including the last 4 bits of the bar (*not used*).
+- `jpark78`: In an effort to fix virtio notify, fixed a bug in PCI enumeration where we go down the first bridge we see instead of enumerating all the devices first. Fixed the wrong `PCI_ECAM_END` value. Set the correct bits for the command register during PCI configuration.
 
 # 16-October-2023
 - `amcdan23`: Fixed mapped ECAM memory address range. Found that the mapped addresses for the PCI device enumeration was wrong: the devices and bridges were being configured in the wrong order, and the bus + slot were being stored in the wrong part of the address. This fixed the bug where notifying the RNG (writing to the notify register) freezed the OS. Fixed these bugs.
