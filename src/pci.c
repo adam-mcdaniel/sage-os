@@ -5,6 +5,7 @@
 #include <kmalloc.h>
 #include <csr.h>
 #include <util.h>
+#include <input.h>
 
 // These contain pointers to the common configurations for each device.
 // The `all_pci_devices` vector contains all devices, while the
@@ -526,7 +527,7 @@ void pci_dispatch_irq(int irq)
 
         else if (virtio_is_input_device(virtdevice)) {
             debugf("input device sent interrupt!\n");
-            input_device_interrupt_handler(virtdevice);
+            input_device_isr(virtdevice);
         }
         // else if (virtio_is_input_device(virtdevice)) {
         //     debugf("Input device sent interrupt!\n");
@@ -538,11 +539,8 @@ void pci_dispatch_irq(int irq)
         else if (virtio_is_gpu_device(virtdevice)) {
             debugf("GPU device sent interrupt!\n");
             VirtioDescriptor descriptors[16];
-            uint16_t received = virtio_receive_descriptor_chain(virtdevice, 0, descriptors, 16, true);
-            debugf("Received %d descriptors\n", received);
-
-            // debugf("Recevied descriptors\n", virtio_has_received_descriptor(virtdevice, 0));
-            
+            uint16_t received = virtio_receive_descriptor_chain(virtdevice, 0, descriptors, 16, false);
+            debugf("Received %d descriptors\n", received);            
         }
     }
 

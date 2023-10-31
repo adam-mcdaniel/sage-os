@@ -190,6 +190,12 @@ typedef struct VirtioDevice {
 
     bool ready;
     Mutex lock;
+
+    // Input device identification
+    struct {
+        unsigned is_keyboard : 1;
+        unsigned is_tablet : 1;
+    };
 } VirtioDevice;
 
 #define VIRTIO_F_RESET         0
@@ -246,6 +252,8 @@ volatile VirtioCapability *virtio_get_capability(VirtioDevice *dev, uint8_t type
 VirtioDevice *virtio_from_pci_device(PCIDevice *pcidevice);
 
 volatile uint16_t *virtio_notify_register(VirtioDevice *device);
+
+uint16_t virtio_set_queue_and_get_size(VirtioDevice *device, uint16_t which_queue);
 
 void virtio_send_descriptor(VirtioDevice *device, uint16_t which_queue, VirtioDescriptor descriptor, bool notify_device_when_done);
 
