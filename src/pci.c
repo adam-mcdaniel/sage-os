@@ -526,7 +526,7 @@ void pci_dispatch_irq(int irq)
             VirtioDescriptor descriptors[16];
             uint16_t received = virtio_receive_descriptor_chain(virtdevice, 0, descriptors, 16, true);
 
-            virtio_handle_interrupt(virtdevice, descriptors, received);
+            // virtio_handle_interrupt(virtdevice, descriptors, received);
             debugf("Received %d descriptors\n", received);
         }
 
@@ -534,7 +534,7 @@ void pci_dispatch_irq(int irq)
             debugf("Block device sent interrupt!\n");
             VirtioDescriptor descriptors[16];
             uint16_t received = virtio_receive_descriptor_chain(virtdevice, 0, descriptors, 16, true);
-            virtio_handle_interrupt(virtdevice, descriptors, received);
+            // virtio_handle_interrupt(virtdevice, descriptors, received);
             debugf("Received %d descriptors\n", received);
         }
 
@@ -555,7 +555,7 @@ void pci_dispatch_irq(int irq)
             VirtioDescriptor descriptors[16];
             uint16_t received = virtio_receive_descriptor_chain(virtdevice, 0, descriptors, 16, true);
             debugf("Received %d descriptors\n", received);
-            virtio_handle_interrupt(virtdevice, descriptors, received);
+            // virtio_handle_interrupt(virtdevice, descriptors, received);
             // virtio_handle_interrupt(virtdevice);
 
             // debugf("Recevied descriptors\n", virtio_has_received_descriptor(virtdevice, 0));

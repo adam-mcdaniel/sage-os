@@ -3,6 +3,8 @@
 
 #define MINIX3_MAGIC 0x4d5a
 
+#define INVALID_INODE 0
+
 #define FS_BOOT_BLOCK_IDX 0
 #define FS_SUPER_BLOCK_IDX 1
 #define FS_IMAP_IDX 2
@@ -95,6 +97,8 @@ void filesystem_put_superblock(SuperBlock superblock);
 
 // Get the block size for the file system.
 uint16_t filesystem_get_block_size(void);
+// Get the zone size for the file system.
+uint16_t filesystem_get_zone_size(void);
 
 size_t filesystem_get_inode_bitmap_size(void);
 size_t filesystem_get_zone_bitmap_size(void);
@@ -120,11 +124,17 @@ void filesystem_free_zone(uint32_t zone);
 bool filesystem_has_inode(uint32_t inode);
 Inode filesystem_get_inode(uint32_t inode);
 void filesystem_put_inode(uint32_t inode, Inode data);
-uint32_t filesystem_alloc_inode(Inode *inode);
-void filesystem_free_inode(uint32_t inode);
 
 void filesystem_get_zone(uint32_t zone, uint8_t *data);
 void filesystem_put_zone(uint32_t zone, uint8_t *data);
 
+void filesystem_get_data(uint32_t inode, uint8_t *data, uint32_t offset, uint32_t count);
+void filesystem_put_data(uint32_t inode, uint8_t *data, uint32_t offset, uint32_t count);
+uint64_t filesystem_get_file_size(uint32_t inode);
+void filesystem_read_file(uint32_t inode, uint8_t *data, uint32_t count);
+
+bool filesystem_is_file(uint32_t inode);
+bool filesystem_is_dir(uint32_t inode);
+bool filesystem_has_dir_entry(uint32_t inode, uint32_t entry);
 void filesystem_get_dir_entry(uint32_t inode, uint32_t entry, DirEntry *data);
 void filesystem_put_dir_entry(uint32_t inode, uint32_t entry, DirEntry *data);
