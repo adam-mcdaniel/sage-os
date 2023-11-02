@@ -9,6 +9,14 @@
 #include <trap.h>
 #include <sbi.h>
 
+// #define TRAP_DEBUG
+
+#ifdef TRAP_DEBUG
+#define debugf(...) debugf(__VA_ARGS__)
+#else
+#define debugf(...)
+#endif
+
 // From src/syscall.c
 void syscall_handle(int hart, uint64_t epc, int64_t *scratch);
 
@@ -128,5 +136,6 @@ void os_trap_handler(void)
     // __asm__ volatile ("savegp");
 
     // SRET();
+    debugf("Leaving OS trap handler\n");
     // fatalf("Could not return from trap\n");
 }

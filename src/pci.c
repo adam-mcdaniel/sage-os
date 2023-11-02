@@ -6,6 +6,14 @@
 #include <csr.h>
 #include <util.h>
 
+// #define PCI_DEBUG
+
+#ifdef PCI_DEBUG
+#define debugf(...) debugf(__VA_ARGS__)
+#else
+#define debugf(...)
+#endif
+
 // These contain pointers to the common configurations for each device.
 // The `all_pci_devices` vector contains all devices, while the
 // `irq_pci_devices` vector contains devices that share an IRQ number (32, 33, 34, and 35).
