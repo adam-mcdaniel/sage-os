@@ -14,7 +14,7 @@ Every week, you will need to write entries in this journal. Include brief inform
 
 Sort your entries in descending order (newest entries at the top).
 # 1-Nov-2023
-- `amcdan23`: Added debug enable/disable flags for the different submodules. Added reading in/writing Inodes, fixed the number of sectors calculated to be read/written in block device submodule. Fixed where packet request could sometimes result in an instruction page fault or a regular page fault.
+- `amcdan23`: Added infrastructure for scheduling jobs to VirtioDevices. Added reading in/writing Inodes, fixed the number of sectors calculated to be read/written in block device submodule. Fixed where packet request could sometimes result in an instruction page fault or a regular page fault. Added debug enable/disable flags for the different submodules. 
 
 # 29-October-2023
 - `amcdan23`: Added the minix3 harddrive to the repo, Rewrote `virtio_send_one_descriptor` to be in terms of `virtio_send_descriptor_chain`. Added functions to read in the inode and zone bitmaps in the filesystem.
