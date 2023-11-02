@@ -13,8 +13,11 @@ Every week, you will need to write entries in this journal. Include brief inform
 * any complications that you've fixed and how you did it.
 
 Sort your entries in descending order (newest entries at the top).
+# 1-Nov-2023
+- `amcdan23`: Added debug enable/disable flags for the different submodules. Added reading in/writing Inodes, fixed the number of sectors calculated to be read/written in block device submodule. Fixed where packet request could sometimes result in an instruction page fault or a regular page fault.
 
 # 29-October-2023
+- `amcdan23`: Added the minix3 harddrive to the repo, Rewrote `virtio_send_one_descriptor` to be in terms of `virtio_send_descriptor_chain`. Added functions to read in the inode and zone bitmaps in the filesystem.
 - `jpark78`: Fixed an issue where `gpu_init` had intermittent failures. Fixed it by turning off IRQ and spinlocking while sending the descriptor, by adding a while loop to wait for the device_idx to catch up, and by removing the error checking code. Even though this fixes a lot of the issues, we still want to figure out why the error checking code is causing it to fail. Also helped with input device initialization by making sure we are setting STVEC before `virtio_init`.
 
 # 28-October-2023
