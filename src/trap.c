@@ -117,7 +117,7 @@ void os_trap_handler(void)
                 // We have to move beyond the ECALL instruction, which is exactly 4 bytes.
                 break;
             default:
-                debugf(
+                fatalf(
                     "Unhandled Synchronous interrupt %ld @ 0x%08lx [0x%08lx]. "
                     "Hanging hart %d\n",
                     cause, epc, tval, hart);

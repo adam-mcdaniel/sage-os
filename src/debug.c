@@ -82,4 +82,3 @@ void klogclear(log_type lt)
 {
     k_log_level &= ~lt;
 }
-
