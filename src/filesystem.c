@@ -19,14 +19,34 @@ uint32_t filesystem_get_max_inode() {
     return filesystem_get_block_size() * filesystem_get_superblock().imap_blocks * 8;
 }
 
-
-
 uintptr_t filesystem_get_inode_byte_offset(SuperBlock sb, uint32_t inode) {
     return (FS_IMAP_IDX + sb.imap_blocks + sb.zmap_blocks) * filesystem_get_block_size() + inode * sizeof(Inode);
 }
 // uintptr_t filesystem_get_inode_bitmap_byte_offset(SuperBlock sb, uint32_t inode) {
 //     return FS_IMAP_IDX * filesystem_get_block_size() + inode / 8;
 // }
+
+
+void filesystem_superblock_init(void) {
+    // uint64_t sector_size = block_device_get_sector_size();
+    // Initialize the superblock
+    // uint64_t num_sectors = block_device_get_sector_count();
+    uint64_t device_bytes = block_device_get_bytes();
+    uint64_t bytes_per_block = 1024;
+    uint64_t num_blocks = device_bytes / bytes_per_block / 2;
+    SuperBlock superblock;
+    superblock.magic = 0x4d5a;
+    superblock.log_zone_size = 0;
+    superblock.max_size = num_blocks * bytes_per_block;
+    superblock.num_zones = num_blocks;
+    superblock.block_size = bytes_per_block;
+    superblock.disk_version = 0;
+    superblock.num_inodes = num_blocks / 8;
+    superblock.imap_blocks = superblock.num_inodes / (bytes_per_block * 8);
+    superblock.zmap_blocks = superblock.num_zones / (bytes_per_block * 8);
+    superblock.first_data_zone = 0;
+    filesystem_put_superblock(superblock);
+}
 
 void filesystem_init(void)
 {
@@ -44,6 +64,12 @@ void filesystem_init(void)
     debugf("   magic: 0x%x\n", sb.magic);
     debugf("   block_size: %d\n", sb.block_size);
     debugf("   disk_version: %d\n", sb.disk_version);
+
+    if (sb.magic != MINIX3_MAGIC) {
+        // We need to initialize the superblock
+        debugf("Minix3 magic is not correct, initializing superblock ourselves...\n");
+        filesystem_superblock_init();
+    }
     // for (uint16_t i=0; i<sb.imap_blocks; i++) {
     // }
     debugf("Max inode: %d\n", filesystem_get_max_inode());
@@ -78,18 +104,6 @@ void filesystem_init(void)
         }
     }
 }
-
-// void filesystem_superblock_init(void) {
-//     uint64_t sector_size = block_device_get_sector_size();
-//     // Initialize the superblock
-//     uint64_t num_sectors = block_device_get_sector_count();
-//     uint64_t device_bytes = block_device_get_bytes();
-//     uint64_t bytes_per_block = 1024;
-//     uint64_t num_blocks = device_bytes / bytes_per_block;
-//     SuperBlock superblock;
-//     superblock.magic = 0x4d5a;
-//     superblock.log_zone_size = 0;
-// }
 
 SuperBlock filesystem_get_superblock() {
     // Get the superblock

@@ -68,3 +68,11 @@ struct os_target {
 };
 #endif
 
+
+
+
+// #define DISABLE_DEBUG
+
+#ifdef DISABLE_DEBUG
+#define debugf(...)
+#endif
