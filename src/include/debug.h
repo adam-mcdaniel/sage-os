@@ -20,6 +20,7 @@ typedef enum {
 
 int  logf(log_type lt, const char *fmt, ...);
 int  debugf(const char *fmt, ...);
+int  textf(const char *fmt, ...);
 void fatalf(const char *fmt, ...);
 void logset(log_type lt);
 void logclear(log_type lt);

@@ -1,5 +1,6 @@
 #include <filesystem.h>
 #include <block.h>
+#include <debug.h>
 
 
 #define FILESYSTEM_DEBUG
@@ -48,6 +49,14 @@ void filesystem_superblock_init(void) {
     filesystem_put_superblock(superblock);
 }
 
+
+void filesystem_get_zone(uint32_t zone, uint8_t *data) {
+    filesystem_get_block(filesystem_get_superblock().first_data_zone + zone, data);
+}
+void filesystem_put_zone(uint32_t zone, uint8_t *data) {
+    filesystem_put_block(filesystem_get_superblock().first_data_zone + zone, data);
+}
+
 void filesystem_init(void)
 {
     // Initialize the filesystem
@@ -86,7 +95,10 @@ void filesystem_init(void)
         if (zone_bitmap[i / 8] & (1 << i % 8)) {
             debugf("Zone %u (%x) is taken\n", i, i);
             uint8_t data[filesystem_get_block_size()];
-            filesystem_get_blocks(i, data, 1);
+            // filesystem_get_blocks(i, data, 1);
+
+            filesystem_get_zone(i, data);
+
             bool any_nonzero = false;
             for (uint16_t j=0; j<filesystem_get_block_size(); j++) {
                 if (data[j] != 0) {
@@ -205,6 +217,14 @@ void filesystem_get_blocks(uint32_t start_block, uint8_t *data, uint16_t count) 
 void filesystem_put_blocks(uint32_t start_block, uint8_t *data, uint16_t count) {
     // SuperBlock sb = filesystem_get_superblock();
     block_device_write_bytes(start_block * filesystem_get_block_size(), data, filesystem_get_block_size() * count);
+}
+
+void filesystem_get_block(uint32_t block, uint8_t *data) {
+    filesystem_get_blocks(block, data, 1);
+}
+
+void filesystem_put_block(uint32_t block, uint8_t *data) {
+    filesystem_put_blocks(block, data, 1);
 }
 
 uint32_t filesystem_alloc_zone(void);
