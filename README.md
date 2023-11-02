@@ -19,6 +19,7 @@ Sort your entries in descending order (newest entries at the top).
 # 29-October-2023
 - `amcdan23`: Added the minix3 harddrive to the repo, Rewrote `virtio_send_one_descriptor` to be in terms of `virtio_send_descriptor_chain`. Added functions to read in the inode and zone bitmaps in the filesystem.
 - `jpark78`: Fixed an issue where `gpu_init` had intermittent failures. Fixed it by turning off IRQ and spinlocking while sending the descriptor, by adding a while loop to wait for the device_idx to catch up, and by removing the error checking code. Even though this fixes a lot of the issues, we still want to figure out why the error checking code is causing it to fail. Also helped with input device initialization by making sure we are setting STVEC before `virtio_init`.
+- `gmorale1`: Added input interrupt handler, refactored input driver to allow multiple input devices.
 
 # 28-October-2023
 - `ttahmid`: Wrote `set_input_device_config` function for setting up select and subsel. 
@@ -41,6 +42,7 @@ Sort your entries in descending order (newest entries at the top).
 - `jpark78`: Helped with debugging the `os_trap_handler` issue.
 
 - `ttahmid`: Implemented all the functions for block device, `virtio_setup_block_request`, `block_read`, `block_write`. `virtio_submit_and_wait` needs to worked on. Testing needs to be done after RNG is working properly.
+- `gmorale`: added initial GPU outline for `gpu.c` and `gpu.h`
 
 # 23-October-2023
 
