@@ -158,6 +158,27 @@ typedef struct VirtioDeviceRing {
     // uint16_t     avail_event;
 } VirtioDeviceRing;
 
+struct VirtioDevice;
+
+typedef struct Job {
+    uint64_t job_id;
+    uint64_t pid_id;
+
+    bool done;
+    struct Context {
+        VirtioDescriptor *desc;
+        uint16_t num_descriptors;
+    } context;
+
+    void (*callback)(struct VirtioDevice *device, struct Job *job);
+    void *data;
+} Job;
+
+Job job_create(uint64_t job_id, uint64_t pid_id, void (*callback)(struct VirtioDevice *device, struct Job *job));
+Job job_create_with_data(uint64_t job_id, uint64_t pid_id, void (*callback)(struct VirtioDevice *device, struct Job *job), void *data);
+// void job_set_context(Job *job, VirtioDescriptor *desc, uint16_t num_descriptors);
+void job_destroy(Job *job);
+
 // This is the actual Virtio device structure that the OS will
 // keep track of for each device. It contains the data for the OS
 // to quickly access vital information for the device.
@@ -182,7 +203,7 @@ typedef struct VirtioDevice {
     volatile VirtioDeviceRing *device;
 
     void *priv;
-    struct List *jobs;
+    struct Vector *jobs;
 
     uint16_t desc_idx;
     uint16_t driver_idx;
@@ -191,6 +212,28 @@ typedef struct VirtioDevice {
     bool ready;
     Mutex lock;
 } VirtioDevice;
+
+void virtio_debug_job(VirtioDevice *dev, Job *job);
+void virtio_create_job(VirtioDevice *dev, uint64_t pid_id, void (*callback)(struct VirtioDevice *device, struct Job *job));
+void virtio_create_job_with_data(VirtioDevice *dev, uint64_t pid_id, void (*callback)(struct VirtioDevice *device, struct Job *job), void *data);
+
+void virtio_callback_and_free_job(VirtioDevice *dev, uint64_t job_id);
+bool virtio_is_device_available(VirtioDevice *dev);
+void virtio_acquire_device(VirtioDevice *dev);
+void virtio_release_device(VirtioDevice *dev);
+
+uint64_t virtio_get_next_job_id(VirtioDevice *dev);
+uint64_t virtio_get_job_id_by_index(VirtioDevice *dev, uint64_t index);
+
+void virtio_add_job(VirtioDevice *dev, Job job);
+Job *virtio_get_job(VirtioDevice *dev, uint64_t job_id);
+void virtio_complete_job(VirtioDevice *dev, uint64_t job_id);
+uint64_t virtio_which_job_from_interrupt(VirtioDevice *dev);
+
+// uint64_t virtio_which_job_from_interrupt(VirtioDevice *dev, VirtioDescriptor desc[], uint16_t num_descriptors);
+void virtio_handle_interrupt(VirtioDevice *dev, VirtioDescriptor desc[], uint16_t num_descriptors);
+// void virtio_handle_interrupt(VirtioDevice *dev);
+// void virtio_handle_interrupt(VirtioDevice *dev, VirtioDescriptor desc[], uint16_t num_descriptors) {
 
 #define VIRTIO_F_RESET         0
 #define VIRTIO_F_ACKNOWLEDGE  (1 << 0)
