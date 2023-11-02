@@ -52,6 +52,16 @@ int debugf(const char *fmt, ...)
     return ret;
 }
 
+int textf(const char *fmt, ...)
+{
+    va_list va;
+    va_start(va, fmt);
+    int ret = vlogf(LOG_TEXT, fmt, va);
+    va_end(va);
+
+    return ret;
+}
+
 ATTR_NORET void fatalf(const char *fmt, ...)
 {
     va_list va;

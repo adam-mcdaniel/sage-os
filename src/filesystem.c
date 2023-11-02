@@ -82,7 +82,29 @@ void filesystem_init(void)
     zone_bitmap = (uint8_t*)kmalloc(filesystem_get_zone_bitmap_size());
     filesystem_get_zone_bitmap(zone_bitmap);
 
+    for (uint32_t i=0; i<sb.num_zones; i++) {
+        if (zone_bitmap[i / 8] & (1 << i % 8)) {
+            debugf("Zone %u (%x) is taken\n", i, i);
+            uint8_t data[filesystem_get_block_size()];
+            filesystem_get_blocks(i, data, 1);
+            bool any_nonzero = false;
+            for (uint16_t j=0; j<filesystem_get_block_size(); j++) {
+                if (data[j] != 0) {
+                    textf("%c", data[j]);
+                    any_nonzero = true;
+                }
+            }
+            if (!any_nonzero) {
+                // debugf("Zone %u (%x) is empty\n", i, i);
+            } else {
+                debugf("\n");
+            }
+        } else {
+            debugf("Zone %u (%x) is free\n", i, i);
+        }
+    }
 
+    /*
     for (uint32_t i=0; i<filesystem_get_max_inode(); i++) {
         if (filesystem_has_inode(i)) {
             Inode inode = filesystem_get_inode(i);
@@ -103,6 +125,8 @@ void filesystem_init(void)
             }
         }
     }
+    */
+
 }
 
 SuperBlock filesystem_get_superblock() {
