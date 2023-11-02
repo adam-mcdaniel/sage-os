@@ -214,26 +214,37 @@ typedef struct VirtioDevice {
 } VirtioDevice;
 
 void virtio_debug_job(VirtioDevice *dev, Job *job);
+// Use this to create a job with no state saved
 void virtio_create_job(VirtioDevice *dev, uint64_t pid_id, void (*callback)(struct VirtioDevice *device, struct Job *job));
+// Use this to create a job with state that will be saved for when the job is called
 void virtio_create_job_with_data(VirtioDevice *dev, uint64_t pid_id, void (*callback)(struct VirtioDevice *device, struct Job *job), void *data);
 
+// Performed by virtio_handle_interrupt
 void virtio_callback_and_free_job(VirtioDevice *dev, uint64_t job_id);
+
+// Is the device free to be acquired?
 bool virtio_is_device_available(VirtioDevice *dev);
+// Performed by virtio_handle_interrupt
 void virtio_acquire_device(VirtioDevice *dev);
+// Performed by virtio_handle_interrupt
 void virtio_release_device(VirtioDevice *dev);
 
+// Get the next scheduled job ID
 uint64_t virtio_get_next_job_id(VirtioDevice *dev);
+// Get a job's ID from its index in the scheduled jobs
 uint64_t virtio_get_job_id_by_index(VirtioDevice *dev, uint64_t index);
 
+// Add a job to the list of jobs in the virtio device (done with virtio_job_create)
 void virtio_add_job(VirtioDevice *dev, Job job);
+// Get a job from its ID
 Job *virtio_get_job(VirtioDevice *dev, uint64_t job_id);
+// Call the device's callback and destroy the job if it is done
 void virtio_complete_job(VirtioDevice *dev, uint64_t job_id);
+// Which job ID does this interrupt correspond to
 uint64_t virtio_which_job_from_interrupt(VirtioDevice *dev);
 
-// uint64_t virtio_which_job_from_interrupt(VirtioDevice *dev, VirtioDescriptor desc[], uint16_t num_descriptors);
+// Handle the job from an interrupt
 void virtio_handle_interrupt(VirtioDevice *dev, VirtioDescriptor desc[], uint16_t num_descriptors);
-// void virtio_handle_interrupt(VirtioDevice *dev);
-// void virtio_handle_interrupt(VirtioDevice *dev, VirtioDescriptor desc[], uint16_t num_descriptors) {
 
 #define VIRTIO_F_RESET         0
 #define VIRTIO_F_ACKNOWLEDGE  (1 << 0)
