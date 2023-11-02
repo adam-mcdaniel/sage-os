@@ -111,6 +111,9 @@ void filesystem_put_zone_bitmap(uint8_t *bitmap_buf);
 void filesystem_get_blocks(uint32_t block, uint8_t *data, uint16_t count);
 void filesystem_put_blocks(uint32_t block, uint8_t *data, uint16_t count);
 
+void filesystem_get_block(uint32_t block, uint8_t *data);
+void filesystem_put_block(uint32_t block, uint8_t *data);
+
 uint32_t filesystem_alloc_zone();
 void filesystem_free_zone(uint32_t zone);
 
@@ -119,6 +122,9 @@ Inode filesystem_get_inode(uint32_t inode);
 void filesystem_put_inode(uint32_t inode, Inode data);
 uint32_t filesystem_alloc_inode(Inode *inode);
 void filesystem_free_inode(uint32_t inode);
+
+void filesystem_get_zone(uint32_t zone, uint8_t *data);
+void filesystem_put_zone(uint32_t zone, uint8_t *data);
 
 void filesystem_get_dir_entry(uint32_t inode, uint32_t entry, DirEntry *data);
 void filesystem_put_dir_entry(uint32_t inode, uint32_t entry, DirEntry *data);

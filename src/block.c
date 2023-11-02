@@ -12,7 +12,7 @@
 #include <block.h>
 #include <util.h>
 
-#define BLOCK_DEVICE_DEBUG
+// #define BLOCK_DEVICE_DEBUG
 
 #ifdef BLOCK_DEVICE_DEBUG
 #define debugf(...) debugf(__VA_ARGS__)
@@ -58,6 +58,7 @@ uint64_t block_device_get_bytes(void) {
 void block_device_handle_job(VirtioDevice *block_device, Job *job) {
     debugf("Handling block device job %u\n", job->job_id);
     BlockRequestPacket *packet = (BlockRequestPacket *)job->data;
+    debugf("Packet status in handle: %x\n", packet->status);
     
     job->data = NULL;
 }
