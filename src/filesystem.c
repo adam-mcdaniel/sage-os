@@ -95,7 +95,6 @@ void filesystem_init(void)
         if (zone_bitmap[i / 8] & (1 << i % 8)) {
             debugf("Zone %u (%x) is taken\n", i, i);
             uint8_t data[filesystem_get_block_size()];
-            // filesystem_get_blocks(i, data, 1);
 
             filesystem_get_zone(i, data);
 
