@@ -10,6 +10,15 @@
 #include <vector.h>
 #include <csr.h>
 #include <block.h>
+#include <util.h>
+
+// #define BLOCK_DEVICE_DEBUG
+
+#ifdef BLOCK_DEVICE_DEBUG
+#define debugf(...) debugf(__VA_ARGS__)
+#else
+#define debugf(...)
+#endif
 
 //use this like a queue
 static Vector *device_active_jobs;
@@ -75,11 +84,12 @@ void block_device_send_request(BlockRequestPacket *packet) {
     chain[2] = status;
 
     // Create the chain
-    debugf("Status before: %d\n", packet->status);
+    // debugf("Status before: %d\n", packet->status);
     virtio_send_descriptor_chain(block_device, 0, chain, 3, true);
+    WFI();
 
     // Check the status
-    debugf("Status after: %d\n", packet->status);
+    // debugf("Status after: %d\n", packet->status);
 }
 
 void block_device_read_sector(uint64_t sector, uint8_t *data) {
@@ -132,10 +142,11 @@ void block_device_write_sectors(uint64_t sector, uint8_t *data, uint64_t count) 
 
 
 void block_device_read_bytes(uint64_t byte, uint8_t *data, uint64_t bytes) {
-    uint64_t sectors = bytes / 512 + (bytes % 512 == 0 ? 0 : 1);
+    debugf("block_device_read_bytes(%d, %p, %d)\n", byte, data, bytes);
+    uint64_t sectors = ALIGN_UP_POT(bytes, 512) / 512;
     uint64_t sector = byte / 512;
     uint8_t buffer[sectors][512];
-
+    
     block_device_read_sectors(sector, (uint8_t *)buffer, sectors);
 
     uint64_t alignment_offset = byte % 512;
@@ -148,7 +159,7 @@ void block_device_read_bytes(uint64_t byte, uint8_t *data, uint64_t bytes) {
 
 
 void block_device_write_bytes(uint64_t byte, uint8_t *data, uint64_t bytes) {
-    uint64_t sectors = bytes / 512 + (bytes % 512 == 0 ? 0 : 1);
+    uint64_t sectors = ALIGN_UP_POT(bytes, 512) / 512;
     uint64_t sector = byte / 512;
     uint8_t buffer[sectors][512];
 

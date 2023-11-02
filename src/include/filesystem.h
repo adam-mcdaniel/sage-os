@@ -96,6 +96,9 @@ void filesystem_put_superblock(SuperBlock superblock);
 // Get the block size for the file system.
 uint16_t filesystem_get_block_size(void);
 
+size_t filesystem_get_inode_bitmap_size(void);
+size_t filesystem_get_zone_bitmap_size(void);
+
 // Read the inode bitmap into the given buffer
 void filesystem_get_inode_bitmap(uint8_t *bitmap_buf);
 // Write the inode bitmap from the given buffer

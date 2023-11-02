@@ -17,6 +17,14 @@
 #include <input.h>
 #include <gpu.h>
 
+// #define VIRTIO_DEBUG
+
+#ifdef VIRTIO_DEBUG
+#define debugf(...) debugf(__VA_ARGS__)
+#else
+#define debugf(...)
+#endif
+
 
 static Vector *virtio_devices = NULL;
 
@@ -251,8 +259,8 @@ volatile uint16_t *virtio_notify_register(VirtioDevice *device) {
     uint16_t queue_notify_off = device->common_cfg->queue_notify_off;
     uint32_t notify_off_multiplier = device->notify_cap->notify_off_multiplier;
     uint64_t bar = (uint64_t)pci_get_device_bar(device->pcidev, bar_num);
-    debugf("Notify cap bar=%d offset=%x, (len=%d)\n", bar_num, offset, device->notify_cap->cap.length);
-    debugf("BAR at %x, offset=%x, queue_notify_off=%x, notify_off_mult=%x\n", bar, offset, queue_notify_off, notify_off_multiplier);
+    // debugf("Notify cap bar=%d offset=%x, (len=%d)\n", bar_num, offset, device->notify_cap->cap.length);
+    // debugf("BAR at %x, offset=%x, queue_notify_off=%x, notify_off_mult=%x\n", bar, offset, queue_notify_off, notify_off_multiplier);
 
     uint16_t *notify = (uint16_t*)(bar + BAR_NOTIFY_CAP(offset, queue_notify_off, notify_off_multiplier));
     return notify;
@@ -276,9 +284,9 @@ void virtio_notify(VirtioDevice *viodev, uint16_t which_queue)
     viodev->common_cfg->queue_select = which_queue;
 
     volatile uint16_t *notify_register = virtio_notify_register(viodev);
-    debugf("Notifying at 0x%p on instruction...\n", notify_register);
+    // debugf("Notifying at 0x%p on instruction...\n", notify_register);
     *notify_register = which_queue;
-    debugf("Notified device\n\n");
+    // debugf("Notified device\n\n");
 }
 
 // Select the queue and get its size
@@ -379,7 +387,7 @@ void virtio_send_descriptor_chain(VirtioDevice *device, uint16_t which_queue, Vi
     uint64_t head_descriptor_index = device->desc_idx;
     for (int i=0; i<num_descriptors; i++) {
         uint64_t descriptor_index = (device->desc_idx + i) % queue_size;
-        debugf("Writing descriptor %d to queue %d\n", descriptor_index, which_queue);
+        // debugf("Writing descriptor %d to queue %d\n", descriptor_index, which_queue);
         VirtioDescriptor descriptor = descriptors[i];
         descriptor.next = (descriptor_index + 1) % queue_size;
         if (i < num_descriptors - 1) {
@@ -387,10 +395,10 @@ void virtio_send_descriptor_chain(VirtioDevice *device, uint16_t which_queue, Vi
         } else {
             descriptor.flags &= ~VIRTQ_DESC_F_NEXT;
         }
-        debugf("Descriptor addr: %p\n", descriptor.addr);
-        debugf("Descriptor len: 0x%x = %d\n", descriptor.len, descriptor.len);
-        debugf("Descriptor flags: 0x%x = %d\n", descriptor.flags, descriptor.flags);
-        debugf("Descriptor next: 0x%x = %d\n", descriptor.next, descriptor.next);
+        // debugf("Descriptor addr: %p\n", descriptor.addr);
+        // debugf("Descriptor len: 0x%x = %d\n", descriptor.len, descriptor.len);
+        // debugf("Descriptor flags: 0x%x = %d\n", descriptor.flags, descriptor.flags);
+        // debugf("Descriptor next: 0x%x = %d\n", descriptor.next, descriptor.next);
         // Put the descriptor in the descriptor table
         device->desc[descriptor_index] = descriptor;
     }
@@ -401,8 +409,8 @@ void virtio_send_descriptor_chain(VirtioDevice *device, uint16_t which_queue, Vi
     // Update the descriptor index for our bookkeeping
     device->desc_idx = (device->desc_idx + num_descriptors) % queue_size;
 
-    debugf("Driver index: %d\n", device->driver->idx);
-    debugf("Descriptor index: %d\n", device->desc_idx);
+    // debugf("Driver index: %d\n", device->driver->idx);
+    // debugf("Descriptor index: %d\n", device->desc_idx);
     
     mutex_unlock(&device->lock);
     IRQ_ON();
@@ -434,23 +442,26 @@ uint16_t virtio_receive_descriptor_chain(VirtioDevice *device, uint16_t which_qu
     uint16_t i = 0;
     while (descriptor->flags & VIRTQ_DESC_F_NEXT) {
         received[i++] = *descriptor;
-        debugf("Reading descriptor %d from queue %d\n", descriptor_index, which_queue);
-        debugf("Descriptor addr: %p\n", descriptor->addr);
-        debugf("Descriptor len: 0x%x = %d\n", descriptor->len, descriptor->len);
-        debugf("Descriptor flags: 0x%x = %d\n", descriptor->flags, descriptor->flags);
-        debugf("Descriptor next: 0x%x = %d\n", descriptor->next, descriptor->next);
+        // debugf("Reading descriptor %d from queue %d\n", descriptor_index, which_queue);
+        // debugf("Descriptor addr: %p\n", descriptor->addr);
+        // debugf("Descriptor len: 0x%x = %d\n", descriptor->len, descriptor->len);
+        // debugf("Descriptor flags: 0x%x = %d\n", descriptor->flags, descriptor->flags);
+        // debugf("Descriptor next: 0x%x = %d\n", descriptor->next, descriptor->next);
         descriptor_index = descriptor->next;
         descriptor = (volatile VirtioDescriptor*)&device->desc[descriptor_index];
     }
 
     received[i] = *descriptor;
-    debugf("Reading descriptor %d from queue %d\n", i, which_queue);
-    debugf("Descriptor addr: %p\n", descriptor->addr);
-    debugf("Descriptor len: 0x%x = %d\n", descriptor->len, descriptor->len);
-    debugf("Descriptor flags: 0x%x = %d\n", descriptor->flags, descriptor->flags);
-    debugf("Descriptor next: 0x%x = %d\n", descriptor->next, descriptor->next);
+    // debugf("Reading descriptor %d from queue %d\n", i, which_queue);
+    // debugf("Descriptor addr: %p\n", descriptor->addr);
+    // debugf("Descriptor len: 0x%x = %d\n", descriptor->len, descriptor->len);
+    // debugf("Descriptor flags: 0x%x = %d\n", descriptor->flags, descriptor->flags);
+    // debugf("Descriptor next: 0x%x = %d\n", descriptor->next, descriptor->next);
     i++;
     device->device_idx = device->device->idx;
+    if (i != num_descriptors) {
+        debugf("Received %d descriptors, but expected %d\n", i, num_descriptors);
+    }
     return i;
 }
 
