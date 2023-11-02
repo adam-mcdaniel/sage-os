@@ -12,7 +12,7 @@
 #include <block.h>
 #include <util.h>
 
-// #define BLOCK_DEVICE_DEBUG
+#define BLOCK_DEVICE_DEBUG
 
 #ifdef BLOCK_DEVICE_DEBUG
 #define debugf(...) debugf(__VA_ARGS__)
@@ -55,9 +55,18 @@ uint64_t block_device_get_bytes(void) {
     return config->capacity * config->blk_size;
 }
 
+void block_device_handle_job(VirtioDevice *block_device, Job *job) {
+    debugf("Handling block device job %u\n", job->job_id);
+    BlockRequestPacket *packet = (BlockRequestPacket *)job->data;
+    
+    job->data = NULL;
+}
+
 void block_device_send_request(BlockRequestPacket *packet) {
     debugf("Sending block request\n");
     // First descriptor is the header
+    packet->status = 0xf;
+
     VirtioDescriptor header;
     header.addr = kernel_mmu_translate((uint64_t)packet);
     header.flags = VIRTQ_DESC_F_NEXT;
@@ -83,17 +92,13 @@ void block_device_send_request(BlockRequestPacket *packet) {
     chain[1] = data;
     chain[2] = status;
 
-    // Create the chain
-    // debugf("Status before: %d\n", packet->status);
+    virtio_create_job_with_data(block_device, 1, block_device_handle_job, packet);
     virtio_send_descriptor_chain(block_device, 0, chain, 3, true);
     WFI();
-
-    // Check the status
-    // debugf("Status after: %d\n", packet->status);
 }
 
 void block_device_read_sector(uint64_t sector, uint8_t *data) {
-    debugf("Reading sector %d\n", sector);
+    // debugf("Reading sector %d\n", sector);
     BlockRequestPacket packet;
     packet.type = VIRTIO_BLK_T_IN;
     packet.sector = sector;
@@ -105,7 +110,7 @@ void block_device_read_sector(uint64_t sector, uint8_t *data) {
 }
 
 void block_device_write_sector(uint64_t sector, uint8_t *data) {
-    debugf("Writing sector %d\n", sector);
+    // debugf("Writing sector %d\n", sector);
     BlockRequestPacket packet;
     packet.type = VIRTIO_BLK_T_OUT;
     packet.sector = sector;
@@ -117,7 +122,7 @@ void block_device_write_sector(uint64_t sector, uint8_t *data) {
 }
 
 void block_device_read_sectors(uint64_t sector, uint8_t *data, uint64_t count) {
-    debugf("Read sectors %d\n", sector);
+    // debugf("Read sectors %d\n", sector);
     BlockRequestPacket packet;
     packet.type = VIRTIO_BLK_T_IN;
     packet.sector = sector;
@@ -129,7 +134,7 @@ void block_device_read_sectors(uint64_t sector, uint8_t *data, uint64_t count) {
 }
 
 void block_device_write_sectors(uint64_t sector, uint8_t *data, uint64_t count) {
-    debugf("Writing sectors %d\n", sector);
+    // debugf("Writing sectors %d\n", sector);
     BlockRequestPacket packet;
     packet.type = VIRTIO_BLK_T_OUT;
     packet.sector = sector;
@@ -142,7 +147,7 @@ void block_device_write_sectors(uint64_t sector, uint8_t *data, uint64_t count) 
 
 
 void block_device_read_bytes(uint64_t byte, uint8_t *data, uint64_t bytes) {
-    debugf("block_device_read_bytes(%d, %p, %d)\n", byte, data, bytes);
+    // debugf("block_device_read_bytes(%d, %p, %d)\n", byte, data, bytes);
     uint64_t sectors = ALIGN_UP_POT(bytes, 512) / 512;
     uint64_t sector = byte / 512;
     uint8_t buffer[sectors][512];
