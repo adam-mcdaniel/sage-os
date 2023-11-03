@@ -227,24 +227,14 @@ void filesystem_init(void)
         }
 
         if (filesystem_is_dir(i)) {
-            debugf("Inode %u (%x) is a directory\n", i, i);
-            // Print size
-            debugf("Directory %u size: %u\n", i, filesystem_get_file_size(i));
+            debugf("Directory %u:\n", i);
 
-            DirEntry dir_entry;
-            
-            for (uint32_t entry = 0; entry < filesystem_get_zone_size() / sizeof(DirEntry); entry++) {
-                debugf("Checking entry #%u\n", entry);
-                if (filesystem_get_dir_entry(i, entry, &dir_entry)) {
-                    debug_dir_entry(dir_entry);
-                    // debugf("Entry %u: %60s\n", entry, dir_entry.inode, dir_entry.name);
-                }
+            DirEntry files[64];
+            uint32_t num_entries = filesystem_list_dir(i, files, 64);
+            for (uint32_t j=0; j<num_entries; j++) {
+                textf("   "); debug_dir_entry(files[j]);
             }
-            // while (filesystem_has_dir_entry(i, entry)) {
-            //     filesystem_get_dir_entry(i, entry, &dir_entry);
-            //     debugf("Entry %u: %s\n", entry, dir_entry.name);
-            //     entry++;
-            // }
+
         }
 
 
@@ -424,7 +414,7 @@ void filesystem_get_data(uint32_t inode, uint8_t *data, uint32_t offset, uint32_
     for (uint8_t direct_zone=0; direct_zone<7; direct_zone++) {
         uint32_t zone = inode_data.zones[direct_zone];
         if (zone == 0) {
-            debugf("No direct zone %d\n", zone);
+            // debugf("No direct zone %d\n", zone);
             continue;
         }
         memset(zone_data, 0, filesystem_get_zone_size());
@@ -633,7 +623,7 @@ void filesystem_put_data(uint32_t inode, uint8_t *data, uint32_t offset, uint32_
     for (uint8_t direct_zone=0; direct_zone<7; direct_zone++) {
         uint32_t zone = inode_data.zones[direct_zone];
         if (zone == 0) {
-            debugf("No direct zone %d\n", zone);
+            // debugf("No direct zone %d\n", zone);
             continue;
         }
 
@@ -885,3 +875,26 @@ void filesystem_put_dir_entry(uint32_t inode, uint32_t entry, DirEntry *data) {
     Inode inode_data = filesystem_get_inode(inode);
     filesystem_put_data(inode, data, entry * sizeof(DirEntry), sizeof(DirEntry));
 }
+
+
+// List all of the entries in the given directory to the given buffer.
+uint32_t filesystem_list_dir(uint32_t inode, DirEntry *entries, uint32_t max_entries) {
+    if (!filesystem_is_dir(inode)) {
+        fatalf("Inode %u (%x) is not a directory\n", inode, inode);
+        return 0;
+    }
+    Inode inode_data = filesystem_get_inode(inode);
+    uint32_t entry = 0;
+    DirEntry tmp;
+    while (filesystem_get_dir_entry(inode, entry, &tmp)) {
+        memcpy(entries + entry, &tmp, sizeof(DirEntry));
+        entry++;
+        if (entry >= max_entries) {
+            break;
+        }
+    }
+    return entry;
+}
+// Returns the inode number of the file with the given name in the given directory.
+// If the file does not exist, return INVALID_INODE.
+uint32_t filesystem_find_dir_entry(uint32_t inode, char *name);
