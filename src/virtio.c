@@ -120,11 +120,9 @@ void virtio_release_device(VirtioDevice *dev) {
 }
 
 void virtio_add_job(VirtioDevice *dev, Job job) {
-    virtio_acquire_device(dev);
     Job *mem = (Job *)kzalloc(sizeof(Job));
     memcpy(mem, &job, sizeof(Job));
     vector_push_ptr(dev->jobs, mem);
-    virtio_release_device(dev);
 }
 
 // Job *virtio_get_job(VirtioDevice *dev, uint64_t job_id) {
