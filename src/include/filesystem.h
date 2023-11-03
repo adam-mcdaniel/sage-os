@@ -135,6 +135,7 @@ void filesystem_read_file(uint32_t inode, uint8_t *data, uint32_t count);
 
 bool filesystem_is_file(uint32_t inode);
 bool filesystem_is_dir(uint32_t inode);
-bool filesystem_has_dir_entry(uint32_t inode, uint32_t entry);
-void filesystem_get_dir_entry(uint32_t inode, uint32_t entry, DirEntry *data);
+// Get the directory entry at the given index. If the entry is invalid, return false.
+// Otherwise, return true and put the entry in the given data pointer.
+bool filesystem_get_dir_entry(uint32_t inode, uint32_t entry, DirEntry *data);
 void filesystem_put_dir_entry(uint32_t inode, uint32_t entry, DirEntry *data);

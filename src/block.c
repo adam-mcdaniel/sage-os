@@ -12,7 +12,7 @@
 #include <block.h>
 #include <util.h>
 
-#define BLOCK_DEVICE_DEBUG
+// #define BLOCK_DEVICE_DEBUG
 
 #ifdef BLOCK_DEVICE_DEBUG
 #define debugf(...) debugf(__VA_ARGS__)
