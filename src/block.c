@@ -12,7 +12,7 @@
 #include <block.h>
 #include <util.h>
 
-// #define BLOCK_DEVICE_DEBUG
+#define BLOCK_DEVICE_DEBUG
 
 #ifdef BLOCK_DEVICE_DEBUG
 #define debugf(...) debugf(__VA_ARGS__)
@@ -123,7 +123,7 @@ void block_device_write_sector(uint64_t sector, uint8_t *data) {
 }
 
 void block_device_read_sectors(uint64_t sector, uint8_t *data, uint64_t count) {
-    // debugf("Read sectors %d\n", sector);
+    debugf("Read sectors %d\n", sector);
     BlockRequestPacket packet;
     packet.type = VIRTIO_BLK_T_IN;
     packet.sector = sector;
@@ -135,7 +135,7 @@ void block_device_read_sectors(uint64_t sector, uint8_t *data, uint64_t count) {
 }
 
 void block_device_write_sectors(uint64_t sector, uint8_t *data, uint64_t count) {
-    // debugf("Writing sectors %d\n", sector);
+    debugf("Writing sectors %d\n", sector);
     BlockRequestPacket packet;
     packet.type = VIRTIO_BLK_T_OUT;
     packet.sector = sector;
