@@ -139,3 +139,11 @@ bool filesystem_is_dir(uint32_t inode);
 // Otherwise, return true and put the entry in the given data pointer.
 bool filesystem_get_dir_entry(uint32_t inode, uint32_t entry, DirEntry *data);
 void filesystem_put_dir_entry(uint32_t inode, uint32_t entry, DirEntry *data);
+
+
+// List all of the entries in the given directory to the given buffer.
+// Return the number of entries retrieved.
+uint32_t filesystem_list_dir(uint32_t inode, DirEntry *entries, uint32_t max_entries);
+// Returns the inode number of the file with the given name in the given directory.
+// If the file does not exist, return INVALID_INODE.
+uint32_t filesystem_find_dir_entry(uint32_t inode, char *name);
