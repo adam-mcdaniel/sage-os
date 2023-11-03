@@ -18,6 +18,21 @@ static SuperBlock sb;
 static uint8_t *inode_bitmap;
 static uint8_t *zone_bitmap;
 
+void debug_dir_entry(DirEntry entry) {
+    debugf("Entry: %u `", entry.inode);
+    for (uint8_t i=0; i<60; i++) {
+        #ifdef FILESYSTEM_DEBUG
+        if (entry.name[i])
+            textf("%c", entry.name[i]);
+        else
+            textf("\\0");
+        #endif
+    }
+    #ifdef FILESYSTEM_DEBUG
+    textf("`\n");
+    #endif
+}
+
 uint32_t filesystem_get_min_inode() {
     return 1;
 }
@@ -210,6 +225,32 @@ void filesystem_init(void)
         if (!filesystem_has_inode(i)) {
             continue;
         }
+
+        if (filesystem_is_dir(i)) {
+            debugf("Inode %u (%x) is a directory\n", i, i);
+            // Print size
+            debugf("Directory %u size: %u\n", i, filesystem_get_file_size(i));
+
+            DirEntry dir_entry;
+            
+            for (uint32_t entry = 0; entry < filesystem_get_zone_size() / sizeof(DirEntry); entry++) {
+                debugf("Checking entry #%u\n", entry);
+                filesystem_get_dir_entry(i, entry, &dir_entry);
+                if (dir_entry.inode == 0) {
+                    continue;
+                } else {
+                    // debugf("Entry %u: %60s\n", entry, dir_entry.inode, dir_entry.name);
+                    debug_dir_entry(dir_entry);
+                }
+            }
+            // while (filesystem_has_dir_entry(i, entry)) {
+            //     filesystem_get_dir_entry(i, entry, &dir_entry);
+            //     debugf("Entry %u: %s\n", entry, dir_entry.name);
+            //     entry++;
+            // }
+        }
+
+
         if (!filesystem_is_file(i)) {
             continue;
         }
@@ -388,6 +429,7 @@ void filesystem_get_data(uint32_t inode, uint8_t *data, uint32_t offset, uint32_
         } else {
             debugf("Reading direct zone %d\n", zone);
         }
+        memset(zone_data, 0, filesystem_get_zone_size());
 
         // Read the zone into the buffer
         filesystem_get_zone(inode_data.zones[zone], zone_data);
@@ -414,6 +456,8 @@ void filesystem_get_data(uint32_t inode, uint8_t *data, uint32_t offset, uint32_
         for (uint8_t indirect_zone=0; indirect_zone<filesystem_get_zone_size() / sizeof(uint32_t); indirect_zone++) {
             uint32_t zone = indirect_zones[indirect_zone];
             if (zone == 0) continue;
+            
+            memset(zone_data, 0, filesystem_get_zone_size());
 
             // Read the zone into the buffer
             filesystem_get_zone(zone, zone_data);
@@ -451,6 +495,7 @@ void filesystem_get_data(uint32_t inode, uint8_t *data, uint32_t offset, uint32_
                 uint32_t zone = indirect_zones[indirect_zone];
                 if (zone == 0) continue;
                 // Read the zone into the buffer
+                memset(zone_data, 0, filesystem_get_zone_size());
                 filesystem_get_zone(zone, zone_data);
 
                 // If the cursor is past the amount of data we want, we're done
@@ -491,6 +536,7 @@ void filesystem_get_data(uint32_t inode, uint8_t *data, uint32_t offset, uint32_
                     uint32_t zone = indirect_zones[indirect_zone];
                     if (zone == 0) continue;
                     // Read the zone into the buffer
+                    memset(zone_data, 0, filesystem_get_zone_size());
                     filesystem_get_zone(zone, zone_data);
 
                     // If the cursor is past the amount of data we want, we're done
@@ -517,6 +563,45 @@ void filesystem_get_data(uint32_t inode, uint8_t *data, uint32_t offset, uint32_
 void filesystem_put_data(uint32_t inode, uint8_t *data, uint32_t offset, uint32_t count);
 
 
-bool filesystem_has_dir_entry(uint32_t inode, uint32_t entry);
-void filesystem_get_dir_entry(uint32_t inode, uint32_t entry, DirEntry *data);
-void filesystem_put_dir_entry(uint32_t inode, uint32_t entry, DirEntry *data);
+bool filesystem_has_dir_entry(uint32_t inode, uint32_t entry) {
+    if (!filesystem_is_dir(inode)) {
+        fatalf("Inode %u (%x) is not a directory\n", inode, inode);
+        return false;
+    }
+    Inode inode_data = filesystem_get_inode(inode);
+    if (entry >= inode_data.size / sizeof(DirEntry)) {
+        return false;
+    }
+    return true;
+}
+
+void filesystem_get_dir_entry(uint32_t inode, uint32_t entry, DirEntry *data) {
+    if (!filesystem_is_dir(inode)) {
+        fatalf("Inode %u (%x) is not a directory\n", inode, inode);
+        return;
+    }
+    Inode inode_data = filesystem_get_inode(inode);
+    // if (entry >= inode_data.size / sizeof(DirEntry)) {
+    //     fatalf("Entry %u is out of bounds for inode %u (%x)\n", entry, inode, inode);
+    //     return;
+    // }
+    // uint8_t buf[sizeof(DirEntry)];
+    filesystem_get_data(inode, data, entry * sizeof(DirEntry), sizeof(DirEntry));
+    // debug_dir_entry(*(DirEntry *)buf);
+    // debugf("Got dir entry %u: %50s\n", entry, ((DirEntry *)buf)->inode);
+    // memcpy(data, buf, sizeof(DirEntry));
+}
+// void filesystem_put_dir_entry(uint32_t inode, uint32_t entry, DirEntry *data) {
+//     if (!filesystem_is_dir(inode)) {
+//         fatalf("Inode %u (%x) is not a directory\n", inode, inode);
+//         return;
+//     }
+//     Inode inode_data = filesystem_get_inode(inode);
+//     if (entry >= inode_data.size / sizeof(DirEntry)) {
+//         fatalf("Entry %u is out of bounds for inode %u (%x)\n", entry, inode, inode);
+//         return;
+//     }
+//     uint8_t buf[sizeof(DirEntry)];
+//     memcpy(buf, data, sizeof(DirEntry));
+//     filesystem_put_data(inode, buf, entry * sizeof(DirEntry), sizeof(DirEntry));
+// }
