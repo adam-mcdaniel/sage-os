@@ -78,7 +78,7 @@ void os_trap_handler(void)
                 break;
             case CAUSE_SEIP:
                 // Forward to src/plic.c
-                debugf("HANDLING IRQ!!!!!!!!!!!!!!!\n");
+                debugf("Entering plic handle\n");
                 plic_handle_irq(hart);
                 debugf("Left plic handle\n");
                 
@@ -108,11 +108,13 @@ void os_trap_handler(void)
                 break;
             case CAUSE_ECALL_U_MODE:  // ECALL U-Mode
                 // Forward to src/syscall.c
+                debugf("Handling syscall\n");
                 syscall_handle(hart, epc, scratch);
                 // We have to move beyond the ECALL instruction, which is exactly 4 bytes.
                 break;
             case CAUSE_ECALL_S_MODE:  // ECALL U-Mode
                 // Forward to src/syscall.c
+                debugf("Handling syscall\n");
                 syscall_handle(hart, epc, scratch);
                 // We have to move beyond the ECALL instruction, which is exactly 4 bytes.
                 break;

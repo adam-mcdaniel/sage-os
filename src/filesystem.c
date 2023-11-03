@@ -6,7 +6,7 @@
 #define min(a, b) ((a) < (b) ? (a) : (b))
 #define max(a, b) ((a) > (b) ? (a) : (b))
 
-#define FILESYSTEM_DEBUG
+// #define FILESYSTEM_DEBUG
 
 #ifdef FILESYSTEM_DEBUG
 #define debugf(...) debugf(__VA_ARGS__)
@@ -32,6 +32,7 @@ void debug_dir_entry(DirEntry entry) {
     textf("`\n");
     #endif
 }
+
 
 uint32_t filesystem_get_min_inode() {
     return 1;
@@ -138,6 +139,36 @@ void debug_inode(uint32_t i) {
     }
 }
 
+
+typedef struct CallbackData {
+    uint32_t file_count;
+    uint32_t dir_count;
+} CallbackData;
+
+// void filesystem_traverse(uint32_t inode, void *data, uint32_t current_depth, uint32_t max_depth, void (*callback)(uint32_t inode, void *data, uint32_t depth));
+void callback(uint32_t inode, char *name, void *data, uint32_t depth) {
+    // Inode inode_data = filesystem_get_inode(inode);
+    // textf("Inode %u (%x):\n", inode, inode);
+    CallbackData *cb_data = (CallbackData *)data;
+
+    for (uint32_t i=0; i<depth; i++) {
+        textf("   ");
+    }
+    textf("%s", name);
+    
+    if (filesystem_is_dir(inode)) {
+        if (inode != 1) {
+            textf("/\n");
+        } else {
+            textf("\n");
+        }
+        cb_data->dir_count++;
+    } else {
+        textf("\n");
+        cb_data->file_count++;
+    }
+}
+
 void filesystem_init(void)
 {
     // Initialize the filesystem
@@ -229,12 +260,21 @@ void filesystem_init(void)
         if (filesystem_is_dir(i)) {
             debugf("Directory %u:\n", i);
 
-            DirEntry files[64];
-            uint32_t num_entries = filesystem_list_dir(i, files, 64);
-            for (uint32_t j=0; j<num_entries; j++) {
-                textf("   "); debug_dir_entry(files[j]);
-            }
+            // DirEntry files[64];
+            // uint32_t num_entries = filesystem_list_dir(i, files, 64);
+            // for (uint32_t j=0; j<num_entries; j++) {
+            //     textf("   "); debug_dir_entry(files[j]);
+            // }
 
+
+            uint32_t dot = filesystem_find_dir_entry(i, ".");
+            uint32_t dotdot = filesystem_find_dir_entry(i, "..");
+            debugf("   . = %u\n", dot);
+            debugf("   .. = %u\n", dotdot);
+            uint32_t home;
+            if (home = filesystem_find_dir_entry(i, "home")) {
+                debugf("   home = %u\n", home);
+            }
         }
 
 
@@ -276,6 +316,10 @@ void filesystem_init(void)
 
         break;
     }
+    
+    CallbackData cb_data = {0};
+    filesystem_traverse(1, "/", &cb_data, 0, 10, callback);
+    textf("Found %u files and %u directories\n", cb_data.file_count, cb_data.dir_count);
 }
 
 SuperBlock filesystem_get_superblock() {
@@ -931,4 +975,55 @@ uint32_t filesystem_list_dir(uint32_t inode, DirEntry *entries, uint32_t max_ent
 }
 // Returns the inode number of the file with the given name in the given directory.
 // If the file does not exist, return INVALID_INODE.
-uint32_t filesystem_find_dir_entry(uint32_t inode, char *name);
+uint32_t filesystem_find_dir_entry(uint32_t inode, char *name) {
+    DirEntry entries[128];
+    uint32_t num_entries = filesystem_list_dir(inode, entries, 128);
+
+    for (uint32_t i=0; i<num_entries; i++) {
+        if (strcmp(entries[i].name, name) == 0) {
+            debugf("Found entry %s at inode %u\n", name, entries[i].inode);
+            return entries[i].inode;
+        }
+    }
+    return INVALID_INODE;
+}
+
+void filesystem_traverse(uint32_t inode, char *root_name, void *data, uint32_t current_depth, uint32_t max_depth, void (*callback)(uint32_t inode, char *name, void *data, uint32_t depth)) {
+    if (current_depth > max_depth) {
+        return;
+    }
+    if (!filesystem_has_inode(inode)) {
+        return;
+    }
+    if (!filesystem_is_dir(inode)) {
+        callback(inode, root_name, data, current_depth);
+        return;
+    }
+
+    Inode inode_data = filesystem_get_inode(inode);
+    uint32_t max_entries = filesystem_get_zone_size() / sizeof(DirEntry);
+    DirEntry entries[max_entries];
+    uint32_t num_entries = filesystem_list_dir(inode, entries, max_entries);
+
+    char name[256];
+    callback(inode, root_name, data, current_depth);
+    for (uint32_t i=0; i<num_entries; i++) {
+        if (entries[i].inode == INVALID_INODE) {
+            continue;
+        }
+        for (uint32_t j=0; j<sizeof(entries[0].name); j++) {
+            if (entries[i].name[j] == 0) {
+                name[j] = 0;
+                break;
+            }
+            name[j] = entries[i].name[j];
+        }
+        if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) {
+            continue;
+        }
+        debugf("Traversing %s at depth %d\n", name, current_depth + 1);
+        filesystem_traverse(entries[i].inode, name, data, current_depth + 1, max_depth, callback);
+    }
+
+    return;
+}
