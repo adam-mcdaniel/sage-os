@@ -444,7 +444,7 @@ void filesystem_get_data(uint32_t inode, uint8_t *data, uint32_t offset, uint32_
         } else if (file_cursor < offset) {
             // We're in the middle of the offset
             // Read the zone into the buffer
-            debugf("Reading direct zone %d\n", zone);
+            debugf("Reading first direct zone %d\n", zone);
             filesystem_get_zone(zone, zone_data);
             // Copy the remaining data into the buffer
             size_t remaining = min(count, filesystem_get_zone_size() - (offset - file_cursor));
@@ -454,18 +454,19 @@ void filesystem_get_data(uint32_t inode, uint8_t *data, uint32_t offset, uint32_
             continue;
         }
 
-        debugf("Reading direct zone %d\n", zone);
         // Read the zone into the buffer
         filesystem_get_zone(zone, zone_data);
         // If the cursor is past the amount of data we want, we're done
 
         
         if (buffer_cursor + filesystem_get_zone_size() > count) {
+            debugf("Reading last direct zone %d\n", zone);
             // Copy the remaining data into the buffer
             memcpy(data + buffer_cursor, zone_data, count - buffer_cursor);
             // We're done
             return;
         } else {
+            debugf("Reading direct zone %d\n", zone);
             // Copy the entire zone into the buffer
             memcpy(data + buffer_cursor, zone_data, filesystem_get_zone_size());
         }
@@ -655,9 +656,6 @@ void filesystem_put_data(uint32_t inode, uint8_t *data, uint32_t offset, uint32_
             // debugf("No direct zone %d\n", zone);
             continue;
         }
-        debugf("File cursor: %d\n", file_cursor);
-        debugf("Buffer cursor: %d\n", buffer_cursor);
-        debugf("Offset: %d\n", offset);
         if (file_cursor + filesystem_get_zone_size() < offset) {
             // We're not at the offset yet
             file_cursor += filesystem_get_zone_size();
@@ -670,8 +668,6 @@ void filesystem_put_data(uint32_t inode, uint8_t *data, uint32_t offset, uint32_
 
             // Copy the remaining data into the buffer
             size_t remaining = min(count, filesystem_get_zone_size() - (offset - file_cursor));
-            debugf("Writing at offset %d\n", offset - file_cursor);
-            debugf("Writing %d bytes\n", remaining);
             memcpy(zone_data + offset - file_cursor, data, remaining);
             filesystem_put_zone(zone, zone_data);
 
@@ -686,18 +682,18 @@ void filesystem_put_data(uint32_t inode, uint8_t *data, uint32_t offset, uint32_
         }
 
         memset(zone_data, 0, filesystem_get_zone_size());
-        debugf("Writing direct zone %d\n", zone);
 
         // Write the buffer into the zone
         if (buffer_cursor + filesystem_get_zone_size() > count) {
             filesystem_get_zone(zone, zone_data);
-            debugf("Writing last %d bytes\n", count - buffer_cursor);
+            debugf("Writing last direct zone %d\n", zone);
             // Copy the remaining data into the buffer
             memcpy(zone_data, data + buffer_cursor, count - buffer_cursor);
             // We're done
             filesystem_put_zone(zone, zone_data);
             return;
         } else {
+            debugf("Writing direct zone %d\n", zone);
             // Copy the entire zone into the buffer
             memcpy(zone_data, data + buffer_cursor, filesystem_get_zone_size());
             filesystem_put_zone(zone, zone_data);
