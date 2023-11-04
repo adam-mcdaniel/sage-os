@@ -158,10 +158,34 @@ typedef struct VirtioDeviceRing {
     // uint16_t     avail_event;
 } VirtioDeviceRing;
 
+struct VirtioDevice;
+
+typedef struct Job {
+    uint64_t job_id;
+    uint64_t pid_id;
+
+    bool done;
+    struct Context {
+        VirtioDescriptor *desc;
+        uint16_t num_descriptors;
+    } context;
+
+    void (*callback)(struct VirtioDevice *device, struct Job *job);
+    void *data;
+} Job;
+
+Job job_create(uint64_t job_id, uint64_t pid_id, void (*callback)(struct VirtioDevice *device, struct Job *job));
+Job job_create_with_data(uint64_t job_id, uint64_t pid_id, void (*callback)(struct VirtioDevice *device, struct Job *job), void *data);
+// void job_set_context(Job *job, VirtioDescriptor *desc, uint16_t num_descriptors);
+void job_destroy(Job *job);
+
 // This is the actual Virtio device structure that the OS will
 // keep track of for each device. It contains the data for the OS
 // to quickly access vital information for the device.
 typedef struct VirtioDevice {
+    // The name of the device, if any.
+    char name[64];
+
     // A pointer the PCIDevice bookkeeping structure.
     // This is used by the OS to track useful information about
     // the PCIDevice, and as a useful interface for configuring
@@ -182,7 +206,7 @@ typedef struct VirtioDevice {
     volatile VirtioDeviceRing *device;
 
     void *priv;
-    struct List *jobs;
+    struct Vector *jobs;
 
     uint16_t desc_idx;
     uint16_t driver_idx;
@@ -191,6 +215,47 @@ typedef struct VirtioDevice {
     bool ready;
     Mutex lock;
 } VirtioDevice;
+
+// Read the queue size from the common configuration.
+uint16_t virtio_get_queue_size(VirtioDevice *dev);
+
+// Set the name of the device
+void virtio_set_device_name(VirtioDevice *dev, const char *name);
+// Get the name of the device
+const char *virtio_get_device_name(VirtioDevice *dev);
+
+void virtio_debug_job(VirtioDevice *dev, Job *job);
+// Use this to create a job with no state saved
+void virtio_create_job(VirtioDevice *dev, uint64_t pid_id, void (*callback)(struct VirtioDevice *device, struct Job *job));
+// Use this to create a job with state that will be saved for when the job is called
+void virtio_create_job_with_data(VirtioDevice *dev, uint64_t pid_id, void (*callback)(struct VirtioDevice *device, struct Job *job), void *data);
+
+// Performed by virtio_handle_interrupt
+void virtio_callback_and_free_job(VirtioDevice *dev, uint64_t job_id);
+
+// Is the device free to be acquired?
+bool virtio_is_device_available(VirtioDevice *dev);
+// Performed by virtio_handle_interrupt
+void virtio_acquire_device(VirtioDevice *dev);
+// Performed by virtio_handle_interrupt
+void virtio_release_device(VirtioDevice *dev);
+
+// Get the next scheduled job ID
+uint64_t virtio_get_next_job_id(VirtioDevice *dev);
+// Get a job's ID from its index in the scheduled jobs
+uint64_t virtio_get_job_id_by_index(VirtioDevice *dev, uint64_t index);
+
+// Add a job to the list of jobs in the virtio device (done with virtio_job_create)
+void virtio_add_job(VirtioDevice *dev, Job job);
+// Get a job from its ID
+Job *virtio_get_job(VirtioDevice *dev, uint64_t job_id);
+// Call the device's callback and destroy the job if it is done
+void virtio_complete_job(VirtioDevice *dev, uint64_t job_id);
+// Which job ID does this interrupt correspond to
+uint64_t virtio_which_job_from_interrupt(VirtioDevice *dev);
+
+// Handle the job from an interrupt
+void virtio_handle_interrupt(VirtioDevice *dev, VirtioDescriptor desc[], uint16_t num_descriptors);
 
 #define VIRTIO_F_RESET         0
 #define VIRTIO_F_ACKNOWLEDGE  (1 << 0)
@@ -221,6 +286,8 @@ VirtioDevice *virtio_get_input_device();
 // Get the GPU device from the list of virtio devices.
 VirtioDevice *virtio_get_gpu_device();
 
+// Get the device ID from the given VirtioDevice
+uint16_t virtio_get_device_id(VirtioDevice *dev);
 // Is this an RNG device?
 bool virtio_is_rng_device(VirtioDevice *dev);
 // Is this an block device?
@@ -245,18 +312,30 @@ volatile VirtioCapability *virtio_get_capability(VirtioDevice *dev, uint8_t type
 //get a virtio device by using a pcidevice pointer
 VirtioDevice *virtio_from_pci_device(PCIDevice *pcidevice);
 
+// Get the pointer to the virtio-device's notify-register
 volatile uint16_t *virtio_notify_register(VirtioDevice *device);
 
-void virtio_send_descriptor(VirtioDevice *device, uint16_t which_queue, VirtioDescriptor descriptor, bool notify_device_when_done);
+// Send exactly one descriptor to the given device's queue, and optionally notify the device when done.
+// The descriptor must contain a physical address.
+void virtio_send_one_descriptor(VirtioDevice *device, uint16_t which_queue, VirtioDescriptor descriptor, bool notify_device_when_done);
 
-volatile VirtioDescriptor *virtio_receive_descriptor(VirtioDevice *device, uint16_t which_queue, uint32_t *id, uint32_t *len);
+// Receive exactly one descriptor from the virtio-device's queue, and optionally block for it.
+// If we do not block, this function will bail out and all of the descriptor data will be zero'd.
+// The descriptor will contain a physical address.
+VirtioDescriptor virtio_receive_one_descriptor(VirtioDevice *device, uint16_t which_queue, bool wait_for_descriptor);
 
+// This checks if a device has sent us a descriptor on a given queue, ready to be received.
 bool virtio_has_received_descriptor(VirtioDevice *device, uint16_t which_queue);
 
+// Receive a chain of descriptors from the virtio-device's queue. This will write to the `descriptors` parameter.
+// This gives you back physical addresses in the descriptors.
 uint16_t virtio_receive_descriptor_chain(VirtioDevice *device, uint16_t which_queue, VirtioDescriptor *descriptors, uint16_t num_descriptors, bool wait_for_descriptor);
 
+// Send an array of descriptors to a given virtio-device's queue, and optionally notify it when finished. This will automatically set the `next`
+// and VIRTIO_F_NEXT field of the `flag` bits of the descriptors to setup the chain. These descriptors must use physical addresses.
 void virtio_send_descriptor_chain(VirtioDevice *device, uint16_t which_queue, VirtioDescriptor *descriptors, uint16_t num_descriptors, bool notify_device_when_done);
 
+// Wait for the given device's queue to update with a descriptor.
 void virtio_wait_for_descriptor(VirtioDevice *device, uint16_t which_queue);
 
 typedef struct VirtioBlockConfig {
@@ -290,20 +369,20 @@ typedef struct VirtioBlockConfig {
    uint8_t unused1[3];
 } VirtioBlockConfig;
 
-struct virtio_input_absinfo {
+typedef struct virtio_input_absinfo {
     uint32_t min;
     uint32_t max;
     uint32_t fuzz;
     uint32_t flat;
     uint32_t res;
-};
+} InputAbsInfo;
 
-struct virtio_input_devids {
+typedef struct virtio_input_devids {
     uint16_t bustype;
     uint16_t vendor;
     uint16_t product;
     uint16_t version;
-};
+} InputDevIds;
 
 typedef struct VirtioInputConfig {
     uint8_t select;
@@ -319,5 +398,5 @@ typedef struct VirtioInputConfig {
 } VirtioInputConfig;
 
 volatile struct VirtioBlockConfig *virtio_get_block_config(VirtioDevice *device);
-volatile struct VirtioInputConfig *virtio_get_input_config(VirtioDevice *device);
 volatile struct VirtioGpuConfig *virtio_get_gpu_config(VirtioDevice *device);
+volatile struct VirtioInputConfig *virtio_get_input_config(VirtioDevice *device);

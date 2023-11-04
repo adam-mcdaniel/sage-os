@@ -15,11 +15,15 @@ typedef enum {
     LOG_DEBUG = 1 << 1,
     LOG_INFO  = 1 << 2,
     LOG_FATAL = 1 << 3,
-    LOG_TEXT  = 1 << 4,
+    LOG_WARN  = 1 << 4,
+    LOG_TEXT  = 1 << 5,
 } log_type;
 
 int  logf(log_type lt, const char *fmt, ...);
 int  debugf(const char *fmt, ...);
+int  infof(const char *fmt, ...);
+int  warnf(const char *fmt, ...);
+int  textf(const char *fmt, ...);
 void fatalf(const char *fmt, ...);
 void logset(log_type lt);
 void logclear(log_type lt);

@@ -39,12 +39,23 @@ typedef struct BlockRequestPacket {
 
 void block_device_send_request(BlockRequestPacket *packet);
 
+// THE DATA MUST BE PHYSICALLY CONTIGUOUS!
 void block_device_read_sector(uint64_t sector, uint8_t *data);
 
+// THE DATA MUST BE PHYSICALLY CONTIGUOUS!
 void block_device_write_sector(uint64_t sector, uint8_t *data);
 
+// THE DATA MUST BE PHYSICALLY CONTIGUOUS!
 void block_device_read_sectors(uint64_t sector, uint8_t *data, uint64_t count);
 
+// THE DATA MUST BE PHYSICALLY CONTIGUOUS!
 void block_device_write_sectors(uint64_t sector, uint8_t *data, uint64_t count);
 
 uint64_t block_device_get_sector_size(void);
+uint64_t block_device_get_sector_count(void);
+uint64_t block_device_get_bytes(void);
+
+// Data does not need to be physically contiguous.
+void block_device_read_bytes(uint64_t byte, uint8_t *data, uint64_t count);
+// Data does not need to be physically contiguous.
+void block_device_write_bytes(uint64_t byte, uint8_t *data, uint64_t count);

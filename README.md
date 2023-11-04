@@ -14,7 +14,20 @@ Every week, you will need to write entries in this journal. Include brief inform
 
 Sort your entries in descending order (newest entries at the top).
 
+# 4-Nov-2023
+- `amcdan23`: Fixed bug where indirect zones are read incorrectly (I accidentally wrote `(uint8_t)*indirect_zone` instead of `(uint8_t*)indirect_zone`, and it still typechecked!). Added callbacks for mapping the filesystem into two maps of inodes and paths. Now we can read the book and the poem into a buffer just by using their `const char *path` string, manipulate them, and write them back! Added struct for convenient representation of a `File`. Added optimization to reduce the number of requests made by the block device to the operating system by saving the inode data after retrieval.
+
+# 3-Nov-2023
+- `amcdan23`: Added functions for enumerating all directory entries, and finding an entry in a directory by its name and parent inode. Created function for writing files based on the function for reading files. Fixed bug where reading/writing to files on zone boundaries had wrong buffer arithmetic. Added functions for traversing file tree with a callback function and some persistent state. Added warnings to log messages.
+
+# 2-Nov-2023
+- `amcdan23`: Used zone manipulating functions to implement reading files. Only works with direct zones. Added functions for getting file information from inodes (is directory, is file). Also added functions for getting individual directory entries.
+
+# 1-Nov-2023
+- `amcdan23`: Created infrastructure for scheduling jobs to VirtioDevices. Added reading in/writing Inodes, fixed the number of sectors calculated to be read/written in block device submodule. Fixed where packet request could sometimes result in an instruction page fault or a regular page fault. Added functions for manipulating zones. Added debug enable/disable flags for the different submodules. 
+
 # 29-October-2023
+- `amcdan23`: Added the minix3 harddrive to the repo, Rewrote `virtio_send_one_descriptor` to be in terms of `virtio_send_descriptor_chain`. Added functions to read in the inode and zone bitmaps in the filesystem.
 - `jpark78`: Fixed an issue where `gpu_init` had intermittent failures. Fixed it by turning off IRQ and spinlocking while sending the descriptor, by adding a while loop to wait for the device_idx to catch up, and by removing the error checking code. Even though this fixes a lot of the issues, we still want to figure out why the error checking code is causing it to fail. Also helped with input device initialization by making sure we are setting STVEC before `virtio_init`.
 - `gmorale1`: Added input interrupt handler, refactored input driver to allow multiple input devices.
 
@@ -30,7 +43,6 @@ Sort your entries in descending order (newest entries at the top).
 # 25-October-2023
 
 - `amcdan23`: Got implementation of block device working! Added functions for block device initialization, setting up and sending request packets, writing to and reading from sectors. Added function for chaining virtio descriptors which performs the packet request. Fixed all the warnings! Wrote `block_device_init`, `block_device_send_request`, `block_device_read_sector`, `block_device_write_sector`, `block_device_read_sectors`, `block_device_write_sectors`, `virtio_send_descriptor_chain`, and `virtio_send_descriptor`. Added basic skeleton for filesystem. Went back and added `virtio_receive_descriptor_chain` + related functions for reading linked list of descriptors from device into a buffer.
-
 - `ttahmid`: Wrote `input.c` and `input.h`. Added functions for input device, `input_device_init`, `input_device_interrupt_handler`. Now, need to query the input device through device configuration registers using type 4 capability.
 
 # 24-October-2023

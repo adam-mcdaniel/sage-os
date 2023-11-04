@@ -19,6 +19,7 @@ void rng_device_init() {
     rng_active_jobs = vector_new();
     rng_device = virtio_get_rng_device();
     debugf("RNG init done for device at %p\n", rng_device->pcidev->ecam_header);
+    virtio_set_device_name(rng_device, "RNG Device");
     rng_device->ready = true;
 }
 
@@ -39,5 +40,5 @@ void rng_fill(void *virtual_buffer_address, uint16_t size) {
     desc.flags = VIRTQ_DESC_F_WRITE;
     desc.next = 0;
 
-    virtio_send_descriptor(rng_device, 0, desc, true);
+    virtio_send_one_descriptor(rng_device, 0, desc, true);
 }

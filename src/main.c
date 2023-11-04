@@ -15,6 +15,7 @@
 #include <trap.h>
 #include <block.h>
 #include <rng.h>
+#include <filesystem.h>
 
 // Global MMU table for the kernel. This is used throughout
 // the kernel.
@@ -140,6 +141,7 @@ static void init_systems(void)
     }
 
 
+    /*
     uint32_t sector[256];
     for (uint64_t i=0; i<sizeof(sector)/sizeof(sector[i]); i++) {
         sector[i] = i;
@@ -165,28 +167,18 @@ static void init_systems(void)
             sector[i+4], sector[i+5], sector[i+6], sector[i+7]);
     }
 
-    // block_device_read_sector(0, sector);
+    uint32_t buf[64] = {0};
+    memset(buf, 0xFF, sizeof(buf));
+    block_device_write_bytes(sizeof(uint32_t) * 3, buf, sizeof(uint32_t) * 4);
+    memset(buf, 5, sizeof(buf));
+    block_device_read_bytes(0, buf, sizeof(uint32_t) * 9);
 
-    // for (int i=0; i<sizeof(sector)/sizeof(sector[i])/8; i++) {
-    //     debugf("%d %d %d %d %d %d %d %d\n",
-    //         sector[i], sector[i+1], sector[i+2], sector[i+3],
-    //         sector[i+4], sector[i+5], sector[i+6], sector[i+7]);
-    // }
-    
-    
-    // debugf("\n");char bytes[5] = {0};
-    // char bytes[5] = {0};
-    // rng_fill(bytes, sizeof(bytes));
-    // WFI();
-    // The WFI above should continue after the PLIC
-    // receives an interrupt from the virtio device.
-    // printf("%02x %02x %02x %02x %02x\n",
-    // bytes[0], 
-    // bytes[1], 
-    // bytes[2], 
-    // bytes[3], 
-    // bytes[4]);
-
+    for (uint64_t i=0; i<sizeof(buf)/sizeof(buf[i]); i+=8) {
+        debugf("%d %d %d %d %d %d %d %d\n",
+            buf[i], buf[i+1], buf[i+2], buf[i+3],
+            buf[i+4], buf[i+5], buf[i+6], buf[i+7]);
+    }
+    */
     // TEST GPU
     debugf("GPU init %s\n", gpu_test() ? "successful" : "failed");
 #endif
@@ -238,6 +230,7 @@ void main(unsigned int hart)
 
     // This is defined above main()
 #ifdef RUN_INTERNAL_CONSOLE
+    filesystem_init();
     console();
 #else
     extern uint32_t *elfcon;
