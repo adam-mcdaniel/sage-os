@@ -9,9 +9,9 @@
 #define min(a, b) ((a) < (b) ? (a) : (b))
 #define max(a, b) ((a) > (b) ? (a) : (b))
 
-// #define minix3_DEBUG
+// #define MINIX3_DEBUG
 
-#ifdef minix3_DEBUG
+#ifdef MINIX3_DEBUG
 #define debugf(...) debugf(__VA_ARGS__)
 #else
 #define debugf(...)
