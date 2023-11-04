@@ -40,6 +40,19 @@
 #define S_IWOTH 00002
 #define S_IXOTH 00001
 
+// Unused for now, will make interface in terms of `File` objects
+typedef struct File {
+    uint32_t inode;
+    uint32_t size;
+    const char *path;
+    bool is_dir;
+    bool is_file;
+    bool is_symlink;
+    bool is_hardlink;
+    bool is_block_device;
+    bool is_char_device;
+} File;
+
 typedef struct SuperBlock {
     // The number of inodes in the filesystem.
     // This is both allocated and unallocated.

@@ -104,7 +104,7 @@ void block_device_send_request(BlockRequestPacket *packet) {
     if (packet->status != 0) {
         warnf("Block device request failed with status %x\n", packet->status);
     }
-
+    
     mutex_unlock(&block_device_mutex);
 }
 
