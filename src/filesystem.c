@@ -140,15 +140,14 @@ void debug_inode(uint32_t i) {
 }
 
 
+// A struct that keeps some data for this callback
 typedef struct CallbackData {
     uint32_t file_count;
     uint32_t dir_count;
 } CallbackData;
 
-// void filesystem_traverse(uint32_t inode, void *data, uint32_t current_depth, uint32_t max_depth, void (*callback)(uint32_t inode, void *data, uint32_t depth));
+// A callback function for counting up the files and printing them out
 void callback(uint32_t inode, char *name, void *data, uint32_t depth) {
-    // Inode inode_data = filesystem_get_inode(inode);
-    // textf("Inode %u (%x):\n", inode, inode);
     CallbackData *cb_data = (CallbackData *)data;
 
     for (uint32_t i=0; i<depth; i++) {
