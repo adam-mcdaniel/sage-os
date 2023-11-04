@@ -3,6 +3,7 @@
 #include <debug.h>
 #include <util.h>
 #include <list.h>
+#include <path.h>
 #include <map.h>
 
 #define min(a, b) ((a) < (b) ? (a) : (b))
@@ -19,11 +20,36 @@
 static SuperBlock sb;
 
 // A map of file paths (absolute path strings) to inodes
-static Map *mapped_files;
+static Map *mapped_paths;
 
 // A map of inodes to file paths (absolute path strings)
 static Map *mapped_inodes;
 
+const char *inode_to_path(uint32_t inode) {
+    uint64_t path;
+    map_get_int(mapped_inodes, inode, &path);
+    return (const char *)path;
+}
+
+uint32_t path_to_inode(const char *path) {
+    uint64_t inode;
+    map_get(mapped_paths, path, &inode);
+    return inode;
+}
+
+void map_callback(uint32_t inode, const char *path, char *name, void *data, uint32_t depth) {
+    infof("Mapping %s to %u\n", path, inode);
+    map_set(mapped_paths, path, inode);
+    map_set_int(mapped_inodes, inode, (uintptr_t)path);
+}
+
+void filesystem_map_files(void) {
+    infof("Mapping files...\n");
+    mapped_paths = map_new();
+    mapped_inodes = map_new();
+
+    filesystem_traverse(1, "/", NULL, 0, 10, map_callback);
+}
 
 static uint8_t *inode_bitmap;
 static uint8_t *zone_bitmap;
@@ -163,9 +189,6 @@ void debug_inode(uint32_t i) {
     debugf("   ctime: %d\n", inode.ctime);
     debugf("   zones[]:\n");
     for (uint8_t j=0; j<10; j++) {
-        if (!inode.zones[j]) {
-            continue;
-        }
         debugf("   zones[%d] = %x (*1024 = %x)\n", j, inode.zones[j], inode.zones[j] * 1024);
     }
 }
@@ -181,19 +204,14 @@ typedef struct CallbackData {
 void callback(uint32_t inode, const char *path, char *name, void *data, uint32_t depth) {
     CallbackData *cb_data = (CallbackData *)data;
 
-
-
     for (uint32_t i=0; i<depth; i++) {
         infof("   ");
     }
-    infof("name: %s", name);
+    infof("%s", name);
+    // infof("name: %s", name);
     
     if (filesystem_is_dir(inode)) {
-        if (inode != 1) {
-            infof("/\n");
-        } else {
-            infof("\n");
-        }
+        infof("/\n");
         cb_data->dir_count++;
     } else {
         infof("\n");
@@ -201,10 +219,10 @@ void callback(uint32_t inode, const char *path, char *name, void *data, uint32_t
     }
 
 
-    for (uint32_t i=0; i<depth; i++) {
-        infof("   ");
-    }
-    infof("path: %s\n\n", path);
+    // for (uint32_t i=0; i<depth; i++) {
+    //     infof("   ");
+    // }
+    // infof("path: %s\n\n", path);
 }
 
 void filesystem_init(void)
@@ -302,11 +320,6 @@ void filesystem_init(void)
         break;
     }
     */
-    
-    CallbackData cb_data = {0};
-    filesystem_traverse(1, "/", &cb_data, 0, 10, callback);
-    infof("Found %u files and %u directories in /\n", cb_data.file_count, cb_data.dir_count);
-
 
     const char *path = "/home/cosc562";
 
@@ -316,6 +329,28 @@ void filesystem_init(void)
     filesystem_traverse(inode, path, &cb_data2, 0, 10, callback);
 
     infof("Found %u files and %u directories in %s\n", cb_data2.file_count, cb_data2.dir_count, path);
+
+    filesystem_map_files();
+
+    const char *book_path = "/home/cosc562/subdir1/subdir2/subdir3/subdir4/subdir5/book1.txt";
+    uint32_t book_inode = path_to_inode(book_path);
+    infof("Inode: %u\n", book_inode);
+    uint64_t book_size = filesystem_get_file_size(book_inode);
+    infof("Book size: %u\n", book_size);
+    char *contents = kmalloc(book_size);
+    filesystem_read_file(book_inode, (uint8_t *)contents, book_size);
+    for (uint64_t i=0; i<book_size; i++) {
+        infof("%c", contents[i]);
+    }
+    infof("\n");
+    kfree(contents);
+
+    
+    infof("Files:\n");
+    CallbackData cb_data = {0};
+    filesystem_traverse(1, "/", &cb_data, 0, 10, callback);
+    infof("Found %u files and %u directories in /\n", cb_data.file_count, cb_data.dir_count);
+
 }
 
 SuperBlock filesystem_get_superblock() {
@@ -521,11 +556,14 @@ void filesystem_get_data(uint32_t inode, uint8_t *data, uint32_t offset, uint32_
     debugf("Done with direct zones\n");
     // The next zone is an indirect zone
     if (inode_data.zones[7] != 0) {
+        debugf("Reading indirect zone %d\n", inode_data.zones[7]);
         uint32_t indirect_zones[filesystem_get_zone_size() / sizeof(uint32_t)];
-        filesystem_get_zone(inode_data.zones[7], (uint8_t)*indirect_zones);
+        filesystem_get_zone(inode_data.zones[7], (uint8_t*)indirect_zones);
+        
 
         for (uint8_t indirect_zone=0; indirect_zone<filesystem_get_zone_size() / sizeof(uint32_t); indirect_zone++) {
             uint32_t zone = indirect_zones[indirect_zone];
+            debugf("Reading indirect zone %d\n", zone);
             if (zone == 0) continue;
             
 
@@ -569,18 +607,19 @@ void filesystem_get_data(uint32_t inode, uint8_t *data, uint32_t offset, uint32_
     if (inode_data.zones[8] != 0) {
         uint32_t double_indirect_zones[filesystem_get_zone_size() / sizeof(uint32_t)];
         // We're done
-        filesystem_get_zone(inode_data.zones[8], (uint8_t)*double_indirect_zones);
+        filesystem_get_zone(inode_data.zones[8], (uint8_t*)double_indirect_zones);
 
         for (uint8_t double_indirect_zone=0; double_indirect_zone<filesystem_get_zone_size() / sizeof(uint32_t); double_indirect_zone++) {
             uint32_t indirect_zone = double_indirect_zones[double_indirect_zone];
             if (indirect_zone == 0) continue;
 
             uint32_t indirect_zones[filesystem_get_zone_size() / sizeof(uint32_t)];
-            filesystem_get_zone(indirect_zone, (uint8_t)*indirect_zones);
+            filesystem_get_zone(indirect_zone, (uint8_t*)indirect_zones);
 
             for (uint8_t indirect_zone=0; indirect_zone<filesystem_get_zone_size() / sizeof(uint32_t); indirect_zone++) {
                 uint32_t zone = indirect_zones[indirect_zone];
                 if (zone == 0) continue;
+                debugf("Reading double indirect zone %d\n", zone);
 
                 if (file_cursor + filesystem_get_zone_size() < offset) {
                     // We're not at the offset yet
@@ -622,23 +661,24 @@ void filesystem_get_data(uint32_t inode, uint8_t *data, uint32_t offset, uint32_
     // The next zone is a triple indirect zone
     if (inode_data.zones[9] != 0) {
         uint32_t triple_indirect_zones[filesystem_get_zone_size() / sizeof(uint32_t)];
-        filesystem_get_zone(inode_data.zones[9], (uint8_t)*triple_indirect_zones);
+        filesystem_get_zone(inode_data.zones[9], (uint8_t*)triple_indirect_zones);
 
         for (uint8_t triple_indirect_zone=0; triple_indirect_zone<filesystem_get_zone_size() / sizeof(uint32_t); triple_indirect_zone++) {
             uint32_t double_indirect_zone = triple_indirect_zones[triple_indirect_zone];
             if (double_indirect_zone == 0) continue;
             uint32_t double_indirect_zones[filesystem_get_zone_size() / sizeof(uint32_t)];
-            filesystem_get_zone(double_indirect_zone, (uint8_t)*double_indirect_zones);
+            filesystem_get_zone(double_indirect_zone, (uint8_t*)double_indirect_zones);
 
             for (uint8_t double_indirect_zone=0; double_indirect_zone<filesystem_get_zone_size() / sizeof(uint32_t); double_indirect_zone++) {
                 uint32_t indirect_zone = double_indirect_zones[double_indirect_zone];
                 if (indirect_zone == 0) continue;
                 uint32_t indirect_zones[filesystem_get_zone_size() / sizeof(uint32_t)];
-                filesystem_get_zone(indirect_zone, (uint8_t)*indirect_zones);
+                filesystem_get_zone(indirect_zone, (uint8_t*)indirect_zones);
 
                 for (uint8_t indirect_zone=0; indirect_zone<filesystem_get_zone_size() / sizeof(uint32_t); indirect_zone++) {
                     uint32_t zone = indirect_zones[indirect_zone];
                     if (zone == 0) continue;
+                    debugf("Reading triple indirect zone %d\n", zone);
                     
                     if (file_cursor + filesystem_get_zone_size() < offset) {
                         // We're not at the offset yet
@@ -750,11 +790,12 @@ void filesystem_put_data(uint32_t inode, uint8_t *data, uint32_t offset, uint32_
     // The next zone is an indirect zone
     if (inode_data.zones[7] != 0) {
         uint32_t indirect_zones[filesystem_get_zone_size() / sizeof(uint32_t)];
-        filesystem_get_zone(inode_data.zones[7], (uint8_t)*indirect_zones);
+        filesystem_get_zone(inode_data.zones[7], (uint8_t*)indirect_zones);
 
         for (uint8_t indirect_zone=0; indirect_zone<filesystem_get_zone_size() / sizeof(uint32_t); indirect_zone++) {
             uint32_t zone = indirect_zones[indirect_zone];
             if (zone == 0) continue;
+            debugf("Writing indirect zone %d\n", zone);
 
             if (file_cursor + filesystem_get_zone_size() < offset) {
                 // We're not at the offset yet
@@ -803,18 +844,19 @@ void filesystem_put_data(uint32_t inode, uint8_t *data, uint32_t offset, uint32_
     if (inode_data.zones[8] != 0) {
         uint32_t double_indirect_zones[filesystem_get_zone_size() / sizeof(uint32_t)];
         // We're done
-        filesystem_get_zone(inode_data.zones[8], (uint8_t)*double_indirect_zones);
+        filesystem_get_zone(inode_data.zones[8], (uint8_t*)double_indirect_zones);
 
         for (uint8_t double_indirect_zone=0; double_indirect_zone<filesystem_get_zone_size() / sizeof(uint32_t); double_indirect_zone++) {
             uint32_t indirect_zone = double_indirect_zones[double_indirect_zone];
             if (indirect_zone == 0) continue;
 
             uint32_t indirect_zones[filesystem_get_zone_size() / sizeof(uint32_t)];
-            filesystem_get_zone(indirect_zone, (uint8_t)*indirect_zones);
+            filesystem_get_zone(indirect_zone, (uint8_t*)indirect_zones);
 
             for (uint8_t indirect_zone=0; indirect_zone<filesystem_get_zone_size() / sizeof(uint32_t); indirect_zone++) {
                 uint32_t zone = indirect_zones[indirect_zone];
                 if (zone == 0) continue;
+                debugf("Writing double indirect zone %d\n", zone);
 
                 if (file_cursor + filesystem_get_zone_size() < offset) {
                     // We're not at the offset yet
@@ -862,23 +904,24 @@ void filesystem_put_data(uint32_t inode, uint8_t *data, uint32_t offset, uint32_
     // The next zone is a triple indirect zone
     if (inode_data.zones[9] != 0) {
         uint32_t triple_indirect_zones[filesystem_get_zone_size() / sizeof(uint32_t)];
-        filesystem_get_zone(inode_data.zones[9], (uint8_t)*triple_indirect_zones);
+        filesystem_get_zone(inode_data.zones[9], (uint8_t*)triple_indirect_zones);
 
         for (uint8_t triple_indirect_zone=0; triple_indirect_zone<filesystem_get_zone_size() / sizeof(uint32_t); triple_indirect_zone++) {
             uint32_t double_indirect_zone = triple_indirect_zones[triple_indirect_zone];
             if (double_indirect_zone == 0) continue;
             uint32_t double_indirect_zones[filesystem_get_zone_size() / sizeof(uint32_t)];
-            filesystem_get_zone(double_indirect_zone, (uint8_t)*double_indirect_zones);
+            filesystem_get_zone(double_indirect_zone, (uint8_t*)double_indirect_zones);
 
             for (uint8_t double_indirect_zone=0; double_indirect_zone<filesystem_get_zone_size() / sizeof(uint32_t); double_indirect_zone++) {
                 uint32_t indirect_zone = double_indirect_zones[double_indirect_zone];
                 if (indirect_zone == 0) continue;
                 uint32_t indirect_zones[filesystem_get_zone_size() / sizeof(uint32_t)];
-                filesystem_get_zone(indirect_zone, (uint8_t)*indirect_zones);
+                filesystem_get_zone(indirect_zone, (uint8_t*)indirect_zones);
 
                 for (uint8_t indirect_zone=0; indirect_zone<filesystem_get_zone_size() / sizeof(uint32_t); indirect_zone++) {
                     uint32_t zone = indirect_zones[indirect_zone];
                     if (zone == 0) continue;
+                    debugf("Writing triple indirect zone %d\n", zone);
 
                     if (file_cursor + filesystem_get_zone_size() < offset) {
                         // We're not at the offset yet
@@ -936,8 +979,10 @@ bool filesystem_get_dir_entry(uint32_t inode, uint32_t entry, DirEntry *data) {
         return false;
     }
     Inode inode_data = filesystem_get_inode(inode);
+    debugf("Getting entry %u from inode %u\n", entry, inode);
     DirEntry tmp;
     filesystem_get_data(inode, &tmp, entry * sizeof(DirEntry), sizeof(DirEntry));
+    debugf("Got entry %s at inode %u\n", tmp.name, tmp.inode);
     if (tmp.inode == 0) {
         return false;
     }
@@ -963,9 +1008,11 @@ uint32_t filesystem_list_dir(uint32_t inode, DirEntry *entries, uint32_t max_ent
         return 0;
     }
     Inode inode_data = filesystem_get_inode(inode);
+    debugf("Listing directory %u\n", inode);
     uint32_t entry = 0;
     DirEntry tmp;
     while (filesystem_get_dir_entry(inode, entry, &tmp)) {
+        debugf("Found entry %s at inode %u\n", tmp.name, tmp.inode);
         memcpy(entries + entry, &tmp, sizeof(DirEntry));
         entry++;
         if (entry >= max_entries) {
@@ -993,7 +1040,8 @@ uint32_t filesystem_find_dir_entry(uint32_t inode, char *name) {
 
 void strcat(char *dest, char *src) {
     uint32_t i, j;
-    for (i=0; dest[i] != 0; i++);
+    for (i=0; dest[i] != 0; i++) {
+    }
     for (j=0; src[j] != 0; j++) {
         dest[i + j] = src[j];
     }
@@ -1001,7 +1049,7 @@ void strcat(char *dest, char *src) {
 }
 
 void filesystem_traverse(uint32_t inode, char *root_path, void *data, uint32_t current_depth, uint32_t max_depth, void (*callback)(uint32_t inode, const char *path, char *name, void *data, uint32_t depth)) {
-    char name[256];
+    debugf("Traversing %s: inode %u at depth %d\n", root_path, inode, current_depth);
     if (current_depth > max_depth) {
         return;
     }
@@ -1009,43 +1057,53 @@ void filesystem_traverse(uint32_t inode, char *root_path, void *data, uint32_t c
         warnf("Inode %u does not exist\n", inode);
         return;
     }
+    debugf("Traversing inode %u at depth %d\n", inode, current_depth);
+    char name[128];
     strncpy(name, path_file_name(root_path), sizeof(name));
     if (!filesystem_is_dir(inode)) {
+        debugf("Not a directory\n");
         callback(inode, root_path, name, data, current_depth);
         return;
+    } else {
+        debugf("Is a directory\n");
     }
 
     Inode inode_data = filesystem_get_inode(inode);
+    debug_inode(inode);
     uint32_t max_entries = filesystem_get_zone_size() / sizeof(DirEntry);
+    debugf("Max entries: %u\n", max_entries);
     DirEntry entries[max_entries];
+    debugf("Allocated entries\n");
     uint32_t num_entries = filesystem_list_dir(inode, entries, max_entries);
+    debugf("Found %u entries\n", num_entries);
 
-    char path[1024];
+    char *path = kmalloc(1024);
     callback(inode, root_path, name, data, current_depth);
     for (uint32_t i=0; i<num_entries; i++) {
         if (entries[i].inode == INVALID_INODE) {
             continue;
         }
-        uint32_t j;
-        for (j=0; j<sizeof(entries[0].name); j++) {
-            if (entries[i].name[j] == 0) {
-                name[j] = 0;
-                break;
-            }
-            name[j] = entries[i].name[j];
-        }
-        name[j] = 0;
+        strncpy(name, entries[i].name, sizeof(name));
+        // for (j=0; j<sizeof(entries[0].name) && j<sizeof(name); j++) {
+        //     if (entries[i].name[j] == 0) {
+        //         name[j] = 0;
+        //         break;
+        //     }
+        //     name[j] = entries[i].name[j];
+        // }
         if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) {
             continue;
         }
 
         strcpy(path, root_path);
-        strcat(path, "/");
+        if (strcmp(path, "/") != 0) {
+            strcat(path, "/");
+        }
         strcat(path, name);
 
-        debugf("Traversing %s at depth %d\n", path, current_depth + 1);
         filesystem_traverse(entries[i].inode, path, data, current_depth + 1, max_depth, callback);
     }
 
+    kfree(path);
     return;
 }
