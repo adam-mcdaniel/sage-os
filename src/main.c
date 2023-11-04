@@ -15,7 +15,7 @@
 #include <trap.h>
 #include <block.h>
 #include <rng.h>
-#include <filesystem.h>
+#include <minix3.h>
 
 // Global MMU table for the kernel. This is used throughout
 // the kernel.
