@@ -103,70 +103,70 @@ typedef struct DirEntry {
    char name[60];
 } DirEntry;
 
-void filesystem_init(void);
+void minix3_init(void);
 
-SuperBlock filesystem_get_superblock(void);
-void filesystem_put_superblock(SuperBlock superblock);
+SuperBlock minix3_get_superblock(void);
+void minix3_put_superblock(SuperBlock superblock);
 
 // Get the block size for the file system.
-uint16_t filesystem_get_block_size(void);
+uint16_t minix3_get_block_size(void);
 // Get the zone size for the file system.
-uint16_t filesystem_get_zone_size(void);
+uint16_t minix3_get_zone_size(void);
 
-size_t filesystem_get_inode_bitmap_size(void);
-size_t filesystem_get_zone_bitmap_size(void);
+size_t minix3_get_inode_bitmap_size(void);
+size_t minix3_get_zone_bitmap_size(void);
 
 // Read the inode bitmap into the given buffer
-void filesystem_get_inode_bitmap(uint8_t *bitmap_buf);
+void minix3_get_inode_bitmap(uint8_t *bitmap_buf);
 // Write the inode bitmap from the given buffer
-void filesystem_put_inode_bitmap(uint8_t *bitmap_buf);
+void minix3_put_inode_bitmap(uint8_t *bitmap_buf);
 // Read the zone bitmap into the given buffer
-void filesystem_get_zone_bitmap(uint8_t *bitmap_buf);
+void minix3_get_zone_bitmap(uint8_t *bitmap_buf);
 // Write the zone bitmap from the given buffer
-void filesystem_put_zone_bitmap(uint8_t *bitmap_buf);
+void minix3_put_zone_bitmap(uint8_t *bitmap_buf);
 
-void filesystem_get_blocks(uint32_t block, uint8_t *data, uint16_t count);
-void filesystem_put_blocks(uint32_t block, uint8_t *data, uint16_t count);
+void minix3_get_blocks(uint32_t block, uint8_t *data, uint16_t count);
+void minix3_put_blocks(uint32_t block, uint8_t *data, uint16_t count);
 
-void filesystem_get_block(uint32_t block, uint8_t *data);
-void filesystem_put_block(uint32_t block, uint8_t *data);
+void minix3_get_block(uint32_t block, uint8_t *data);
+void minix3_put_block(uint32_t block, uint8_t *data);
 
-uint32_t filesystem_alloc_zone();
-void filesystem_free_zone(uint32_t zone);
+uint32_t minix3_alloc_zone();
+void minix3_free_zone(uint32_t zone);
 
-bool filesystem_has_inode(uint32_t inode);
-Inode filesystem_get_inode(uint32_t inode);
-void filesystem_put_inode(uint32_t inode, Inode data);
+bool minix3_has_inode(uint32_t inode);
+Inode minix3_get_inode(uint32_t inode);
+void minix3_put_inode(uint32_t inode, Inode data);
 
-void filesystem_get_zone(uint32_t zone, uint8_t *data);
-void filesystem_put_zone(uint32_t zone, uint8_t *data);
+void minix3_get_zone(uint32_t zone, uint8_t *data);
+void minix3_put_zone(uint32_t zone, uint8_t *data);
 
-void filesystem_get_data(uint32_t inode, uint8_t *data, uint32_t offset, uint32_t count);
-void filesystem_put_data(uint32_t inode, uint8_t *data, uint32_t offset, uint32_t count);
-uint64_t filesystem_get_file_size(uint32_t inode);
-void filesystem_read_file(uint32_t inode, uint8_t *data, uint32_t count);
+void minix3_get_data(uint32_t inode, uint8_t *data, uint32_t offset, uint32_t count);
+void minix3_put_data(uint32_t inode, uint8_t *data, uint32_t offset, uint32_t count);
+uint64_t minix3_get_file_size(uint32_t inode);
+void minix3_read_file(uint32_t inode, uint8_t *data, uint32_t count);
 
-bool filesystem_is_file(uint32_t inode);
-bool filesystem_is_dir(uint32_t inode);
+bool minix3_is_file(uint32_t inode);
+bool minix3_is_dir(uint32_t inode);
 // Get the directory entry at the given index. If the entry is invalid, return false.
 // Otherwise, return true and put the entry in the given data pointer.
-bool filesystem_get_dir_entry(uint32_t inode, uint32_t entry, DirEntry *data);
-void filesystem_put_dir_entry(uint32_t inode, uint32_t entry, DirEntry *data);
+bool minix3_get_dir_entry(uint32_t inode, uint32_t entry, DirEntry *data);
+void minix3_put_dir_entry(uint32_t inode, uint32_t entry, DirEntry *data);
 
 
 // List all of the entries in the given directory to the given buffer.
 // Return the number of entries retrieved.
-uint32_t filesystem_list_dir(uint32_t inode, DirEntry *entries, uint32_t max_entries);
+uint32_t minix3_list_dir(uint32_t inode, DirEntry *entries, uint32_t max_entries);
 // Returns the inode number of the file with the given name in the given directory.
 // If the file does not exist, return INVALID_INODE.
-uint32_t filesystem_find_dir_entry(uint32_t inode, char *name);
+uint32_t minix3_find_dir_entry(uint32_t inode, char *name);
 
-void filesystem_traverse(uint32_t inode, char *root_path, void *data, uint32_t current_depth, uint32_t max_depth, void (*callback)(uint32_t inode, const char *path, char *entry_name, void *data, uint32_t depth));
+void minix3_traverse(uint32_t inode, char *root_path, void *data, uint32_t current_depth, uint32_t max_depth, void (*callback)(uint32_t inode, const char *path, char *entry_name, void *data, uint32_t depth));
 
 // Get the path of the file with the given inode number.
 // The file must be mapped first.
-const char *filesystem_inode_to_path(uint32_t inode);
+const char *minix3_inode_to_path(uint32_t inode);
 
 // Get the inode number of the file at the given path.
 // The file must be mapped first.
-uint32_t filesystem_path_to_inode(const char *path);
+uint32_t minix3_path_to_inode(const char *path);
