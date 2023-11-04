@@ -72,7 +72,12 @@ struct os_target {
 
 
 // #define DISABLE_DEBUG
+// #define DISABLE_WARNINGS
 
 #ifdef DISABLE_DEBUG
 #define debugf(...)
+#endif
+
+#ifdef DISABLE_DEBUG
+#define warnf(...)
 #endif

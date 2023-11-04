@@ -30,6 +30,7 @@ void block_device_init() {
     block_device = virtio_get_block_device();
     block_device_mutex = MUTEX_UNLOCKED;
     debugf("Block device init done for device at %p\n", block_device->pcidev->ecam_header);
+    virtio_set_device_name(block_device, "Block Device #1");
     block_device->ready = true;
 
     volatile VirtioBlockConfig *config = virtio_get_block_config(block_device);
@@ -100,6 +101,10 @@ void block_device_send_request(BlockRequestPacket *packet) {
     WFI();
 
     debugf("Packet status after send: %x\n", packet->status);
+    if (packet->status != 0) {
+        warnf("Block device request failed with status %x\n", packet->status);
+    }
+
     mutex_unlock(&block_device_mutex);
 }
 
@@ -153,7 +158,7 @@ void block_device_write_sectors(uint64_t sector, uint8_t *data, uint64_t count) 
 
 
 void block_device_read_bytes(uint64_t byte, uint8_t *data, uint64_t bytes) {
-    // debugf("block_device_read_bytes(%d, %p, %d)\n", byte, data, bytes);
+    debugf("block_device_read_bytes(%d, %p, %d)\n", byte, data, bytes);
     uint64_t sectors = ALIGN_UP_POT(bytes, 512) / 512;
     uint64_t sector = byte / 512;
     uint8_t buffer[sectors][512];
@@ -170,6 +175,7 @@ void block_device_read_bytes(uint64_t byte, uint8_t *data, uint64_t bytes) {
 
 
 void block_device_write_bytes(uint64_t byte, uint8_t *data, uint64_t bytes) {
+    debugf("block_device_write_bytes(%d, %p, %d)\n", byte, data, bytes);
     uint64_t sectors = ALIGN_UP_POT(bytes, 512) / 512;
     uint64_t sector = byte / 512;
     uint8_t buffer[sectors][512];

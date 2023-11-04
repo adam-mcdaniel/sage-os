@@ -1,19 +1,21 @@
 #pragma once
 
+#include <lock.h>
 #include <virtio.h>
 #include <input-event-codes.h>
 
 #define INPUT_EVENT_BUFFER_SIZE 64
 
-enum virtio_input_config_select {
-    VIRTIO_INPUT_CFG_UNSET     = 0x00,
-    VIRTIO_INPUT_CFG_ID_NAME   = 0x01,
+typedef enum virtio_input_config_select {
+    VIRTIO_INPUT_CFG_UNSET = 0x00,
+    VIRTIO_INPUT_CFG_ID_NAME = 0x01,
     VIRTIO_INPUT_CFG_ID_SERIAL = 0x02,
     VIRTIO_INPUT_CFG_ID_DEVIDS = 0x03,
     VIRTIO_INPUT_CFG_PROP_BITS = 0x10,
-    VIRTIO_INPUT_CFG_EV_BITS   = 0x11,
-    VIRTIO_INPUT_CFG_ABS_INFO  = 0x12,
-};
+    VIRTIO_INPUT_CFG_EV_BITS = 0x11,
+    VIRTIO_INPUT_CFG_ABS_INFO = 0x12,
+} InputConfigSelect;
+
 
 struct virtio_input_event {
     uint16_t type;
@@ -22,6 +24,7 @@ struct virtio_input_event {
 };
 
 typedef struct InputDevice {
+    Mutex lock;
     VirtioDevice *virtio_dev;
     struct virtio_input_event event_buffer[INPUT_EVENT_BUFFER_SIZE];
     int head;

@@ -19,6 +19,7 @@ void rng_device_init() {
     rng_active_jobs = vector_new();
     rng_device = virtio_get_rng_device();
     debugf("RNG init done for device at %p\n", rng_device->pcidev->ecam_header);
+    virtio_set_device_name(rng_device, "RNG Device");
     rng_device->ready = true;
 }
 

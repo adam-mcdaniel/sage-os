@@ -40,9 +40,11 @@ void input_device_init(VirtioDevice *device) {
     get_input_device_config(device,VIRTIO_INPUT_CFG_ID_NAME,0,8);
     if (config->ids.product == EV_KEY) {
         debugf("Found keyboard input device.\n");
+        virtio_set_device_name(device, "Keyboard");
     }
-    else if (config->ids.product = EV_ABS) {
+    else if (config->ids.product == EV_ABS) {
         debugf("Found tablet input device.\n");
+        virtio_set_device_name(device, "Tablet");
     }
     else {
         debugf("Found an input device product id %d\n", config->ids.product);
