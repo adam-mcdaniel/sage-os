@@ -13,6 +13,16 @@ Every week, you will need to write entries in this journal. Include brief inform
 * any complications that you've fixed and how you did it.
 
 Sort your entries in descending order (newest entries at the top).
+
+# 4-Nov-2023
+- `amcdan23`: Fixed bug where indirect zones are read incorrectly (I accidentally wrote `(uint8_t)*indirect_zone` instead of `(uint8_t*)indirect_zone`, and it still typechecked!). Added callbacks for mapping the filesystem into two maps of inodes and paths. Now we can read the book and the poem into a buffer, manipulate them, and write them back! Added struct for convenient representation of a `File`. Added optimization to reduce the number of requests made by the block device to the operating system by saving the inode data after retrieval.
+
+# 3-Nov-2023
+- `amcdan23`: Added functions for enumerating all directory entries, and finding an entry in a directory by its name and parent inode. Created function for writing files based on the function for reading files. Fixed bug where reading/writing to files on zone boundaries had wrong buffer arithmetic. Added functions for traversing file tree with a callback function and some persistent state. Added warnings to log messages.
+
+# 2-Nov-2023
+- `amcdan23`: Used zone manipulating functions to implement reading files. Only works with direct zones. Added functions for getting file information from inodes (is directory, is file). Also added functions for getting individual directory entries.
+
 # 1-Nov-2023
 - `amcdan23`: Created infrastructure for scheduling jobs to VirtioDevices. Added reading in/writing Inodes, fixed the number of sectors calculated to be read/written in block device submodule. Fixed where packet request could sometimes result in an instruction page fault or a regular page fault. Added functions for manipulating zones. Added debug enable/disable flags for the different submodules. 
 
