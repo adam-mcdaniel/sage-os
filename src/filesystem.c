@@ -2,6 +2,7 @@
 #include <block.h>
 #include <debug.h>
 #include <util.h>
+#include <list.h>
 
 #define min(a, b) ((a) < (b) ? (a) : (b))
 #define max(a, b) ((a) > (b) ? (a) : (b))
@@ -23,14 +24,37 @@ void debug_dir_entry(DirEntry entry) {
     for (uint8_t i=0; i<60; i++) {
         #ifdef FILESYSTEM_DEBUG
         if (entry.name[i])
-            textf("%c", entry.name[i]);
+            infof("%c", entry.name[i]);
         else
-            textf("\\0");
+            infof("\\0");
         #endif
     }
     #ifdef FILESYSTEM_DEBUG
-    textf("`\n");
+    infof("`\n");
     #endif
+}
+
+
+uint32_t filesystem_get_inode_from_path(const char *path) {
+    List *path_items = path_split(path);
+
+    uint32_t parent = 1; // Root inode
+
+    uint32_t i = 0, num_items = list_size(path_items);
+    ListElem *elem;
+    list_for_each(path_items, elem) {
+        char *name = (char *)list_elem_value(elem);
+        infof("Getting inode from relative path %s, num_items = %u\n", name, num_items);
+        if (strcmp(name, "/") == 0 || strcmp(name, "") == 0) {
+            return parent;
+        }
+        uint32_t child = filesystem_find_dir_entry(parent, name);
+        infof("Got child %u\n", child);
+        parent = child;
+        i++;
+    }
+
+    return parent;
 }
 
 
@@ -102,8 +126,7 @@ void filesystem_put_zone(uint32_t zone, uint8_t *data) {
         fatalf("Zone %u (%x) is before the first data zone %u (%x)\n", zone, zone, sb.first_data_zone, sb.first_data_zone);
         return;
     }
-    
-    // filesystem_put_block(filesystem_get_superblock().first_data_zone + zone, data);
+
     filesystem_put_block(zone, data);
 }
 
@@ -151,19 +174,19 @@ void callback(uint32_t inode, char *name, void *data, uint32_t depth) {
     CallbackData *cb_data = (CallbackData *)data;
 
     for (uint32_t i=0; i<depth; i++) {
-        textf("   ");
+        infof("   ");
     }
-    textf("%s", name);
+    infof("%s", name);
     
     if (filesystem_is_dir(inode)) {
         if (inode != 1) {
-            textf("/\n");
+            infof("/\n");
         } else {
-            textf("\n");
+            infof("\n");
         }
         cb_data->dir_count++;
     } else {
-        textf("\n");
+        infof("\n");
         cb_data->file_count++;
     }
 }
@@ -187,7 +210,7 @@ void filesystem_init(void)
 
     if (sb.magic != MINIX3_MAGIC) {
         // We need to initialize the superblock
-        debugf("Minix3 magic is not correct, initializing superblock ourselves...\n");
+        warnf("Minix3 magic is not correct, initializing superblock ourselves...\n");
         filesystem_superblock_init();
     }
     // for (uint16_t i=0; i<sb.imap_blocks; i++) {
@@ -202,54 +225,9 @@ void filesystem_init(void)
     zone_bitmap = (uint8_t*)kmalloc(filesystem_get_zone_bitmap_size());
     filesystem_get_zone_bitmap(zone_bitmap);
 
-    // for (uint32_t i=0; i<sb.num_zones; i++) {
-    //     if (zone_bitmap[i / 8] & (1 << i % 8)) {
-    //         debugf("Zone %u (%x) is taken\n", i, i);
-    //         uint8_t data[filesystem_get_block_size()];
 
-    //         filesystem_get_zone(i, data);
-
-    //         bool any_nonzero = false;
-    //         for (uint16_t j=0; j<filesystem_get_block_size(); j++) {
-    //             if (data[j] != 0) {
-    //                 textf("%c", data[j]);
-    //                 any_nonzero = true;
-    //             }
-    //         }
-    //         if (!any_nonzero) {
-    //             // debugf("Zone %u (%x) is empty\n", i, i);
-    //         } else {
-    //             debugf("\n");
-    //         }
-    //     } else {
-    //         debugf("Zone %u (%x) is free\n", i, i);
-    //     }
-    // }
-
-    // for (uint32_t i=0; i<filesystem_get_max_inode(); i++) {
-    //     if (filesystem_has_inode(i)) {
-    //         Inode inode = filesystem_get_inode(i);
-    //         if (inode.num_links > 0) {
-    //             debugf("Inode %u (%x):\n", i, i);
-    //             debugf("   mode: %x\n", inode.mode);
-    //             debugf("   num_links: %d\n", inode.num_links);
-    //             debugf("   uid: %d\n", inode.uid);
-    //             debugf("   gid: %d\n", inode.gid);
-    //             debugf("   size: %d\n", inode.size);
-    //             debugf("   atime: %d\n", inode.atime);
-    //             debugf("   mtime: %d\n", inode.mtime);
-    //             debugf("   ctime: %d\n", inode.ctime);
-    //             debugf("   zones[]:\n");
-    //             for (uint8_t j=0; j<10; j++) {
-    //                 if (!inode.zones[j]) {
-    //                     continue;
-    //                 }
-    //                 debugf("   zones[%d] = %x (*1024 = %x)\n", j, inode.zones[j], inode.zones[j] * 1024);
-    //             }
-    //         }
-    //     }
-    // }
-
+    /*
+    // Filesystem function tests
     for (uint32_t i=filesystem_get_min_inode(); i<filesystem_get_max_inode(); i++) {
         // debugf("Checking inode %u (%x)...\n", i, i);
         if (!filesystem_has_inode(i)) {
@@ -258,14 +236,6 @@ void filesystem_init(void)
 
         if (filesystem_is_dir(i)) {
             debugf("Directory %u:\n", i);
-
-            // DirEntry files[64];
-            // uint32_t num_entries = filesystem_list_dir(i, files, 64);
-            // for (uint32_t j=0; j<num_entries; j++) {
-            //     textf("   "); debug_dir_entry(files[j]);
-            // }
-
-
             uint32_t dot = filesystem_find_dir_entry(i, ".");
             uint32_t dotdot = filesystem_find_dir_entry(i, "..");
             debugf("   . = %u\n", dot);
@@ -291,9 +261,9 @@ void filesystem_init(void)
         debugf("Read file\n");
         for (uint16_t j=0; j<size; j++) {
             if (j % filesystem_get_zone_size() == 0) {
-                textf("[ZONE %u]", j / filesystem_get_zone_size());
+                infof("[ZONE %u]", j / filesystem_get_zone_size());
             }
-            textf("%c", buf[j]);
+            infof("%c", buf[j]);
         }
 
         char test[] = "Hello world!";
@@ -308,17 +278,28 @@ void filesystem_init(void)
         debugf("Read file\n");
         for (uint16_t j=0; j<size; j++) {
             if (j % filesystem_get_zone_size() == 0) {
-                textf("[ZONE %u]", j / filesystem_get_zone_size());
+                infof("[ZONE %u]", j / filesystem_get_zone_size());
             }
-            textf("%c", buf[j]);
+            infof("%c", buf[j]);
         }
 
         break;
     }
+    */
     
     CallbackData cb_data = {0};
     filesystem_traverse(1, "/", &cb_data, 0, 10, callback);
-    textf("Found %u files and %u directories\n", cb_data.file_count, cb_data.dir_count);
+    infof("Found %u files and %u directories in /\n", cb_data.file_count, cb_data.dir_count);
+
+
+    const char *path = "/home/cosc562";
+
+    CallbackData cb_data2 = {0};
+    uint32_t inode = filesystem_get_inode_from_path(path);
+    infof("%s has inode %u\n", path, inode);
+    filesystem_traverse(inode, path, &cb_data2, 0, 10, callback);
+
+    infof("Found %u files and %u directories in %s\n", cb_data2.file_count, cb_data2.dir_count, path);
 }
 
 SuperBlock filesystem_get_superblock() {
@@ -423,7 +404,7 @@ bool filesystem_has_inode(uint32_t inode) {
 }
 Inode filesystem_get_inode(uint32_t inode) {
     if (inode == INVALID_INODE) {
-        fatalf("filesystem_get_inode: Invalid inode %u\n", inode);
+        warnf("filesystem_get_inode: Invalid inode %u\n", inode);
         return (Inode){0};
     }
     SuperBlock sb = filesystem_get_superblock();
@@ -435,7 +416,7 @@ Inode filesystem_get_inode(uint32_t inode) {
 }
 void filesystem_put_inode(uint32_t inode, Inode data) {
     if (inode == INVALID_INODE) {
-        fatalf("filesystem_put_inode: Invalid inode %u\n", inode);
+        warnf("filesystem_put_inode: Invalid inode %u\n", inode);
         return;
     }
     SuperBlock sb = filesystem_get_superblock();
@@ -447,11 +428,17 @@ void filesystem_put_inode(uint32_t inode, Inode data) {
 
 bool filesystem_is_dir(uint32_t inode) {
     Inode inode_data = filesystem_get_inode(inode);
+    if (inode_data.num_links == 0) {
+        warnf("filesystem_is_dir: Inode %u has no links\n", inode);
+    }
     return S_ISDIR(inode_data.mode) && inode_data.num_links > 0;
 }
 
 bool filesystem_is_file(uint32_t inode) {
     Inode inode_data = filesystem_get_inode(inode);
+    if (inode_data.num_links == 0) {
+        warnf("filesystem_is_file: Inode %u has no links\n", inode);
+    }
     return S_ISREG(inode_data.mode) && inode_data.num_links > 0;
 }
 
@@ -475,7 +462,7 @@ void filesystem_get_data(uint32_t inode, uint8_t *data, uint32_t offset, uint32_
     for (uint8_t direct_zone=0; direct_zone<7; direct_zone++) {
         uint32_t zone = inode_data.zones[direct_zone];
         if (zone == 0) {
-            // debugf("No direct zone %d\n", zone);
+            debugf("No direct zone %d\n", zone);
             continue;
         }
         memset(zone_data, 0, filesystem_get_zone_size());
@@ -499,9 +486,8 @@ void filesystem_get_data(uint32_t inode, uint8_t *data, uint32_t offset, uint32_
 
         // Read the zone into the buffer
         filesystem_get_zone(zone, zone_data);
-        // If the cursor is past the amount of data we want, we're done
 
-        
+        // If the cursor is past the amount of data we want, we're done
         if (buffer_cursor + filesystem_get_zone_size() > count) {
             debugf("Reading last direct zone %d\n", zone);
             // Copy the remaining data into the buffer
@@ -696,7 +682,7 @@ void filesystem_put_data(uint32_t inode, uint8_t *data, uint32_t offset, uint32_
     for (uint8_t direct_zone=0; direct_zone<7; direct_zone++) {
         uint32_t zone = inode_data.zones[direct_zone];
         if (zone == 0) {
-            // debugf("No direct zone %d\n", zone);
+            debugf("No direct zone %d\n", zone);
             continue;
         }
         if (file_cursor + filesystem_get_zone_size() < offset) {
@@ -930,7 +916,7 @@ void filesystem_put_data(uint32_t inode, uint8_t *data, uint32_t offset, uint32_
 
 bool filesystem_get_dir_entry(uint32_t inode, uint32_t entry, DirEntry *data) {
     if (!filesystem_is_dir(inode)) {
-        fatalf("Inode %u (%x) is not a directory\n", inode, inode);
+        warnf("Inode %u (%x) is not a directory\n", inode, inode);
         return false;
     }
     Inode inode_data = filesystem_get_inode(inode);
@@ -946,7 +932,7 @@ bool filesystem_get_dir_entry(uint32_t inode, uint32_t entry, DirEntry *data) {
 
 void filesystem_put_dir_entry(uint32_t inode, uint32_t entry, DirEntry *data) {
     if (!filesystem_is_dir(inode)) {
-        fatalf("Inode %u (%x) is not a directory\n", inode, inode);
+        warnf("Inode %u (%x) is not a directory\n", inode, inode);
         return;
     }
     Inode inode_data = filesystem_get_inode(inode);
@@ -957,7 +943,7 @@ void filesystem_put_dir_entry(uint32_t inode, uint32_t entry, DirEntry *data) {
 // List all of the entries in the given directory to the given buffer.
 uint32_t filesystem_list_dir(uint32_t inode, DirEntry *entries, uint32_t max_entries) {
     if (!filesystem_is_dir(inode)) {
-        fatalf("Inode %u (%x) is not a directory\n", inode, inode);
+        warnf("Inode %u (%x) is not a directory\n", inode, inode);
         return 0;
     }
     Inode inode_data = filesystem_get_inode(inode);
@@ -967,6 +953,7 @@ uint32_t filesystem_list_dir(uint32_t inode, DirEntry *entries, uint32_t max_ent
         memcpy(entries + entry, &tmp, sizeof(DirEntry));
         entry++;
         if (entry >= max_entries) {
+            warnf("Too many entries in directory %u\n", inode);
             break;
         }
     }
@@ -984,6 +971,7 @@ uint32_t filesystem_find_dir_entry(uint32_t inode, char *name) {
             return entries[i].inode;
         }
     }
+    warnf("Could not find entry %s in inode %u\n", name, inode);
     return INVALID_INODE;
 }
 
@@ -1010,13 +998,15 @@ void filesystem_traverse(uint32_t inode, char *root_name, void *data, uint32_t c
         if (entries[i].inode == INVALID_INODE) {
             continue;
         }
-        for (uint32_t j=0; j<sizeof(entries[0].name); j++) {
+        uint32_t j;
+        for (j=0; j<sizeof(entries[0].name); j++) {
             if (entries[i].name[j] == 0) {
                 name[j] = 0;
                 break;
             }
             name[j] = entries[i].name[j];
         }
+        name[j] = 0;
         if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) {
             continue;
         }

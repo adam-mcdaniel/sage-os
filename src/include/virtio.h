@@ -183,6 +183,9 @@ void job_destroy(Job *job);
 // keep track of for each device. It contains the data for the OS
 // to quickly access vital information for the device.
 typedef struct VirtioDevice {
+    // The name of the device, if any.
+    char name[64];
+
     // A pointer the PCIDevice bookkeeping structure.
     // This is used by the OS to track useful information about
     // the PCIDevice, and as a useful interface for configuring
@@ -212,6 +215,14 @@ typedef struct VirtioDevice {
     bool ready;
     Mutex lock;
 } VirtioDevice;
+
+// Read the queue size from the common configuration.
+uint16_t virtio_get_queue_size(VirtioDevice *dev);
+
+// Set the name of the device
+void virtio_set_device_name(VirtioDevice *dev, const char *name);
+// Get the name of the device
+const char *virtio_get_device_name(VirtioDevice *dev);
 
 void virtio_debug_job(VirtioDevice *dev, Job *job);
 // Use this to create a job with no state saved
@@ -358,20 +369,20 @@ typedef struct VirtioBlockConfig {
    uint8_t unused1[3];
 } VirtioBlockConfig;
 
-struct virtio_input_absinfo {
+typedef struct virtio_input_absinfo {
     uint32_t min;
     uint32_t max;
     uint32_t fuzz;
     uint32_t flat;
     uint32_t res;
-};
+} InputAbsInfo;
 
-struct virtio_input_devids {
+typedef struct virtio_input_devids {
     uint16_t bustype;
     uint16_t vendor;
     uint16_t product;
     uint16_t version;
-};
+} InputDevIds;
 
 typedef struct VirtioInputConfig {
     uint8_t select;
@@ -387,5 +398,5 @@ typedef struct VirtioInputConfig {
 } VirtioInputConfig;
 
 volatile struct VirtioBlockConfig *virtio_get_block_config(VirtioDevice *device);
-volatile struct VirtioInputConfig *virtio_get_input_config(VirtioDevice *device);
 volatile struct VirtioGpuConfig *virtio_get_gpu_config(VirtioDevice *device);
+volatile struct VirtioInputConfig *virtio_get_input_config(VirtioDevice *device);

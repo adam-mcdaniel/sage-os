@@ -31,6 +31,7 @@ void gpu_device_init() {
     device_active_jobs = vector_new();
     gpu_device = virtio_get_gpu_device();
     // debugf("GPU device init done for device at %p\n", gpu_device->pcidev->ecam_header);
+    virtio_set_device_name(gpu_device, "GPU Device");
     gpu_device->ready = true;
     volatile VirtioGpuConfig *config = virtio_get_gpu_config(gpu_device);
     debugf("GPU device has %d events that needs to be read\n", config->events_read);

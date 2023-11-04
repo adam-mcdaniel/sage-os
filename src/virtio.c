@@ -160,7 +160,7 @@ void virtio_debug_job(VirtioDevice *dev, Job *job) {
 void virtio_handle_interrupt(VirtioDevice *dev, VirtioDescriptor desc[], uint16_t num_descriptors) {
     uint64_t job_id = virtio_which_job_from_interrupt(dev);
     if (job_id == -1ULL) {
-        debugf("No job found matching interrupt\n");
+        warnf("No job found matching interrupt\n");
         return;
     }
 
@@ -192,13 +192,13 @@ void virtio_complete_job(VirtioDevice *dev, uint64_t job_id) {
     virtio_acquire_device(dev);
     Job *job = virtio_get_job(dev, job_id);
     if (job == NULL) {
-        debugf("No job found with ID %d\n", job_id);
+        warnf("No job found with ID %d\n", job_id);
         virtio_release_device(dev);
         return;
     }
 
     if (job->done) {
-        debugf("Job %d already done\n", job_id);
+        warnf("Job %d already done\n", job_id);
         virtio_release_device(dev);
         return;
     }
@@ -245,6 +245,10 @@ bool virtio_is_gpu_device(VirtioDevice *dev) {
     return virtio_get_device_id(dev) == VIRTIO_PCI_DEVICE_ID(VIRTIO_PCI_DEVICE_GPU);
 }
 
+uint16_t virtio_get_queue_size(VirtioDevice *dev) {
+    return dev->common_cfg->queue_size;
+}
+
 VirtioDevice *virtio_get_device(uint16_t device_type) {
     for (uint16_t i=0; i<virtio_count_saved_devices(); i++) {
         VirtioDevice *dev = virtio_get_nth_saved_device(i);
@@ -253,7 +257,7 @@ VirtioDevice *virtio_get_device(uint16_t device_type) {
         }
     }
 
-    debugf("No device could be found");
+    warnf("No device could be found");
     return NULL;
 }
 
@@ -289,7 +293,7 @@ VirtioDevice *virtio_from_pci_device(PCIDevice *pcidevice) {
     for(uint32_t i = 0; i < vector_size(virtio_devices);i++){
         VirtioDevice *curr_virt_device = NULL;
         vector_get_ptr(virtio_devices, i, &curr_virt_device);
-        if(curr_virt_device->pcidev == pcidevice){
+        if(curr_virt_device->pcidev == pcidevice) {
             return curr_virt_device;
         }
     }
@@ -332,6 +336,7 @@ void virtio_init(void) {
 
             // Create a new bookkeeping structure for the virtio device
             VirtioDevice viodev;
+
             // Add the PCI device to the bookkeeping structure
             viodev.pcidev = pcidevice;
             // Add the common configuration, notify capability, and ISR to the bookkeeping structure
@@ -365,7 +370,7 @@ void virtio_init(void) {
             }
             viodev.common_cfg->device_status |= VIRTIO_F_FEATURES_OK;
             if (!(viodev.common_cfg->device_status & VIRTIO_F_FEATURES_OK)) {
-                debugf("Device does not accept features\n");
+                warnf("Device does not accept features\n");
             }
             
             // Fix qsize below
@@ -399,13 +404,13 @@ void virtio_init(void) {
             debugf("virtio_init: queue_driver = 0x%08lx physical (0x%08lx virtual)\n", phys_driver, viodev.driver);
             debugf("virtio_init: queue_device = 0x%08lx physical (0x%08lx virtual)\n", phys_device, viodev.device);
             if (viodev.common_cfg->queue_desc != phys_desc) {
-                debugf("Device does not reflect physical desc ring  @0x%08x (wrote %x but read %x)\n", &viodev.common_cfg->queue_desc, phys_desc, viodev.common_cfg->queue_desc);
+                warnf("Device does not reflect physical desc ring  @0x%08x (wrote %x but read %x)\n", &viodev.common_cfg->queue_desc, phys_desc, viodev.common_cfg->queue_desc);
             }
             if (viodev.common_cfg->queue_driver != phys_driver) {
-                debugf("Device does not reflect physical driver ring@0x%08x (wrote %x but read %x)\n", &viodev.common_cfg->queue_driver, phys_driver, viodev.common_cfg->queue_driver);
+                warnf("Device does not reflect physical driver ring@0x%08x (wrote %x but read %x)\n", &viodev.common_cfg->queue_driver, phys_driver, viodev.common_cfg->queue_driver);
             }
             if (viodev.common_cfg->queue_device != phys_device){
-                debugf("Device does not reflect physical device ring@0x%08x (wrote %x but read %x)\n", &viodev.common_cfg->queue_device, phys_device, viodev.common_cfg->queue_device);
+                warnf("Device does not reflect physical device ring@0x%08x (wrote %x but read %x)\n", &viodev.common_cfg->queue_device, phys_device, viodev.common_cfg->queue_device);
             }
             debugf("Set up tables for virtio device\n");
             viodev.common_cfg->queue_enable = 1;
@@ -413,14 +418,14 @@ void virtio_init(void) {
             viodev.device->flags = 0;
             viodev.lock = MUTEX_UNLOCKED;
             viodev.jobs = vector_new();
-            
+            virtio_set_device_name(&viodev, "Unknown Virtio Device");
             // Add to vector using vector_push
             virtio_save_device(viodev);
         }
     }
     rng_device_init();
     block_device_init();
-    
+    gpu_device_init();
     /*
     loop over every virtio device and initialize based on type
     */
@@ -431,12 +436,20 @@ void virtio_init(void) {
             input_device_init(dev);
         }
     }
-
-
-    gpu_device_init();
+    for (uint16_t i=0; i<virtio_count_saved_devices(); i++) {
+        VirtioDevice *dev = virtio_get_nth_saved_device(i);
+        infof("Found device #%u: \"%s\"\n", i, virtio_get_device_name(dev));
+    }
     debugf("virtio_init: Done initializing virtio system\n");
 }
 
+void virtio_set_device_name(VirtioDevice *dev, const char *name) {
+    strncpy(dev->name, name, sizeof(dev->name));
+}
+
+const char *virtio_get_device_name(VirtioDevice *dev) {
+    return dev->name;
+}
 
 // Get the notify capability for the given virtio device.
 volatile uint16_t *virtio_notify_register(VirtioDevice *device) {
@@ -464,7 +477,7 @@ void virtio_notify(VirtioDevice *viodev, uint16_t which_queue)
     uint16_t num_queues = viodev->common_cfg->num_queues;
 
     if (which_queue >= num_queues) {
-        logf(LOG_ERROR, "virtio_notify: Provided queue number %d is too big (num_queues=%d)...\n", which_queue, num_queues);
+        warnf("virtio_notify: Provided queue number %d is too big (num_queues=%d) for device %s\n", which_queue, num_queues, viodev->name);
         return;
     }
 
@@ -485,7 +498,7 @@ uint64_t virtio_set_queue_and_get_size(VirtioDevice *device, uint16_t which_queu
     uint16_t num_queues = device->common_cfg->num_queues;
 
     if (which_queue >= num_queues) {
-        fatalf("virtio_notify: Provided queue number %d is too big (num_queues=%d)...\n", which_queue, num_queues);
+        warnf("virtio_notify: Provided queue number %d is too big (num_queues=%d)...\n", which_queue, num_queues);
         return -1ULL;
     }
 
@@ -560,14 +573,14 @@ void virtio_send_descriptor_chain(VirtioDevice *device, uint16_t which_queue, Vi
 }
 
 
-uint16_t virtio_receive_descriptor_chain(VirtioDevice *device, uint16_t which_queue, VirtioDescriptor *received, uint16_t num_descriptors, bool wait_for_descriptor) {
+uint16_t virtio_receive_descriptor_chain(VirtioDevice *device, uint16_t which_queue, VirtioDescriptor *received, uint16_t max_descriptors, bool wait_for_descriptor) {
     uint64_t queue_size = virtio_set_queue_and_get_size(device, which_queue);
     if (wait_for_descriptor) {
         virtio_wait_for_descriptor(device, which_queue);
     }
 
     if (!virtio_has_received_descriptor(device, which_queue)) {
-        debugf("No descriptor received\n");
+        warnf("No descriptor received\n");
         return 0;
     }
     
@@ -597,8 +610,8 @@ uint16_t virtio_receive_descriptor_chain(VirtioDevice *device, uint16_t which_qu
     // debugf("Descriptor next: 0x%x = %d\n", descriptor->next, descriptor->next);
     i++;
     device->device_idx = device->device->idx;
-    if (i != num_descriptors) {
-        debugf("Received %d descriptors, but expected %d\n", i, num_descriptors);
+    if (i > max_descriptors) {
+        warnf("Received %d descriptors, but expected %d or fewer\n", i, max_descriptors);
     }
     return i;
 }
