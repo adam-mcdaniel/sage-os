@@ -24,7 +24,8 @@ SYMS=cosc562.sym cosc562.dbg
 #### QEMU STUFF
 QEMU?=qemu-system-riscv64
 QEMU_DEBUG_PIPE=debug.pipe
-QEMU_HARD_DRIVE_1=hdd1.dsk
+# QEMU_HARD_DRIVE_1=hdd1.dsk
+QEMU_HARD_DRIVE_1=minix3_test1.dsk
 QEMU_HARD_DRIVE_2=hdd2.dsk
 QEMU_HARD_DRIVE_3=hdd3.dsk
 QEMU_BIOS=./sbi/sbi.elf

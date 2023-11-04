@@ -6,6 +6,14 @@
 #include <csr.h>
 #include <util.h>
 
+// #define PCI_DEBUG
+
+#ifdef PCI_DEBUG
+#define debugf(...) debugf(__VA_ARGS__)
+#else
+#define debugf(...)
+#endif
+
 // These contain pointers to the common configurations for each device.
 // The `all_pci_devices` vector contains all devices, while the
 // `irq_pci_devices` vector contains devices that share an IRQ number (32, 33, 34, and 35).
@@ -500,7 +508,7 @@ void pci_dispatch_irq(int irq)
     // uint32_t vector_idx = irq - 32;
     PCIDevice *pcidevice = pci_find_device_by_irq(irq);
     if (pcidevice == NULL) {
-        debugf("No PCI device found with IRQ %d\n", irq);
+        warnf("No PCI device found with IRQ %d\n", irq);
         return;
     }
     debugf("PCI device with IRQ %d: 0x%04x\n", irq, pcidevice->ecam_header->device_id);
@@ -509,18 +517,21 @@ void pci_dispatch_irq(int irq)
         // Access through ecam_header
         VirtioDevice *virtdevice = virtio_from_pci_device(pcidevice);
         debugf("Virtio device! %p\n", virtdevice->pcidev->ecam_header);
-        
+
         if (virtio_is_rng_device(virtdevice)) {
             debugf("RNG sent interrupt!\n");
             VirtioDescriptor descriptors[16];
-            uint16_t received = virtio_receive_descriptor_chain(virtdevice, 0, descriptors, 16, true);
+            uint16_t received = virtio_receive_descriptor_chain(virtdevice, 0, descriptors, 1, true);
+
+            virtio_handle_interrupt(virtdevice, descriptors, received);
             debugf("Received %d descriptors\n", received);
         }
 
         else if (virtio_is_block_device(virtdevice)) {
             debugf("Block device sent interrupt!\n");
             VirtioDescriptor descriptors[16];
-            uint16_t received = virtio_receive_descriptor_chain(virtdevice, 0, descriptors, 16, true);
+            uint16_t received = virtio_receive_descriptor_chain(virtdevice, 0, descriptors, 3, true);
+            virtio_handle_interrupt(virtdevice, descriptors, received);
             debugf("Received %d descriptors\n", received);
         }
 
@@ -538,10 +549,9 @@ void pci_dispatch_irq(int irq)
         else if (virtio_is_gpu_device(virtdevice)) {
             debugf("GPU device sent interrupt!\n");
             VirtioDescriptor descriptors[16];
-            uint16_t received = virtio_receive_descriptor_chain(virtdevice, 0, descriptors, 16, true);
+            uint16_t received = virtio_receive_descriptor_chain(virtdevice, 0, descriptors, 3, true);
             debugf("Received %d descriptors\n", received);
-
-            // debugf("Recevied descriptors\n", virtio_has_received_descriptor(virtdevice, 0));
+            virtio_handle_interrupt(virtdevice, descriptors, received);
             
         }
     }
