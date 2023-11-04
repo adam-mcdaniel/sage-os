@@ -25,13 +25,13 @@ static Map *mapped_paths;
 // A map of inodes to file paths (absolute path strings)
 static Map *mapped_inodes;
 
-const char *inode_to_path(uint32_t inode) {
+const char *filesystem_inode_to_path(uint32_t inode) {
     uint64_t path;
     map_get_int(mapped_inodes, inode, &path);
     return (const char *)path;
 }
 
-uint32_t path_to_inode(const char *path) {
+uint32_t filesystem_path_to_inode(const char *path) {
     uint64_t inode;
     map_get(mapped_paths, path, &inode);
     return inode;
@@ -332,17 +332,22 @@ void filesystem_init(void)
 
     filesystem_map_files();
 
+    // Path of the book
     const char *book_path = "/home/cosc562/subdir1/subdir2/subdir3/subdir4/subdir5/book1.txt";
-    uint32_t book_inode = path_to_inode(book_path);
-    infof("Inode: %u\n", book_inode);
+    // Get the inode of the book
+    uint32_t book_inode = filesystem_path_to_inode(book_path);
+    // Get the size of the book
     uint64_t book_size = filesystem_get_file_size(book_inode);
-    infof("Book size: %u\n", book_size);
-    char *contents = kmalloc(book_size);
-    filesystem_read_file(book_inode, (uint8_t *)contents, book_size);
+    // Allocate a buffer for the book
+    uint8_t *contents = kmalloc(book_size);
+    // Read the book into the buffer
+    filesystem_read_file(book_inode, contents, book_size);
+    // Print the book
     for (uint64_t i=0; i<book_size; i++) {
         infof("%c", contents[i]);
     }
     infof("\n");
+    // Free the buffer
     kfree(contents);
 
     
@@ -350,7 +355,6 @@ void filesystem_init(void)
     CallbackData cb_data = {0};
     filesystem_traverse(1, "/", &cb_data, 0, 10, callback);
     infof("Found %u files and %u directories in /\n", cb_data.file_count, cb_data.dir_count);
-
 }
 
 SuperBlock filesystem_get_superblock() {
