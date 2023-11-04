@@ -457,16 +457,26 @@ bool filesystem_has_inode(uint32_t inode) {
     }
     return inode_bitmap[inode / 8] & (1 << inode % 8);
 }
+
+static uint32_t last_inode = 0;
+static Inode last_inode_data;
+
 Inode filesystem_get_inode(uint32_t inode) {
     if (inode == INVALID_INODE) {
         warnf("filesystem_get_inode: Invalid inode %u\n", inode);
         return (Inode){0};
     }
+    else if (inode == last_inode) {
+        return last_inode_data;
+    }
     SuperBlock sb = filesystem_get_superblock();
     Inode data;
     uint64_t offset = filesystem_get_inode_byte_offset(sb, inode);
 
+    // block_device_read_bytes(offset, (uint8_t*)&data, sizeof(Inode));
     block_device_read_bytes(offset, (uint8_t*)&data, sizeof(Inode));
+    last_inode_data = data;
+    last_inode = inode;
     return data;
 }
 void filesystem_put_inode(uint32_t inode, Inode data) {

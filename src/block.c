@@ -21,6 +21,7 @@
 #endif
 
 //use this like a queue
+static uint64_t request_count = 0;
 static Vector *device_active_jobs;
 static VirtioDevice *block_device;
 static Mutex block_device_mutex;
@@ -68,7 +69,9 @@ void block_device_handle_job(VirtioDevice *block_device, Job *job) {
 
 void block_device_send_request(BlockRequestPacket *packet) {
     mutex_spinlock(&block_device_mutex);
-    debugf("Sending block request\n");
+    request_count++;
+
+    debugf("Sending block request #%u\n", request_count);
     // First descriptor is the header
     packet->status = 0xf;
 
@@ -100,7 +103,7 @@ void block_device_send_request(BlockRequestPacket *packet) {
     virtio_send_descriptor_chain(block_device, 0, chain, 3, true);
     WFI();
 
-    debugf("Packet status after send: %x\n", packet->status);
+    debugf("Packet status after sending request #%u: %x\n", request_count, packet->status);
     if (packet->status != 0) {
         warnf("Block device request failed with status %x\n", packet->status);
     }
