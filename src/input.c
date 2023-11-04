@@ -48,10 +48,7 @@ void input_device_init(VirtioDevice *device) {
     }
     else {
         debugf("Found an input device product id %d\n", config->ids.product);
-    }  
-
-
-
+    }
 }
 
 void get_input_device_config(VirtioDevice *device, uint8_t select, uint8_t subsel, uint8_t size) {
