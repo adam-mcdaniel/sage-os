@@ -230,7 +230,7 @@ void main(unsigned int hart)
 
     // This is defined above main()
 #ifdef RUN_INTERNAL_CONSOLE
-    filesystem_init();
+    minix3_init();
     console();
 #else
     extern uint32_t *elfcon;
