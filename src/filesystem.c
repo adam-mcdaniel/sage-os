@@ -3,6 +3,7 @@
 #include <debug.h>
 #include <util.h>
 #include <list.h>
+#include <map.h>
 
 #define min(a, b) ((a) < (b) ? (a) : (b))
 #define max(a, b) ((a) > (b) ? (a) : (b))
@@ -16,6 +17,14 @@
 #endif
 
 static SuperBlock sb;
+
+// A map of file paths (absolute path strings) to inodes
+static Map *mapped_files;
+
+// A map of inodes to file paths (absolute path strings)
+static Map *mapped_inodes;
+
+
 static uint8_t *inode_bitmap;
 static uint8_t *zone_bitmap;
 
@@ -33,7 +42,6 @@ void debug_dir_entry(DirEntry entry) {
     infof("`\n");
     #endif
 }
-
 
 uint32_t filesystem_get_inode_from_path(const char *path) {
     List *path_items = path_split(path);
@@ -170,13 +178,15 @@ typedef struct CallbackData {
 } CallbackData;
 
 // A callback function for counting up the files and printing them out
-void callback(uint32_t inode, char *name, void *data, uint32_t depth) {
+void callback(uint32_t inode, const char *path, char *name, void *data, uint32_t depth) {
     CallbackData *cb_data = (CallbackData *)data;
+
+
 
     for (uint32_t i=0; i<depth; i++) {
         infof("   ");
     }
-    infof("%s", name);
+    infof("name: %s", name);
     
     if (filesystem_is_dir(inode)) {
         if (inode != 1) {
@@ -189,6 +199,12 @@ void callback(uint32_t inode, char *name, void *data, uint32_t depth) {
         infof("\n");
         cb_data->file_count++;
     }
+
+
+    for (uint32_t i=0; i<depth; i++) {
+        infof("   ");
+    }
+    infof("path: %s\n\n", path);
 }
 
 void filesystem_init(void)
@@ -975,15 +991,27 @@ uint32_t filesystem_find_dir_entry(uint32_t inode, char *name) {
     return INVALID_INODE;
 }
 
-void filesystem_traverse(uint32_t inode, char *root_name, void *data, uint32_t current_depth, uint32_t max_depth, void (*callback)(uint32_t inode, char *name, void *data, uint32_t depth)) {
+void strcat(char *dest, char *src) {
+    uint32_t i, j;
+    for (i=0; dest[i] != 0; i++);
+    for (j=0; src[j] != 0; j++) {
+        dest[i + j] = src[j];
+    }
+    dest[i + j] = 0;
+}
+
+void filesystem_traverse(uint32_t inode, char *root_path, void *data, uint32_t current_depth, uint32_t max_depth, void (*callback)(uint32_t inode, const char *path, char *name, void *data, uint32_t depth)) {
+    char name[256];
     if (current_depth > max_depth) {
         return;
     }
     if (!filesystem_has_inode(inode)) {
+        warnf("Inode %u does not exist\n", inode);
         return;
     }
+    strncpy(name, path_file_name(root_path), sizeof(name));
     if (!filesystem_is_dir(inode)) {
-        callback(inode, root_name, data, current_depth);
+        callback(inode, root_path, name, data, current_depth);
         return;
     }
 
@@ -992,8 +1020,8 @@ void filesystem_traverse(uint32_t inode, char *root_name, void *data, uint32_t c
     DirEntry entries[max_entries];
     uint32_t num_entries = filesystem_list_dir(inode, entries, max_entries);
 
-    char name[256];
-    callback(inode, root_name, data, current_depth);
+    char path[1024];
+    callback(inode, root_path, name, data, current_depth);
     for (uint32_t i=0; i<num_entries; i++) {
         if (entries[i].inode == INVALID_INODE) {
             continue;
@@ -1010,8 +1038,13 @@ void filesystem_traverse(uint32_t inode, char *root_name, void *data, uint32_t c
         if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) {
             continue;
         }
-        debugf("Traversing %s at depth %d\n", name, current_depth + 1);
-        filesystem_traverse(entries[i].inode, name, data, current_depth + 1, max_depth, callback);
+
+        strcpy(path, root_path);
+        strcat(path, "/");
+        strcat(path, name);
+
+        debugf("Traversing %s at depth %d\n", path, current_depth + 1);
+        filesystem_traverse(entries[i].inode, path, data, current_depth + 1, max_depth, callback);
     }
 
     return;

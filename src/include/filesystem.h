@@ -148,7 +148,7 @@ uint32_t filesystem_list_dir(uint32_t inode, DirEntry *entries, uint32_t max_ent
 // If the file does not exist, return INVALID_INODE.
 uint32_t filesystem_find_dir_entry(uint32_t inode, char *name);
 
-void filesystem_traverse(uint32_t inode, char *root_name, void *data, uint32_t current_depth, uint32_t max_depth, void (*callback)(uint32_t inode, char *dir_entry_name, void *data, uint32_t depth));
+void filesystem_traverse(uint32_t inode, char *root_path, void *data, uint32_t current_depth, uint32_t max_depth, void (*callback)(uint32_t inode, const char *path, char *entry_name, void *data, uint32_t depth));
 
 // Get the inode number of the file at the given path.
 uint32_t filesystem_get_inode_from_path(const char *path);
