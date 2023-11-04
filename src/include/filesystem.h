@@ -163,5 +163,10 @@ uint32_t filesystem_find_dir_entry(uint32_t inode, char *name);
 
 void filesystem_traverse(uint32_t inode, char *root_path, void *data, uint32_t current_depth, uint32_t max_depth, void (*callback)(uint32_t inode, const char *path, char *entry_name, void *data, uint32_t depth));
 
+// Get the path of the file with the given inode number.
+// The file must be mapped first.
+const char *filesystem_inode_to_path(uint32_t inode);
+
 // Get the inode number of the file at the given path.
-uint32_t filesystem_get_inode_from_path(const char *path);
+// The file must be mapped first.
+uint32_t filesystem_path_to_inode(const char *path);
