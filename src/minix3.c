@@ -43,6 +43,8 @@ void map_callback(uint32_t inode, const char *path, char *name, void *data, uint
     map_set_int(mapped_inodes, inode, (uintptr_t)path);
 }
 
+// This creates the `mapped_paths` and `mapped_inodes` maps
+// for caching the paths of files and their inodes
 void minix3_map_files(void) {
     infof("Mapping files...\n");
     mapped_paths = map_new();
