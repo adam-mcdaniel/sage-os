@@ -4,9 +4,12 @@
 #include <debug.h>
 #include "path.h"
 
+
+
+
 // Populate stat from a path.
 // Used by stat(2).
-void vfs_stat(const char *path, Stat *stat) {
+int vfs_stat_path(const char *path, Stat *stat) {
     uint32_t inode = minix3_path_to_inode(path);
     Inode data = minix3_get_inode(inode);
     stat->inode = inode;
@@ -18,9 +21,15 @@ void vfs_stat(const char *path, Stat *stat) {
     stat->atime = data.atime;
     stat->mtime = data.mtime;
     stat->ctime = data.ctime;
+
+    return 0;
 }
 
-bool vfs_link(const char *path1, const char *path2) {
+int vfs_stat(File *file, Stat *stat) {
+    return vfs_stat_path(file->path, stat);
+}
+
+bool vfs_link_paths(const char *path1, const char *path2) {
     uint32_t inode1 = minix3_get_inode_from_path(path1, 0);
     uint32_t inode2 = minix3_get_inode_from_path(path2, 1);
 
@@ -54,3 +63,8 @@ bool vfs_link(const char *path1, const char *path2) {
     minix3_put_inode(inode1, inode1_data);
     return true;
 }
+
+bool vfs_link(File *file1, File *file2) {
+    return vfs_link_paths(file1->path, file2->path);
+}
+
