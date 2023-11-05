@@ -17,3 +17,11 @@ typedef struct File {
 } File;
 
 void vfs_stat(const char *path, Stat *stat);
+bool vfs_link(const char *path1, const char *path2);
+int vfs_create(const char *path, uint16_t type);
+// unlink()
+// open()
+// close()
+// read
+// write
+// seek
