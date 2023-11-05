@@ -47,11 +47,19 @@ int vfs_write(File *file, const char *buf, int count);
 int vfs_seek(File *file, int offset, int whence);
 int vfs_tell(File *file);
 
+#define VFS_TYPE_FILE 0
+#define VFS_TYPE_DIR  1
+#define VFS_TYPE_LINK 2
+#define VFS_TYPE_CHAR 3
+#define VFS_TYPE_BLOCK 4
+#define VFS_TYPE_PIPE 5
+#define VFS_TYPE_SOCKET 6
+
+int vfs_create(const char *path, uint16_t type);
 int vfs_stat_path(const char *path, Stat *stat);
 int vfs_stat(File *file, Stat *stat);
 bool vfs_link(File *file1, File *file2);
 bool vfs_link_paths(const char *path1, const char *path2);
-int vfs_create(const char *path, uint16_t type);
 
 // unlink()
 // open()
