@@ -1,6 +1,7 @@
 #include <minix3.h>
 #include <block.h>
 #include <debug.h>
+#include <stdint.h>
 #include <util.h>
 #include <list.h>
 #include <path.h>
@@ -135,6 +136,24 @@ void minix3_superblock_init(void) {
     minix3_put_superblock(superblock);
 }
 
+bool minix3_has_zone(uint32_t zone) {
+    return inode_bitmap[zone / 8] & (1 << zone % 8);
+}
+
+uint32_t minix3_get_next_free_zone() {
+    size_t zone_bitmap_size = minix3_get_zone_size();
+    for (int i = 0; i < zone_bitmap_size; i++) {
+        if (zone_bitmap[i] != 0xFF) {
+            for (int j = 0; j < 8; j++) {
+                uint32_t zone = 8 * i + j;
+                if (!minix3_has_zone(zone))
+                    return zone;
+            }
+        }
+    }
+    warnf("minix3_get_next_free_zone: Couldn't find free zone\n");
+    return 0;
+}
 
 void minix3_get_zone(uint32_t zone, uint8_t *data) {
     SuperBlock sb = minix3_get_superblock();
@@ -460,8 +479,26 @@ bool minix3_has_inode(uint32_t inode) {
     return inode_bitmap[inode / 8] & (1 << inode % 8);
 }
 
-static uint32_t last_inode = 0;
-static Inode last_inode_data;
+uint32_t minix3_get_next_free_inode() {
+    size_t inode_bitmap_size = minix3_get_inode_bitmap_size();
+
+    for (int i = 0; i < inode_bitmap_size; i++) {
+        if (inode_bitmap[i] != 0xFF) {
+            for (int j = 0; j < 8; j++) {
+                uint32_t inode = 8 * i + j;
+                if (!minix3_has_inode(inode)) {
+                    return inode;
+                }
+            }
+        }
+    }
+
+    warnf("minix3_get_next_free_inode: Couldn't find free inode\n");
+    return 0;
+}
+
+static uint32_t last_inode = 0; // Last inode number we looked up
+static Inode last_inode_data; // Data of the last inode
 
 Inode minix3_get_inode(uint32_t inode) {
     if (inode == INVALID_INODE) {
@@ -481,6 +518,7 @@ Inode minix3_get_inode(uint32_t inode) {
     last_inode = inode;
     return data;
 }
+
 void minix3_put_inode(uint32_t inode, Inode data) {
     if (inode == INVALID_INODE) {
         warnf("minix3_put_inode: Invalid inode %u\n", inode);
