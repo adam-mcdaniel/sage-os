@@ -5,6 +5,8 @@
 #include "path.h"
 
 
+int vfs_read(File *file, void *buf, int count);
+int vfs_write(File *file, const char *buf, int count);
 
 
 // Populate stat from a path.

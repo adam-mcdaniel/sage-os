@@ -550,7 +550,7 @@ void minix3_put_inode(uint32_t inode, Inode data) {
 
 // Allocate a free inode.
 // Return the allocated zero'd inode. 
-Inode *minix3_alloc_inode() {
+uint32_t minix3_alloc_inode() {
     uint32_t free_inode = minix3_get_next_free_inode();
     if (!free_inode) {
         warnf("minix3_alloc_inode: Couldn't find free inode\n");
@@ -561,7 +561,7 @@ Inode *minix3_alloc_inode() {
     memset(&data, 0, sizeof(data));
     minix3_put_inode(free_inode, data);
     // infof("minix3_alloc_inode %p\n", minix3_get_inode_byte_offset(sb, free_inode)); // TODO: REMOVE
-    return (Inode *)minix3_get_inode_byte_offset(sb, free_inode);
+    return free_inode;
 }
 
 bool minix3_is_dir(uint32_t inode) {
