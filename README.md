@@ -16,15 +16,18 @@ Sort your entries in descending order (newest entries at the top).
 
 # 4-Nov-2023
 - `amcdan23`: Fixed bug where indirect zones are read incorrectly (I accidentally wrote `(uint8_t)*indirect_zone` instead of `(uint8_t*)indirect_zone`, and it still typechecked!). Added callbacks for mapping the filesystem into two maps of inodes and paths. Now we can read the book and the poem into a buffer just by using their `const char *path` string, manipulate them, and write them back! Added struct for convenient representation of a `File`. Added optimization to reduce the number of requests made by the block device to the operating system by saving the inode data after retrieval.
+- `jpark78`: Added functions to support stat(2) and link(2). Also added functions to allocate inode and find the next free directory entry. Also added get_parent option to `minix3_get_inode_from_path` to more easily find the inode of the parent.
 
 # 3-Nov-2023
 - `amcdan23`: Added functions for enumerating all directory entries, and finding an entry in a directory by its name and parent inode. Created function for writing files based on the function for reading files. Fixed bug where reading/writing to files on zone boundaries had wrong buffer arithmetic. Added functions for traversing file tree with a callback function and some persistent state. Added warnings to log messages.
+- `jpark78`: Added functions for finding free inode and zone. Also added function to mark the inode/zone bitmap.
 
 # 2-Nov-2023
 - `amcdan23`: Used zone manipulating functions to implement reading files. Only works with direct zones. Added functions for getting file information from inodes (is directory, is file). Also added functions for getting individual directory entries.
 
 # 1-Nov-2023
 - `amcdan23`: Created infrastructure for scheduling jobs to VirtioDevices. Added reading in/writing Inodes, fixed the number of sectors calculated to be read/written in block device submodule. Fixed where packet request could sometimes result in an instruction page fault or a regular page fault. Added functions for manipulating zones. Added debug enable/disable flags for the different submodules. 
+- `jpark78`: Fix input device init and ISR to receive keyboard, tablet events but traps with instruction page fault when the incoming input is too fast. Fixed a bug in virtio_receive_decriptor_chain where we were setting our internal device_idx equal to the device->idx regardless of the number of descriptors read instead of incrementing it by one. Added is_keybaord and is_tablet to VirtioDevice to differentiate between a keyboard and a tablet. This was prefered over querying the device specific config since we are not able to handle interrupts inside input_device_isr.
 
 # 29-October-2023
 - `amcdan23`: Added the minix3 harddrive to the repo, Rewrote `virtio_send_one_descriptor` to be in terms of `virtio_send_descriptor_chain`. Added functions to read in the inode and zone bitmaps in the filesystem.
