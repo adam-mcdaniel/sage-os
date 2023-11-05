@@ -135,9 +135,12 @@ uint32_t minix3_alloc_zone();
 void minix3_free_zone(uint32_t zone);
 
 bool minix3_has_inode(uint32_t inode);
+uint32_t minix3_get_next_free_inode();
 Inode minix3_get_inode(uint32_t inode);
 void minix3_put_inode(uint32_t inode, Inode data);
 
+bool minix3_has_zone(uint32_t zone);
+uint32_t minix3_get_next_free_zone();
 void minix3_get_zone(uint32_t zone, uint8_t *data);
 void minix3_put_zone(uint32_t zone, uint8_t *data);
 
