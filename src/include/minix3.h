@@ -40,19 +40,6 @@
 #define S_IWOTH 00002
 #define S_IXOTH 00001
 
-// Unused for now, will make interface in terms of `File` objects
-typedef struct File {
-    uint32_t inode;
-    uint32_t size;
-    const char *path;
-    bool is_dir;
-    bool is_file;
-    bool is_symlink;
-    bool is_hardlink;
-    bool is_block_device;
-    bool is_char_device;
-} File;
-
 typedef struct SuperBlock {
     // The number of inodes in the filesystem.
     // This is both allocated and unallocated.
@@ -131,15 +118,20 @@ void minix3_put_blocks(uint32_t block, uint8_t *data, uint16_t count);
 void minix3_get_block(uint32_t block, uint8_t *data);
 void minix3_put_block(uint32_t block, uint8_t *data);
 
-uint32_t minix3_alloc_zone();
-void minix3_free_zone(uint32_t zone);
-
 bool minix3_has_inode(uint32_t inode);
+bool minix3_take_inode(uint32_t inode);
+uint32_t minix3_get_next_free_inode();
 Inode minix3_get_inode(uint32_t inode);
+uint32_t minix3_get_inode_from_path(const char *path, bool get_parent);
 void minix3_put_inode(uint32_t inode, Inode data);
+Inode *minix3_alloc_inode();
 
+bool minix3_has_zone(uint32_t zone);
+bool minix3_take_zone(uint32_t zone);
+uint32_t minix3_get_next_free_zone();
 void minix3_get_zone(uint32_t zone, uint8_t *data);
 void minix3_put_zone(uint32_t zone, uint8_t *data);
+uint32_t minix3_alloc_zone();
 
 void minix3_get_data(uint32_t inode, uint8_t *data, uint32_t offset, uint32_t count);
 void minix3_put_data(uint32_t inode, uint8_t *data, uint32_t offset, uint32_t count);
@@ -148,6 +140,8 @@ void minix3_read_file(uint32_t inode, uint8_t *data, uint32_t count);
 
 bool minix3_is_file(uint32_t inode);
 bool minix3_is_dir(uint32_t inode);
+
+uint32_t minix3_find_next_free_dir_entry(uint32_t inode);
 // Get the directory entry at the given index. If the entry is invalid, return false.
 // Otherwise, return true and put the entry in the given data pointer.
 bool minix3_get_dir_entry(uint32_t inode, uint32_t entry, DirEntry *data);
@@ -159,7 +153,7 @@ void minix3_put_dir_entry(uint32_t inode, uint32_t entry, DirEntry *data);
 uint32_t minix3_list_dir(uint32_t inode, DirEntry *entries, uint32_t max_entries);
 // Returns the inode number of the file with the given name in the given directory.
 // If the file does not exist, return INVALID_INODE.
-uint32_t minix3_find_dir_entry(uint32_t inode, char *name);
+uint32_t minix3_find_dir_entry(uint32_t inode, const char *name);
 
 void minix3_traverse(uint32_t inode, char *root_path, void *data, uint32_t current_depth, uint32_t max_depth, void (*callback)(uint32_t inode, const char *path, char *entry_name, void *data, uint32_t depth));
 
