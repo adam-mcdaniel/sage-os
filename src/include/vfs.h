@@ -1,8 +1,11 @@
 #include <minix3.h>
 #include <stat.h>
 #include <stdint.h>
+#include <virtio.h>
 
 typedef struct File {
+    VirtioDevice *dev;
+
     uint32_t inode;
     uint32_t size;
     const char *path;
