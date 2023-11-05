@@ -140,6 +140,10 @@ bool minix3_has_zone(uint32_t zone) {
     return inode_bitmap[zone / 8] & (1 << zone % 8);
 }
 
+bool minix3_take_zone(uint32_t zone) {
+    return inode_bitmap[zone / 8] |= (1 << zone % 8);
+}
+
 uint32_t minix3_get_next_free_zone() {
     size_t zone_bitmap_size = minix3_get_zone_size();
     for (int i = 0; i < zone_bitmap_size; i++) {
@@ -468,15 +472,22 @@ void minix3_put_block(uint32_t block, uint8_t *data) {
     minix3_put_blocks(block, data, 1);
 }
 
-uint32_t minix3_alloc_zone(void);
-void minix3_free_zone(uint32_t zone);
-
 bool minix3_has_inode(uint32_t inode) {
     if (inode == INVALID_INODE) {
         debugf("minix3_has_inode: Invalid inode %u\n", inode);
         return false;
     }
     return inode_bitmap[inode / 8] & (1 << inode % 8);
+}
+
+// Mark the inode taken in the inode map.
+bool minix3_take_inode(uint32_t inode) {
+    if (inode == INVALID_INODE) {
+        debugf("minix3_has_inode: Invalid inode %u\n", inode);
+        return false;
+    }
+    inode_bitmap[inode / 8] |= (1 << inode % 8);
+    return true;
 }
 
 uint32_t minix3_get_next_free_inode() {
@@ -529,6 +540,22 @@ void minix3_put_inode(uint32_t inode, Inode data) {
 
     // debugf("Putting inode %u at offset %u (%x)...\n", inode, offset, offset);
     block_device_write_bytes(offset, (uint8_t*)&data, sizeof(Inode));
+}
+
+// Allocate a free inode.
+// Return the allocated zero'd inode. 
+Inode *minix3_alloc_inode() {
+    uint32_t free_inode = minix3_get_next_free_inode();
+    if (!free_inode) {
+        warnf("minix3_alloc_inode: Couldn't find free inode\n");
+        return 0;
+    }
+    minix3_take_inode(free_inode);
+    Inode data;
+    memset(&data, 0, sizeof(data));
+    minix3_put_inode(free_inode, data);
+    // infof("minix3_alloc_inode %p\n", minix3_get_inode_byte_offset(sb, free_inode)); // TODO: REMOVE
+    return (Inode *)minix3_get_inode_byte_offset(sb, free_inode);
 }
 
 bool minix3_is_dir(uint32_t inode) {
