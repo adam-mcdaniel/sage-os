@@ -36,3 +36,14 @@
 #define S_IWRITE      0200    /* Write by owner.  */
 #define S_IEXEC       0100    /* Execute by owner.  */
 
+typedef struct Stat {
+    uint32_t inode;    /* Inode number */
+    uint16_t mode;     /* File type and mode */
+    uint16_t num_link; /* Number of hard links  */
+    uint32_t uid;      /* User ID of owner */ 
+    uint32_t gid;      /* Group ID of owner */
+    uint32_t size;     /* Total size, in bytes */
+    uint32_t atime;    /* Time of last access */ 
+    uint32_t mtime;    /* Time of last modification */ 
+    uint32_t ctime;    /* Time of last status change */ 
+} Stat;

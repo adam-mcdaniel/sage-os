@@ -1,6 +1,7 @@
 #include <minix3.h>
 #include <block.h>
 #include <debug.h>
+#include <stdint.h>
 #include <util.h>
 #include <list.h>
 #include <path.h>
@@ -71,7 +72,11 @@ void debug_dir_entry(DirEntry entry) {
     #endif
 }
 
-uint32_t minix3_get_inode_from_path(const char *path) {
+// Return the inode number from path.
+// If get_parent is true, return the inode number of the parent.
+// If given path /dir0/dir1file, return inode of /dir0/dir1/
+uint32_t minix3_get_inode_from_path(const char *path, bool get_parent) {
+    // TODO: Add support for relative path.
     List *path_items = path_split(path);
 
     uint32_t parent = 1; // Root inode
@@ -84,6 +89,9 @@ uint32_t minix3_get_inode_from_path(const char *path) {
         if (strcmp(name, "/") == 0 || strcmp(name, "") == 0) {
             return parent;
         }
+        if (get_parent && strcmp(name, "") == 0) {
+            return parent;
+        }
         uint32_t child = minix3_find_dir_entry(parent, name);
         infof("Got child %u\n", child);
         parent = child;
@@ -92,7 +100,6 @@ uint32_t minix3_get_inode_from_path(const char *path) {
 
     return parent;
 }
-
 
 uint32_t minix3_get_min_inode() {
     return 1;
@@ -135,6 +142,28 @@ void minix3_superblock_init(void) {
     minix3_put_superblock(superblock);
 }
 
+bool minix3_has_zone(uint32_t zone) {
+    return inode_bitmap[zone / 8] & (1 << zone % 8);
+}
+
+bool minix3_take_zone(uint32_t zone) {
+    return inode_bitmap[zone / 8] |= (1 << zone % 8);
+}
+
+uint32_t minix3_get_next_free_zone() {
+    size_t zone_bitmap_size = minix3_get_zone_size();
+    for (int i = 0; i < zone_bitmap_size; i++) {
+        if (zone_bitmap[i] != 0xFF) {
+            for (int j = 0; j < 8; j++) {
+                uint32_t zone = 8 * i + j;
+                if (!minix3_has_zone(zone))
+                    return zone;
+            }
+        }
+    }
+    warnf("minix3_get_next_free_zone: Couldn't find free zone\n");
+    return 0;
+}
 
 void minix3_get_zone(uint32_t zone, uint8_t *data) {
     SuperBlock sb = minix3_get_superblock();
@@ -326,7 +355,7 @@ void minix3_init(void)
     const char *path = "/home/cosc562";
 
     CallbackData cb_data2 = {0};
-    uint32_t inode = minix3_get_inode_from_path(path);
+    uint32_t inode = minix3_get_inode_from_path(path, false);
     infof("%s has inode %u\n", path, inode);
     minix3_traverse(inode, path, &cb_data2, 0, 10, callback);
 
@@ -449,9 +478,6 @@ void minix3_put_block(uint32_t block, uint8_t *data) {
     minix3_put_blocks(block, data, 1);
 }
 
-uint32_t minix3_alloc_zone(void);
-void minix3_free_zone(uint32_t zone);
-
 bool minix3_has_inode(uint32_t inode) {
     if (inode == INVALID_INODE) {
         debugf("minix3_has_inode: Invalid inode %u\n", inode);
@@ -460,8 +486,36 @@ bool minix3_has_inode(uint32_t inode) {
     return inode_bitmap[inode / 8] & (1 << inode % 8);
 }
 
-static uint32_t last_inode = 0;
-static Inode last_inode_data;
+// Mark the inode taken in the inode map.
+bool minix3_take_inode(uint32_t inode) {
+    if (inode == INVALID_INODE) {
+        debugf("minix3_has_inode: Invalid inode %u\n", inode);
+        return false;
+    }
+    inode_bitmap[inode / 8] |= (1 << inode % 8);
+    return true;
+}
+
+uint32_t minix3_get_next_free_inode() {
+    size_t inode_bitmap_size = minix3_get_inode_bitmap_size();
+
+    for (int i = 0; i < inode_bitmap_size; i++) {
+        if (inode_bitmap[i] != 0xFF) {
+            for (int j = 0; j < 8; j++) {
+                uint32_t inode = 8 * i + j;
+                if (!minix3_has_inode(inode)) {
+                    return inode;
+                }
+            }
+        }
+    }
+
+    warnf("minix3_get_next_free_inode: Couldn't find free inode\n");
+    return 0;
+}
+
+static uint32_t last_inode = 0; // Last inode number we looked up
+static Inode last_inode_data; // Data of the last inode
 
 Inode minix3_get_inode(uint32_t inode) {
     if (inode == INVALID_INODE) {
@@ -481,6 +535,7 @@ Inode minix3_get_inode(uint32_t inode) {
     last_inode = inode;
     return data;
 }
+
 void minix3_put_inode(uint32_t inode, Inode data) {
     if (inode == INVALID_INODE) {
         warnf("minix3_put_inode: Invalid inode %u\n", inode);
@@ -491,6 +546,22 @@ void minix3_put_inode(uint32_t inode, Inode data) {
 
     // debugf("Putting inode %u at offset %u (%x)...\n", inode, offset, offset);
     block_device_write_bytes(offset, (uint8_t*)&data, sizeof(Inode));
+}
+
+// Allocate a free inode.
+// Return the allocated zero'd inode. 
+Inode *minix3_alloc_inode() {
+    uint32_t free_inode = minix3_get_next_free_inode();
+    if (!free_inode) {
+        warnf("minix3_alloc_inode: Couldn't find free inode\n");
+        return 0;
+    }
+    minix3_take_inode(free_inode);
+    Inode data;
+    memset(&data, 0, sizeof(data));
+    minix3_put_inode(free_inode, data);
+    // infof("minix3_alloc_inode %p\n", minix3_get_inode_byte_offset(sb, free_inode)); // TODO: REMOVE
+    return (Inode *)minix3_get_inode_byte_offset(sb, free_inode);
 }
 
 bool minix3_is_dir(uint32_t inode) {
@@ -988,6 +1059,27 @@ void minix3_put_data(uint32_t inode, uint8_t *data, uint32_t offset, uint32_t co
     return;
 }
 
+// TODO: Figure out a better way to report error than return -1 since it can 
+// be a valid dir entry number.
+uint32_t minix3_find_next_free_dir_entry(uint32_t inode) {
+    if (!minix3_is_dir(inode)) {
+        warnf("minix3_find_next_free_dir_entry: Inode %u (0x%x) not a directory\n", inode, inode);
+        return -1;
+    }
+
+    Inode data = minix3_get_inode(inode);
+    DirEntry *entry;
+    for (int i = 0; i < (data.size / 64); i++) {
+        if (!minix3_get_dir_entry(inode, i, entry)) {
+            return -1;
+        }
+        if (entry->inode == 0) {
+            return i;
+        }
+    }
+    warnf("minix3_find_next_free_dir_entry: Couldn't find a free directory entry\n");
+    return -1;
+}
 
 bool minix3_get_dir_entry(uint32_t inode, uint32_t entry, DirEntry *data) {
     if (!minix3_is_dir(inode)) {
@@ -1040,7 +1132,7 @@ uint32_t minix3_list_dir(uint32_t inode, DirEntry *entries, uint32_t max_entries
 }
 // Returns the inode number of the file with the given name in the given directory.
 // If the file does not exist, return INVALID_INODE.
-uint32_t minix3_find_dir_entry(uint32_t inode, char *name) {
+uint32_t minix3_find_dir_entry(uint32_t inode, const char *name) {
     DirEntry entries[128];
     uint32_t num_entries = minix3_list_dir(inode, entries, 128);
 
