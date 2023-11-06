@@ -6,7 +6,7 @@
 #include <map.h>
 #include <list.h>
 
-#define VFS_DEBUG
+// #define VFS_DEBUG
 
 #ifdef VFS_DEBUG
 #define debugf(...) debugf(__VA_ARGS__)
@@ -153,18 +153,11 @@ const char *vfs_path_from_mounted_device(VirtioDevice *mounted_device) {
         VirtioDevice *block_device;
         map_get(mounted_devices, list_elem_value(key), &block_device);
         if (block_device == mounted_device) {
-            infof("Mounted device: %s at disk #%u\n", list_elem_value(key), count);
             result = list_elem_value(key);
         }
         count++;
     }
     map_free_get_keys(keys);
-
-    if (count == 0) {
-        warnf("There are no mounted devices\n");
-    } else {
-        infof("There are %u mounted drives\n", count);
-    }
 
     return result;
 }
