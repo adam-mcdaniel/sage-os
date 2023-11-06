@@ -203,6 +203,7 @@ void vfs_mount_callback(VirtioDevice *block_device, uint32_t inode, const char *
             debugf("vfs_mount_callback: could not find block device %u\n", mounted_device_count);
             return;
         }
+        infof("Mounting block device at %s\n", path);
         vfs_mount(block_device, path);
     }
 }
@@ -247,6 +248,7 @@ void vfs_mount(VirtioDevice *block_device, const char *path) {
     map_set(mounted_devices, block_device_path, (uint64_t)block_device);
     debugf("vfs_mount: mounted (%p) %s at %s\n", block_device, block_device_path, path);
     mounted_device_count += 1;
+
 }
 
 VirtioDevice *vfs_get_mounted_device(const char *path) {
