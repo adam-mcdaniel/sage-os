@@ -52,15 +52,16 @@ uint32_t minix3_get_inode_from_path(VirtioDevice *block_device, const char *path
     ListElem *elem;
     list_for_each(path_items, elem) {
         char *name = (char *)list_elem_value(elem);
-        infof("Getting inode from relative path %s, num_items = %u\n", name, num_items);
+        debugf("Getting inode from relative path %s, num_items = %u\n", name, num_items);
         if (strcmp(name, "/") == 0 || strcmp(name, "") == 0) {
             return parent;
         }
-        if (get_parent && strcmp(name, "") == 0) {
+        if (i == num_items - 2 && get_parent) {
+            debugf("Returning parent inode %u\n", parent);
             return parent;
         }
         uint32_t child = minix3_find_dir_entry(block_device, parent, name);
-        infof("Got child %u\n", child);
+        debugf("Got child %u\n", child);
         parent = child;
         i++;
     }
@@ -135,12 +136,12 @@ uint32_t minix3_get_next_free_zone(VirtioDevice *block_device) {
 void minix3_get_zone(VirtioDevice *block_device, uint32_t zone, uint8_t *data) {
     SuperBlock sb = minix3_get_superblock(block_device);
     if (zone > sb.num_zones + sb.first_data_zone) {
-        fatalf("Zone %u (%x) is out of bounds\n", zone, zone);
+        warnf("Zone %u (%x) is out of bounds\n", zone, zone);
         return;
     }
 
     if (zone < sb.first_data_zone) {
-        fatalf("Zone %u (%x) is before the first data zone %u (%x)\n", zone, zone, sb.first_data_zone, sb.first_data_zone);
+        warnf("Zone %u (%x) is before the first data zone %u (%x)\n", zone, zone, sb.first_data_zone, sb.first_data_zone);
         return;
     }
     
@@ -150,12 +151,12 @@ void minix3_get_zone(VirtioDevice *block_device, uint32_t zone, uint8_t *data) {
 void minix3_put_zone(VirtioDevice *block_device, uint32_t zone, uint8_t *data) {
     SuperBlock sb = minix3_get_superblock(block_device);
     if (zone > sb.num_zones + sb.first_data_zone) {
-        fatalf("Zone %u (%x) is out of bounds\n", zone, zone);
+        warnf("Zone %u (%x) is out of bounds\n", zone, zone);
         return;
     }
 
     if (zone < sb.first_data_zone) {
-        fatalf("Zone %u (%x) is before the first data zone %u (%x)\n", zone, zone, sb.first_data_zone, sb.first_data_zone);
+        warnf("Zone %u (%x) is before the first data zone %u (%x)\n", zone, zone, sb.first_data_zone, sb.first_data_zone);
         return;
     }
 
@@ -167,6 +168,8 @@ uint64_t minix3_get_file_size(VirtioDevice *block_device, uint32_t inode) {
     if (S_ISREG(inode_data.mode)) {
         return inode_data.size;
     } else if (S_ISDIR(inode_data.mode)) {
+        return 0;
+    } else if (S_ISBLK(inode_data.mode)) {
         return 0;
     } else {
         fatalf("Unknown inode type %x\n", inode_data.mode);
@@ -223,22 +226,23 @@ void callback(VirtioDevice *block_device, uint32_t inode, const char *path, char
     // infof("path: %s\n\n", path);
 }
 
-void minix3_init(VirtioDevice *block_device)
+void minix3_init(VirtioDevice *block_device, const char *path)
 {
     // Initialize the filesystem
+    infof("Initializing Minix3 filesystem on device %p at %s\n", block_device, path);
     minix3_get_superblock(block_device);
-    debugf("Filesystem block size: %d\n", minix3_get_block_size(block_device));
-    debugf("Superblock:\n");
-    debugf("   num_inodes: %d\n", sb.num_inodes);
-    debugf("   imap_blocks: %d\n", sb.imap_blocks);
-    debugf("   zmap_blocks: %d\n", sb.zmap_blocks);
-    debugf("   first_data_zone: %d\n", sb.first_data_zone);
-    debugf("   log_zone_size: %d\n", sb.log_zone_size);
-    debugf("   max_size: 0x%x (%d)\n", sb.max_size, sb.max_size);
-    debugf("   num_zones: 0x%x (%d)\n", sb.num_zones, sb.num_zones);
-    debugf("   magic: 0x%x\n", sb.magic);
-    debugf("   block_size: %d\n", sb.block_size);
-    debugf("   disk_version: %d\n", sb.disk_version);
+    infof("Filesystem block size: %d\n", minix3_get_block_size(block_device));
+    infof("Superblock:\n");
+    infof("   num_inodes: %d\n", sb.num_inodes);
+    infof("   imap_blocks: %d\n", sb.imap_blocks);
+    infof("   zmap_blocks: %d\n", sb.zmap_blocks);
+    infof("   first_data_zone: %d\n", sb.first_data_zone);
+    infof("   log_zone_size: %d\n", sb.log_zone_size);
+    infof("   max_size: 0x%x (%d)\n", sb.max_size, sb.max_size);
+    infof("   num_zones: 0x%x (%d)\n", sb.num_zones, sb.num_zones);
+    infof("   magic: 0x%x\n", sb.magic);
+    infof("   block_size: %d\n", sb.block_size);
+    infof("   disk_version: %d\n", sb.disk_version);
 
     if (sb.magic != MINIX3_MAGIC) {
         // We need to initialize the superblock
@@ -247,7 +251,7 @@ void minix3_init(VirtioDevice *block_device)
     }
     // for (uint16_t i=0; i<sb.imap_blocks; i++) {
     // }
-    debugf("Max inode: %d\n", minix3_get_max_inode());
+    debugf("Max inode: %d\n", minix3_get_max_inode(block_device));
     // This does not work yet, broken
 
     // Copy the inode bitmap into memory
@@ -321,40 +325,42 @@ void minix3_init(VirtioDevice *block_device)
     }
     */
 
-    const char *path = "/home/cosc562";
+    // const char *path = "/home/cosc562";
 
     CallbackData cb_data2 = {0};
-    uint32_t inode = minix3_get_inode_from_path(block_device, path, false);
-    infof("%s has inode %u\n", path, inode);
-    minix3_traverse(block_device, inode, path, &cb_data2, 0, 10, callback);
+    // uint32_t inode = minix3_get_inode_from_path(block_device, path, false);
+    // infof("%s has inode %u\n", path, inode);
+    
 
-    infof("Found %u files and %u directories in %s\n", cb_data2.file_count, cb_data2.dir_count, path);
+    minix3_traverse(block_device, 1, "/", &cb_data2, 0, 10, callback);
+
+    // infof("Found %u files and %u directories in %s\n", cb_data2.file_count, cb_data2.dir_count, path);
 
     // minix3_map_files(block_device);
 
     // Path of the book
-    const char *book_path = "/home/cosc562/subdir1/subdir2/subdir3/subdir4/subdir5/book1.txt";
-    // Get the inode of the book
-    uint32_t book_inode = minix3_get_inode_from_path(block_device, book_path, false);
-    // Get the size of the book
-    uint64_t book_size = minix3_get_file_size(block_device, book_inode);
-    // Allocate a buffer for the book
-    uint8_t *contents = kmalloc(book_size);
-    // Read the book into the buffer
-    minix3_read_file(block_device, book_inode, contents, book_size);
-    // Print the book
-    for (uint64_t i=0; i<book_size; i++) {
-        infof("%c", contents[i]);
-    }
-    infof("\n");
+    // const char *book_path = "/home/cosc562/subdir1/subdir2/subdir3/subdir4/subdir5/book1.txt";
+    // // Get the inode of the book
+    // uint32_t book_inode = minix3_get_inode_from_path(block_device, book_path, false);
+    // // Get the size of the book
+    // uint64_t book_size = minix3_get_file_size(block_device, book_inode);
+    // // Allocate a buffer for the book
+    // uint8_t *contents = kmalloc(book_size);
+    // // Read the book into the buffer
+    // minix3_read_file(block_device, book_inode, contents, book_size);
+    // // Print the book
+    // for (uint64_t i=0; i<book_size; i++) {
+    //     infof("%c", contents[i]);
+    // }
+    // infof("\n");
     // Free the buffer
-    kfree(contents);
+    // kfree(contents);
 
     
-    infof("Files:\n");
-    CallbackData cb_data = {0};
-    minix3_traverse(block_device, 1, "/", &cb_data, 0, 10, callback);
-    infof("Found %u files and %u directories in /\n", cb_data.file_count, cb_data.dir_count);
+    // infof("Files:\n");
+    // CallbackData cb_data = {0};
+    // minix3_traverse(block_device, 1, "/", &cb_data, 0, 10, callback);
+    // infof("Found %u files and %u directories in /\n", cb_data.file_count, cb_data.dir_count);
 }
 
 SuperBlock minix3_get_superblock(VirtioDevice *block_device) {
@@ -471,6 +477,7 @@ bool minix3_has_inode(VirtioDevice *block_device, uint32_t inode) {
 
 // Mark the inode taken in the inode map.
 bool minix3_take_inode(VirtioDevice *block_device, uint32_t inode) {
+    minix3_load_bitmaps(block_device);
     if (inode == INVALID_INODE) {
         debugf("minix3_has_inode: Invalid inode %u\n", inode);
         return false;
@@ -481,10 +488,16 @@ bool minix3_take_inode(VirtioDevice *block_device, uint32_t inode) {
     }
 
     inode_bitmap[inode / 8] |= (1 << inode % 8);
+    Inode inode_data = minix3_get_inode(block_device, inode);
+    inode_data.num_links = 1;
+    minix3_put_inode(block_device, inode, inode_data);
+
     return true;
 }
 
 uint32_t minix3_get_next_free_inode(VirtioDevice *block_device) {
+    debugf("Getting next free inode...\n");
+    minix3_load_bitmaps(block_device);
     size_t inode_bitmap_size = minix3_get_inode_bitmap_size(block_device);
 
     for (size_t i = 0; i < inode_bitmap_size; i++) {
@@ -543,10 +556,13 @@ uint32_t minix3_alloc_inode(VirtioDevice *block_device) {
     if (!free_inode) {
         warnf("minix3_alloc_inode: Couldn't find free inode\n");
         return 0;
+    } else {
+        debugf("minix3_alloc_inode: Found free inode %u\n", free_inode);
     }
     minix3_take_inode(block_device, free_inode);
     Inode data;
     memset(&data, 0, sizeof(data));
+    data.num_links = 1;
     minix3_put_inode(block_device, free_inode, data);
     // infof("minix3_alloc_inode %p\n", minix3_get_inode_byte_offset(sb, free_inode)); // TODO: REMOVE
     return free_inode;
@@ -568,11 +584,20 @@ bool minix3_is_file(VirtioDevice *block_device, uint32_t inode) {
     return S_ISREG(inode_data.mode) && inode_data.num_links > 0;
 }
 
+bool minix3_is_block_device(VirtioDevice *block_device, uint32_t inode) {
+    Inode inode_data = minix3_get_inode(block_device, inode);
+    if (inode_data.num_links == 0) {
+        warnf("minix3_is_block_device: Inode %u has no links\n", inode);
+    }
+    return S_ISBLK(inode_data.mode) && inode_data.num_links > 0;
+}
+
 void minix3_read_file(VirtioDevice *block_device, uint32_t inode, uint8_t *data, uint32_t count) {
     minix3_get_data(block_device, inode, data, 0, count);
 }
 
 void minix3_get_data(VirtioDevice *block_device, uint32_t inode, uint8_t *data, uint32_t offset, uint32_t count) {
+    debugf("minix3_get_data: Getting data from inode %u, offset %u, count %u\n", inode, offset, count);
     // First, get the inode
     Inode inode_data = minix3_get_inode(block_device, inode);
     
@@ -590,6 +615,8 @@ void minix3_get_data(VirtioDevice *block_device, uint32_t inode, uint8_t *data, 
         if (zone == 0) {
             debugf("No direct zone %d\n", zone);
             continue;
+        } else {
+            debugf("Direct zone %d\n", zone);
         }
         memset(zone_data, 0, minix3_get_zone_size(block_device));
 
@@ -1057,12 +1084,14 @@ uint32_t minix3_find_next_free_dir_entry(VirtioDevice *block_device, uint32_t in
 
     Inode data = minix3_get_inode(block_device, inode);
     DirEntry entry;
-    for (size_t i = 0; i < (data.size / 64); i++) {
-        if (!minix3_get_dir_entry(block_device, inode, i, &entry)) {
-            return -1;
-        }
+    for (size_t i = 0; i < minix3_get_zone_size(block_device) / sizeof(DirEntry); i++) {
+        minix3_get_dir_entry(block_device, inode, i, &entry);
+
         if (entry.inode == 0) {
+            debugf("minix3_find_next_free_dir_entry: Found free entry %u\n", i);
             return i;
+        } else {
+            debugf("minix3_find_next_free_dir_entry: Entry %u is %s\n", i, entry.name);
         }
     }
     warnf("minix3_find_next_free_dir_entry: Couldn't find a free directory entry\n");
@@ -1077,13 +1106,15 @@ bool minix3_get_dir_entry(VirtioDevice *block_device, uint32_t inode, uint32_t e
     Inode inode_data = minix3_get_inode(block_device, inode);
     debugf("Getting entry %u from inode %u\n", entry, inode);
     DirEntry tmp;
-    minix3_get_data(block_device, inode, (uint8_t*)&tmp, entry * sizeof(DirEntry), sizeof(DirEntry));
-    debugf("Got entry %s at inode %u\n", tmp.name, tmp.inode);
+
+    uint32_t offset = entry * sizeof(DirEntry);
+    minix3_get_data(block_device, inode, (uint8_t*)&tmp, offset, sizeof(DirEntry));
+    memcpy(data, &tmp, sizeof(DirEntry));
+    debugf("Got entry %s at offset %u from inode %u\n", tmp.name, offset, inode);
     if (tmp.inode == 0) {
         return false;
     }
 
-    memcpy(data, &tmp, sizeof(DirEntry));
     return true;
 }
 

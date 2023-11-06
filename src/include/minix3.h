@@ -90,7 +90,7 @@ typedef struct DirEntry {
    char name[60];
 } DirEntry;
 
-void minix3_init(VirtioDevice *block_device);
+void minix3_init(VirtioDevice *block_device, const char *path);
 void minix3_load_bitmaps(VirtioDevice *block_device);
 
 SuperBlock minix3_get_superblock(VirtioDevice *block_device);
@@ -141,6 +141,7 @@ void minix3_read_file(VirtioDevice *block_device, uint32_t inode, uint8_t *data,
 
 bool minix3_is_file(VirtioDevice *block_device, uint32_t inode);
 bool minix3_is_dir(VirtioDevice *block_device, uint32_t inode);
+bool minix3_is_block_device(VirtioDevice *block_device, uint32_t inode);
 
 uint32_t minix3_find_next_free_dir_entry(VirtioDevice *block_device, uint32_t inode);
 // Get the directory entry at the given index. If the entry is invalid, return false.
