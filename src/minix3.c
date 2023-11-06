@@ -21,6 +21,7 @@
 static SuperBlock sb;
 
 // static VirtioDevice *block_device;
+static VirtioDevice *loaded_block_device;
 static uint8_t *inode_bitmap;
 static uint8_t *zone_bitmap;
 
@@ -118,7 +119,7 @@ bool minix3_has_zone(VirtioDevice *block_device, uint32_t zone) {
 }
 
 bool minix3_take_zone(VirtioDevice *block_device, uint32_t zone) {
-    minix3_load_bitmaps(block_device);
+    minix3_load_device(block_device);
     if (minix3_has_zone(block_device, zone)) {
         warnf("minix3_take_zone: zone %u is already taken\n", zone);
         return false;
@@ -284,7 +285,7 @@ void minix3_init(VirtioDevice *block_device, const char *path)
 
     // inode_bitmap = (uint8_t *)kmalloc(minix3_get_inode_bitmap_size());
     // zone_bitmap = (uint8_t*)kmalloc(minix3_get_zone_bitmap_size(block_device));
-    minix3_load_bitmaps(block_device);
+    minix3_load_device(block_device);
 
 
     /*
@@ -460,7 +461,13 @@ void minix3_put_zone_bitmap(VirtioDevice *block_device, uint8_t *bitmap_buf) {
     minix3_put_blocks(block_device, FS_IMAP_IDX + sb.imap_blocks, bitmap_buf, sb.zmap_blocks);
 }
 
-void minix3_load_bitmaps(VirtioDevice *block_device) {
+void minix3_load_device(VirtioDevice *block_device) {
+    if (loaded_block_device == block_device) {
+        return;
+    } else {
+        loaded_block_device = block_device;
+    }
+
     if (inode_bitmap && zone_bitmap) {
         minix3_get_inode_bitmap(block_device, inode_bitmap);
         minix3_get_zone_bitmap(block_device, zone_bitmap);
@@ -490,7 +497,7 @@ void minix3_put_block(VirtioDevice *block_device, uint32_t block, uint8_t *data)
 }
 
 bool minix3_has_inode(VirtioDevice *block_device, uint32_t inode) {
-    minix3_load_bitmaps(block_device);
+    minix3_load_device(block_device);
 
     if (inode == INVALID_INODE) {
         debugf("minix3_has_inode: Invalid inode %u\n", inode);
@@ -501,7 +508,7 @@ bool minix3_has_inode(VirtioDevice *block_device, uint32_t inode) {
 
 // Mark the inode taken in the inode map.
 bool minix3_take_inode(VirtioDevice *block_device, uint32_t inode) {
-    minix3_load_bitmaps(block_device);
+    minix3_load_device(block_device);
     if (inode == INVALID_INODE) {
         debugf("minix3_has_inode: Invalid inode %u\n", inode);
         return false;
@@ -522,7 +529,7 @@ bool minix3_take_inode(VirtioDevice *block_device, uint32_t inode) {
 
 uint32_t minix3_get_next_free_inode(VirtioDevice *block_device) {
     debugf("Getting next free inode...\n");
-    minix3_load_bitmaps(block_device);
+    minix3_load_device(block_device);
     size_t inode_bitmap_size = minix3_get_inode_bitmap_size(block_device);
 
     for (size_t i = 0; i < inode_bitmap_size; i++) {
@@ -544,7 +551,7 @@ static uint32_t last_inode = 0; // Last inode number we looked up
 static Inode last_inode_data; // Data of the last inode
 
 Inode minix3_get_inode(VirtioDevice *block_device, uint32_t inode) {
-    minix3_load_bitmaps(block_device);
+    minix3_load_device(block_device);
     if (inode == INVALID_INODE) {
         warnf("minix3_get_inode: Invalid inode %u\n", inode);
         return (Inode){0};
@@ -564,7 +571,7 @@ Inode minix3_get_inode(VirtioDevice *block_device, uint32_t inode) {
 }
 
 void minix3_put_inode(VirtioDevice *block_device, uint32_t inode, Inode data) {
-    minix3_load_bitmaps(block_device);
+    minix3_load_device(block_device);
     if (inode == INVALID_INODE) {
         warnf("minix3_put_inode: Invalid inode %u\n", inode);
         return;
@@ -1201,7 +1208,7 @@ uint32_t minix3_list_dir(VirtioDevice *block_device, uint32_t inode, DirEntry *e
 // Returns the inode number of the file with the given name in the given directory.
 // If the file does not exist, return INVALID_INODE.
 uint32_t minix3_find_dir_entry(VirtioDevice *block_device, uint32_t inode, const char *name) {
-    minix3_load_bitmaps(block_device);
+    minix3_load_device(block_device);
     
     DirEntry entries[128];
     uint32_t num_entries = minix3_list_dir(block_device, inode, entries, 128);
