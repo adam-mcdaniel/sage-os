@@ -44,7 +44,7 @@ void debug_dir_entry(DirEntry entry) {
 // If given path /dir0/dir1file, return inode of /dir0/dir1/
 uint32_t minix3_get_inode_from_path(VirtioDevice *block_device, const char *path, bool get_parent) {
     // TODO: Add support for relative path.
-    warnf("Getting inode from path %s\n", path);
+    debugf("Getting inode from path %s\n", path);
     List *path_items = path_split(path);
 
     uint32_t parent = 1; // Root inode
@@ -54,18 +54,18 @@ uint32_t minix3_get_inode_from_path(VirtioDevice *block_device, const char *path
     list_for_each(path_items, elem) {
 
         char *name = (char *)list_elem_value(elem);
-        warnf("Getting inode from relative path %s, num_items = %u\n", name, num_items);
+        debugf("Getting inode from relative path %s, num_items = %u\n", name, num_items);
         if (strcmp(name, "/") == 0 || strcmp(name, "") == 0) {
             return parent;
         }
-        warnf("i = %u, num_items = %u\n", i, num_items);
+        debugf("i = %u, num_items = %u\n", i, num_items);
         if (get_parent && i == num_items - 1) {
-            warnf("Returning parent inode %u\n", parent);
+            debugf("Returning parent inode %u\n", parent);
             return parent;
         }
         uint32_t child = minix3_find_dir_entry(block_device, parent, name);
         parent = child;
-        warnf("Got child %u\n", child);
+        debugf("Got child %u\n", child);
         i++;
     }
 
@@ -1126,10 +1126,10 @@ uint32_t minix3_find_next_free_dir_entry(VirtioDevice *block_device, uint32_t in
         minix3_get_dir_entry(block_device, inode, i, &entry);
 
         if (entry.inode == 0) {
-            warnf("minix3_find_next_free_dir_entry: Found free entry %u\n", i);
+            debugf("minix3_find_next_free_dir_entry: Found free entry %u\n", i);
             return i;
         } else {
-            warnf("minix3_find_next_free_dir_entry: Entry %u is %s\n", i, entry.name);
+            debugf("minix3_find_next_free_dir_entry: Entry %u is %s\n", i, entry.name);
         }
     }
     warnf("minix3_find_next_free_dir_entry: Couldn't find a free directory entry\n");
@@ -1231,10 +1231,6 @@ void minix3_traverse(VirtioDevice *block_device, uint32_t inode, char *root_path
     strncpy(name, path_file_name(root_path), sizeof(name));
     if (minix3_is_dir(block_device, inode)) {
         debugf("Is a directory\n");
-    } else if (minix3_is_block_device(block_device, inode)) {
-        debugf("Is a block device\n");
-        callback(block_device, inode, root_path, name, data, current_depth);
-        return;
     } else {
         debugf("Not a directory\n");
         callback(block_device, inode, root_path, name, data, current_depth);
