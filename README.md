@@ -1,10 +1,11 @@
-**#NetID : ttahmid**
-**#NetID : amcdan23**
-**#NetID : gmorale1**
-**#NetID : jpark78**
+# Group 4's Journal
 
+![OS](OS.png)
 
-# 4's Journal
+- **NetID**: ttahmid
+- **NetID**: amcdan23
+- **NetID**: gmorale1
+- **NetID**: jpark78
 
 Every week, you will need to write entries in this journal. Include brief information about:
 
