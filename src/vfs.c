@@ -35,7 +35,28 @@ int vfs_read(File *file, void *buf, int count) {
         return -1;
     }
 }
-int vfs_write(File *file, const char *buf, int count);
+int vfs_write(File *file, const char *buf, int count) {
+    if (file->offset + count > file->size) {
+        count = file->size - file->offset;
+    }
+
+    switch (file->type) {
+    case VFS_TYPE_FILE:
+        minix3_put_data(file->dev, file->inode, buf, file->offset, count);
+        file->offset += count;
+        return count;
+    case VFS_TYPE_BLOCK:
+        block_device_write_bytes(file->dev, file->offset, buf, (uint64_t)count);
+        file->offset += count;
+        return count;
+    case VFS_TYPE_DIR:
+        debugf("vfs_write: writing to directory not supported\n");
+        return -1;
+    default:
+        debugf("vfs_write: unsupported file type %d\n", file->type);
+        return -1;
+    }
+}
 
 
 // Populate stat from a path.
@@ -97,7 +118,23 @@ void vfs_init(void) {
     infof("vfs_init: mounted %u devices\n", mounted_device_count);
 }
 
+char *get_parent_path(const char *path) {
+    char *parent_path = kmalloc(strlen(path) + 1);
+    strcpy(parent_path, path);
+    char *filename = path_file_name(parent_path);
+    if (&filename[-1] == parent_path) {
+        // We are at root
+        filename[0] = '\0';
+        return parent_path;
+    }
+
+    filename[-1] = '\0';
+    return parent_path;
+}
+
 void vfs_mount(VirtioDevice *block_device, const char *path) {
+    minix3_init(block_device, path);
+
     if (mounted_devices == NULL) {
         mounted_devices = map_new();
     }
@@ -147,14 +184,65 @@ VirtioDevice *vfs_get_mounted_device(const char *path) {
 
         filename[-1] = '\0';
 
+
         // Get the parent device
         debugf("vfs_get_mounted_device: getting parent device for %s\n", parent_path);
         block_device = vfs_get_mounted_device(parent_path);
+        kfree(parent_path);
     } else {
         debugf("vfs_get_mounted_device: found device for %s\n", path);
     }
 
     return block_device;
+}
+
+bool is_mounted_device(const char *path) {
+    return map_contains(mounted_devices, path);
+}
+
+char *get_path_relative_to_mount_point(const char *path) {
+    // vfs_get_mounted_device(path);
+    if (path == NULL) {
+        debugf("get_path_relative_to_mount_point: path is NULL\n");
+        return NULL;
+    }
+
+    if (strlen(path) == 0 || strcmp(path, "") == 0) {
+        debugf("get_path_relative_to_mount_point: path is empty\n");
+        return NULL;
+    }
+
+    char *result = kmalloc(strlen(path) + 1);
+    if (strcmp(path, "/") == 0) {
+        debugf("get_path_relative_to_mount_point: path is /\n");
+        strcpy(result, "/");
+        return result;
+    }
+
+
+    if (is_mounted_device(path)) {
+        debugf("get_path_relative_to_mount_point: path is a mounted device\n");
+        strcpy(result, "/");
+        return result;
+    } else {
+        debugf("get_path_relative_to_mount_point: path is not a mounted device\n");
+        char *parent_path = get_parent_path(path);
+        while (!is_mounted_device(parent_path)) {
+            debugf("get_path_relative_to_mount_point: %s is not a mounted device\n", parent_path);
+            char *parent_parent_path = get_parent_path(parent_path);
+            kfree(parent_path);
+            parent_path = parent_parent_path;
+
+            if (strcmp(parent_path, "/") == 0 || strcmp(parent_path, "") == 0) {
+                debugf("get_path_relative_to_mount_point: parent path is /\n");
+            }
+        }
+
+        debugf("get_path_relative_to_mount_point: %s is a mounted device\n", parent_path);
+        strcpy(result, path + strlen(parent_path) - 1);
+        kfree(parent_path);
+        return result;
+    }
 }
 
 bool vfs_should_create_if_doesnt_exist(flags_t flags, mode_t mode, type_t type) {
@@ -174,6 +262,8 @@ File *vfs_open(const char *path, flags_t flags, mode_t mode, type_t type) {
     file->mode = mode;
     file->type = type;
 
+    char *path_relative_to_mount_point = get_path_relative_to_mount_point(path);
+    debugf("vfs_open: %s relative to mount point is %s\n", path, path_relative_to_mount_point);
     VirtioDevice *parent_device = vfs_get_mounted_device(path);
     debugf("vfs_open: parent device is %p\n", parent_device);
     debugf("vfs_open: parent path is %s\n", path);
@@ -187,6 +277,8 @@ File *vfs_open(const char *path, flags_t flags, mode_t mode, type_t type) {
     switch (type) {
     case VFS_TYPE_FILE:
         file->dev = vfs_get_mounted_device(path);
+        // Get the path relative to the mount point
+
         file->inode = minix3_get_inode_from_path(file->dev, file->path, false);
         file->inode_data = minix3_get_inode(file->dev, file->inode);
         file->size = file->inode_data.size;
@@ -194,7 +286,7 @@ File *vfs_open(const char *path, flags_t flags, mode_t mode, type_t type) {
         break;
 
     case VFS_TYPE_DIR:
-        file->dev = vfs_get_mounted_device(path);
+        file->dev = vfs_get_mounted_device(path);        
         file->inode = minix3_get_inode_from_path(file->dev, file->path, false);
         file->inode_data = minix3_get_inode(file->dev, file->inode);
         file->size = file->inode_data.size;
@@ -207,8 +299,6 @@ File *vfs_open(const char *path, flags_t flags, mode_t mode, type_t type) {
 
         // Get the number of the block device
         debugf("vfs_open: block device number is %u\n", block_device_num);
-
-
         file->inode = minix3_get_inode_from_path(parent_device, file->path, false);
         debugf("vfs_open: inode is %u\n", file->inode);
 
@@ -238,20 +328,20 @@ File *vfs_open(const char *path, flags_t flags, mode_t mode, type_t type) {
             memset(&dir_entry, 0, sizeof(dir_entry));
             dir_entry.inode = file->inode;
             strcpy(dir_entry.name, block_device_name);
-            debugf("vfs_open: created dir entry\n");
+            debugf("vfs_open: created dir entry with inode %u and name %s\n", dir_entry.inode, dir_entry.name);
 
             // Find the next free directory entry
             free_dir_entry = minix3_find_next_free_dir_entry(parent_device, parent_inode);
             debugf("vfs_open: found free dir entry %u\n", free_dir_entry);
 
             // Put the directory entry
-            minix3_put_dir_entry(parent_device, parent_inode, free_dir_entry, &dir_entry);
+            minix3_put_dir_entry(parent_device, parent_inode, free_dir_entry, dir_entry);
             debugf("vfs_open: put dir entry\n");
 
             // Create the inode
             Inode inode_data;
             memset(&inode_data, 0, sizeof(inode_data));
-            inode_data.mode = mode;
+            inode_data.mode = S_IFBLK;
             inode_data.num_links = 1;
             inode_data.uid = 0;
             inode_data.gid = 0;
@@ -260,7 +350,7 @@ File *vfs_open(const char *path, flags_t flags, mode_t mode, type_t type) {
             inode_data.mtime = 0;
             inode_data.ctime = 0;
             minix3_put_inode(parent_device, file->inode, inode_data);
-            debugf("vfs_open: put inode\n");
+            debugf("vfs_open: put inode %u\n", file->inode);
         } else {
             debugf("vfs_open: not creating block device\n");
         }
@@ -269,12 +359,12 @@ File *vfs_open(const char *path, flags_t flags, mode_t mode, type_t type) {
         file->dev = virtio_get_block_device(block_device_num);
         if (file->dev == NULL) {
             debugf("vfs_open: could not find block device\n");
+            kfree(path_relative_to_mount_point);
             return NULL;
         } else {
             debugf("vfs_open: found block device\n");
         }
         debugf("vfs_open: block device is %p\n", file->dev);
-        minix3_init(file->dev, path);
         // if (vfs_should_create_if_doesnt_exist(flags, mode, type)) {
         //     debugf("vfs_open: creating block device\n");
         // } else {
@@ -300,6 +390,7 @@ File *vfs_open(const char *path, flags_t flags, mode_t mode, type_t type) {
         vfs_mount(file->dev, path);
         break;
     }
+    kfree(path_relative_to_mount_point);
 }
 
 // This creates the `mapped_paths` and `mapped_inodes` maps
@@ -388,7 +479,7 @@ bool vfs_link(File *dir, File *file) {
     data.inode = file->inode;
     strcpy(data.name, path_file_name(dir->path));
     uint32_t free_dir_entry = minix3_find_next_free_dir_entry(block_device, dir->inode);
-    minix3_put_dir_entry(block_device, dir->inode, free_dir_entry, &data);
+    minix3_put_dir_entry(block_device, dir->inode, free_dir_entry, data);
 
     Inode inode1_data = minix3_get_inode(block_device, file->inode);
     inode1_data.num_links += 1;

@@ -44,6 +44,7 @@ void debug_dir_entry(DirEntry entry) {
 // If given path /dir0/dir1file, return inode of /dir0/dir1/
 uint32_t minix3_get_inode_from_path(VirtioDevice *block_device, const char *path, bool get_parent) {
     // TODO: Add support for relative path.
+    warnf("Getting inode from path %s\n", path);
     List *path_items = path_split(path);
 
     uint32_t parent = 1; // Root inode
@@ -51,18 +52,20 @@ uint32_t minix3_get_inode_from_path(VirtioDevice *block_device, const char *path
     uint32_t i = 0, num_items = list_size(path_items);
     ListElem *elem;
     list_for_each(path_items, elem) {
+
         char *name = (char *)list_elem_value(elem);
-        debugf("Getting inode from relative path %s, num_items = %u\n", name, num_items);
+        warnf("Getting inode from relative path %s, num_items = %u\n", name, num_items);
         if (strcmp(name, "/") == 0 || strcmp(name, "") == 0) {
             return parent;
         }
-        if (i == num_items - 2 && get_parent) {
-            debugf("Returning parent inode %u\n", parent);
+        warnf("i = %u, num_items = %u\n", i, num_items);
+        if (get_parent && i == num_items - 1) {
+            warnf("Returning parent inode %u\n", parent);
             return parent;
         }
         uint32_t child = minix3_find_dir_entry(block_device, parent, name);
-        debugf("Got child %u\n", child);
         parent = child;
+        warnf("Got child %u\n", child);
         i++;
     }
 
@@ -115,7 +118,19 @@ bool minix3_has_zone(VirtioDevice *block_device, uint32_t zone) {
 }
 
 bool minix3_take_zone(VirtioDevice *block_device, uint32_t zone) {
-    return inode_bitmap[zone / 8] |= (1 << zone % 8);
+    minix3_load_bitmaps(block_device);
+    if (minix3_has_zone(block_device, zone)) {
+        warnf("minix3_take_zone: zone %u is already taken\n", zone);
+        return false;
+    }
+
+    zone_bitmap[zone / 8] |= (1 << zone % 8);
+    minix3_put_zone_bitmap(block_device, zone_bitmap);
+    // Inode inode_data = minix3_get_zone(block_device, zone);
+    // inode_data.num_links = 1;
+    // minix3_put_inode(block_device, inode, inode_data);
+
+    return true;
 }
 
 uint32_t minix3_get_next_free_zone(VirtioDevice *block_device) {
@@ -488,6 +503,7 @@ bool minix3_take_inode(VirtioDevice *block_device, uint32_t inode) {
     }
 
     inode_bitmap[inode / 8] |= (1 << inode % 8);
+    minix3_put_inode_bitmap(block_device, inode_bitmap);
     Inode inode_data = minix3_get_inode(block_device, inode);
     inode_data.num_links = 1;
     minix3_put_inode(block_device, inode, inode_data);
@@ -519,6 +535,7 @@ static uint32_t last_inode = 0; // Last inode number we looked up
 static Inode last_inode_data; // Data of the last inode
 
 Inode minix3_get_inode(VirtioDevice *block_device, uint32_t inode) {
+    minix3_load_bitmaps(block_device);
     if (inode == INVALID_INODE) {
         warnf("minix3_get_inode: Invalid inode %u\n", inode);
         return (Inode){0};
@@ -538,6 +555,7 @@ Inode minix3_get_inode(VirtioDevice *block_device, uint32_t inode) {
 }
 
 void minix3_put_inode(VirtioDevice *block_device, uint32_t inode, Inode data) {
+    minix3_load_bitmaps(block_device);
     if (inode == INVALID_INODE) {
         warnf("minix3_put_inode: Invalid inode %u\n", inode);
         return;
@@ -559,13 +577,32 @@ uint32_t minix3_alloc_inode(VirtioDevice *block_device) {
     } else {
         debugf("minix3_alloc_inode: Found free inode %u\n", free_inode);
     }
-    minix3_take_inode(block_device, free_inode);
+    if (!minix3_take_inode(block_device, free_inode)) {
+        warnf("minix3_alloc_inode: Couldn't take inode %u\n", free_inode);
+        return 0;
+    }
+
     Inode data;
     memset(&data, 0, sizeof(data));
     data.num_links = 1;
     minix3_put_inode(block_device, free_inode, data);
     // infof("minix3_alloc_inode %p\n", minix3_get_inode_byte_offset(sb, free_inode)); // TODO: REMOVE
     return free_inode;
+}
+
+uint32_t minix3_alloc_zone(VirtioDevice *block_device) {
+    uint32_t free_zone = minix3_get_next_free_zone(block_device);
+    if (!free_zone) {
+        warnf("minix3_alloc_zone: Couldn't find free zone\n");
+        return 0;
+    } else {
+        debugf("minix3_alloc_zone: Found free zone %u\n", free_zone);
+    }
+    if (!minix3_take_zone(block_device, free_zone)) {
+        warnf("minix3_alloc_zone: Couldn't take zone %u\n", free_zone);
+        return 0;
+    }
+    return free_zone;
 }
 
 bool minix3_is_dir(VirtioDevice *block_device, uint32_t inode) {
@@ -856,6 +893,7 @@ void minix3_put_data(VirtioDevice *block_device, uint32_t inode, uint8_t *data, 
             // Copy the remaining data into the buffer
             size_t remaining = min(count, minix3_get_zone_size(block_device) - (offset - file_cursor));
             memcpy(zone_data + offset - file_cursor, data, remaining);
+            debugf("Wrote %u bytes to zone %u at offset %u (0x%x)\n", remaining, zone, offset, offset);
             minix3_put_zone(block_device, zone, zone_data);
 
             buffer_cursor += remaining;
@@ -1088,10 +1126,10 @@ uint32_t minix3_find_next_free_dir_entry(VirtioDevice *block_device, uint32_t in
         minix3_get_dir_entry(block_device, inode, i, &entry);
 
         if (entry.inode == 0) {
-            debugf("minix3_find_next_free_dir_entry: Found free entry %u\n", i);
+            warnf("minix3_find_next_free_dir_entry: Found free entry %u\n", i);
             return i;
         } else {
-            debugf("minix3_find_next_free_dir_entry: Entry %u is %s\n", i, entry.name);
+            warnf("minix3_find_next_free_dir_entry: Entry %u is %s\n", i, entry.name);
         }
     }
     warnf("minix3_find_next_free_dir_entry: Couldn't find a free directory entry\n");
@@ -1118,13 +1156,15 @@ bool minix3_get_dir_entry(VirtioDevice *block_device, uint32_t inode, uint32_t e
     return true;
 }
 
-void minix3_put_dir_entry(VirtioDevice *block_device, uint32_t inode, uint32_t entry, DirEntry *data) {
+void minix3_put_dir_entry(VirtioDevice *block_device, uint32_t inode, uint32_t entry, DirEntry data) {
     if (!minix3_is_dir(block_device, inode)) {
         warnf("Inode %u (%x) is not a directory\n", inode, inode);
         return;
     }
-    Inode inode_data = minix3_get_inode(block_device, inode);
-    minix3_put_data(block_device, inode, (uint8_t*)data, entry * sizeof(DirEntry), sizeof(DirEntry));
+    // Inode inode_data = minix3_get_inode(block_device, inode);
+    debugf("Putting entry %u to inode %u\n", entry, inode);
+
+    minix3_put_data(block_device, inode, (uint8_t*)&data, entry * sizeof(DirEntry), sizeof(DirEntry));
 }
 
 
@@ -1152,6 +1192,8 @@ uint32_t minix3_list_dir(VirtioDevice *block_device, uint32_t inode, DirEntry *e
 // Returns the inode number of the file with the given name in the given directory.
 // If the file does not exist, return INVALID_INODE.
 uint32_t minix3_find_dir_entry(VirtioDevice *block_device, uint32_t inode, const char *name) {
+    minix3_load_bitmaps(block_device);
+    
     DirEntry entries[128];
     uint32_t num_entries = minix3_list_dir(block_device, inode, entries, 128);
 
@@ -1187,12 +1229,16 @@ void minix3_traverse(VirtioDevice *block_device, uint32_t inode, char *root_path
     debugf("Traversing inode %u at depth %d\n", inode, current_depth);
     char name[128];
     strncpy(name, path_file_name(root_path), sizeof(name));
-    if (!minix3_is_dir(block_device, inode)) {
-        debugf("Not a directory\n");
+    if (minix3_is_dir(block_device, inode)) {
+        debugf("Is a directory\n");
+    } else if (minix3_is_block_device(block_device, inode)) {
+        debugf("Is a block device\n");
         callback(block_device, inode, root_path, name, data, current_depth);
         return;
     } else {
-        debugf("Is a directory\n");
+        debugf("Not a directory\n");
+        callback(block_device, inode, root_path, name, data, current_depth);
+        return;
     }
 
     Inode inode_data = minix3_get_inode(block_device, inode);

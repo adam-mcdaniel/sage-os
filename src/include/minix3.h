@@ -147,7 +147,7 @@ uint32_t minix3_find_next_free_dir_entry(VirtioDevice *block_device, uint32_t in
 // Get the directory entry at the given index. If the entry is invalid, return false.
 // Otherwise, return true and put the entry in the given data pointer.
 bool minix3_get_dir_entry(VirtioDevice *block_device, uint32_t inode, uint32_t entry, DirEntry *data);
-void minix3_put_dir_entry(VirtioDevice *block_device, uint32_t inode, uint32_t entry, DirEntry *data);
+void minix3_put_dir_entry(VirtioDevice *block_device, uint32_t inode, uint32_t entry, DirEntry data);
 
 
 // List all of the entries in the given directory to the given buffer.
