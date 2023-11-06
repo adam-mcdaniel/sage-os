@@ -7,6 +7,7 @@
 #include <list.h>
 
 #define VFS_DEBUG
+
 #ifdef VFS_DEBUG
 #define debugf(...) debugf(__VA_ARGS__)
 #else
@@ -102,6 +103,7 @@ int vfs_write(File *file, const char *buf, int count) {
 //     return 0;
 // }
 
+static Map *open_files;
 static size_t mounted_device_count = 0;
 static Map *mounted_devices;
 
@@ -115,7 +117,7 @@ void vfs_print_mounted_devices() {
     if (mounted_devices == NULL) {
         mounted_devices = map_new();
     }
-
+    debugf("vfs_print_mounted_devices: %u mounted devices\n", map_size(mounted_devices));
     if (map_size(mounted_devices) == 0) {
         debugf("vfs_print_mounted_devices: no mounted devices\n");
         return;
@@ -132,18 +134,54 @@ void vfs_print_mounted_devices() {
     map_free_get_keys(keys);
 }
 
+void vfs_print_open_files() {
+    if (open_files == NULL) {
+        open_files = map_new();
+    }
+
+    debugf("vfs_print_open_files: %u open files\n", map_size(open_files));
+    if (map_size(open_files) == 0) {
+        debugf("vfs_print_open_files: no open files\n");
+        return;
+    }
+
+    List *keys = map_get_keys(open_files);
+    ListElem *key;
+    list_for_each(keys, key) {
+        File *file;
+        map_get(open_files, list_elem_value(key), &file);
+        debugf("vfs_print_open_files: %s -> %p\n", list_elem_value(key), file);
+    }
+    map_free_get_keys(keys);
+}
+
+void vfs_mount_callback(VirtioDevice *block_device, uint32_t inode, const char *path, char *name, void *data, uint32_t depth) {
+    if (strcmp(path, "/") == 0) {
+        debugf("vfs_mount_callback: skipping /\n");
+        return;
+    }
+
+    // Check if this is a block device that needs to be mounted
+    Inode inode_data = minix3_get_inode(block_device, inode);
+    if (S_ISBLK(inode_data.mode)) {
+        debugf("vfs_mount_callback: found block device %s\n", path);
+        // Mount the block device
+        block_device = virtio_get_block_device(mounted_device_count);
+        if (block_device == NULL) {
+            debugf("vfs_mount_callback: could not find block device %u\n", mounted_device_count);
+            return;
+        }
+        vfs_mount(block_device, path);
+    }
+}
+
 void vfs_init(void) {
     mounted_devices = map_new();
     VirtioDevice *block_device = virtio_get_block_device(0);
     vfs_print_mounted_devices();
     vfs_mount(block_device, "/");
-
-    File *file = vfs_open("/dev/sda/root.txt", O_RDONLY, 0, VFS_TYPE_FILE);
-    debugf("vfs_init: file is %p\n", file);
-    debug_file(file);
-    uint8_t buf[100];
-    vfs_read(file, buf, 100);
-    debugf("vfs_init: read %s\n", buf);
+    
+    minix3_traverse(block_device, 1, "/", NULL, 0, 10, vfs_mount_callback);
 
     vfs_print_mounted_devices();
     infof("vfs_init: mounted %u devices\n", mounted_device_count);
@@ -291,9 +329,9 @@ bool vfs_should_truncate(flags_t flags, mode_t mode, type_t type) {
     return flags & O_TRUNC;
 }
 
-static Map *open_files;
-
 File *vfs_open(const char *path, flags_t flags, mode_t mode, type_t type) {
+    debugf("vfs_open: opening %s\n", path);
+
     if (is_mounted_device(path)) {
         debugf("vfs_open: path is a mounted device\n");
         return NULL;
@@ -381,8 +419,6 @@ File *vfs_open(const char *path, flags_t flags, mode_t mode, type_t type) {
         file->inode_data = minix3_get_inode(file->dev, file->inode);
         file->size = file->inode_data.size;
         file->is_file = true;
-
-        debug_file(file);
         break;
 
     case VFS_TYPE_DIR:
@@ -459,6 +495,7 @@ File *vfs_open(const char *path, flags_t flags, mode_t mode, type_t type) {
 
         // Get the block device
         file->dev = virtio_get_block_device(block_device_num);
+        
         if (file->dev == NULL) {
             debugf("vfs_open: could not find block device\n");
             kfree(path_relative_to_mount_point);
@@ -489,7 +526,6 @@ File *vfs_open(const char *path, flags_t flags, mode_t mode, type_t type) {
 
         file->size = block_device_get_bytes(file->dev);
         file->is_block_device = true;
-
         vfs_mount(file->dev, path);
         break;
     }
@@ -498,7 +534,8 @@ File *vfs_open(const char *path, flags_t flags, mode_t mode, type_t type) {
 
     // Insert the file into the open files map
     map_set(open_files, path, file);
-
+    // debugf("vfs_open: %d files open\n", map_size(open_files));
+    vfs_print_open_files();
     return file;
 }
 
