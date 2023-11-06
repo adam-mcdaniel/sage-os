@@ -247,6 +247,8 @@ void main(unsigned int hart)
     vfs_read(file2, buffer, 1024);
     logf(LOG_INFO, "Read another 1024 bytes from file /home/cosc562/subdir1/subdir2/subdir3/subdir4/subdir5/book1.txt: %1024s\n", buffer);
 
+    vfs_close(file);
+    vfs_close(file2);
 
     console();
 #else
