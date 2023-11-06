@@ -235,11 +235,17 @@ void main(unsigned int hart)
     vfs_init();
 
     File *file = vfs_open("/dev/sda/root.txt", 0, O_RDONLY, VFS_TYPE_FILE);
-    uint8_t *buffer = kzalloc(1024);
+    uint8_t *buffer = kzalloc(2048);
     vfs_read(file, buffer, 1024);
-    logf(LOG_INFO, "Read from file /dev/sda/root.txt: %s\n", buffer);
+    logf(LOG_INFO, "Read from file /dev/sda/root.txt: %1024s\n", buffer);
+    // vfs_print_mounted_devices();
 
-    vfs_print_mounted_devices();
+
+    File *file2 = vfs_open("/home/cosc562/subdir1/subdir2/subdir3/subdir4/subdir5/book1.txt", 0, O_RDONLY, VFS_TYPE_FILE);
+    vfs_read(file2, buffer, 1024);
+    logf(LOG_INFO, "Read 1024 bytes from file /home/cosc562/subdir1/subdir2/subdir3/subdir4/subdir5/book1.txt: %1024s\n", buffer);
+    vfs_read(file2, buffer, 1024);
+    logf(LOG_INFO, "Read another 1024 bytes from file /home/cosc562/subdir1/subdir2/subdir3/subdir4/subdir5/book1.txt: %1024s\n", buffer);
 
 
     console();
