@@ -214,6 +214,12 @@ typedef struct VirtioDevice {
 
     bool ready;
     Mutex lock;
+
+    // Input device identification
+    struct {
+        unsigned is_keyboard : 1;
+        unsigned is_tablet : 1;
+    };
 } VirtioDevice;
 
 // Read the queue size from the common configuration.
@@ -280,9 +286,9 @@ VirtioDevice *virtio_get_nth_saved_device(uint16_t n);
 // Get the RNG device from the list of virtio devices.
 VirtioDevice *virtio_get_rng_device();
 // Get the Block device from the list of virtio devices.
-VirtioDevice *virtio_get_block_device();
+VirtioDevice *virtio_get_block_device(uint16_t n);
 // Get the Input device from the list of virtio devices.
-VirtioDevice *virtio_get_input_device();
+VirtioDevice *virtio_get_input_device(uint16_t n);
 // Get the GPU device from the list of virtio devices.
 VirtioDevice *virtio_get_gpu_device();
 
@@ -314,6 +320,8 @@ VirtioDevice *virtio_from_pci_device(PCIDevice *pcidevice);
 
 // Get the pointer to the virtio-device's notify-register
 volatile uint16_t *virtio_notify_register(VirtioDevice *device);
+
+uint16_t virtio_set_queue_and_get_size(VirtioDevice *device, uint16_t which_queue);
 
 // Send exactly one descriptor to the given device's queue, and optionally notify the device when done.
 // The descriptor must contain a physical address.
