@@ -1,4 +1,5 @@
 #include <debug.h>
+#include <stdint.h>
 #include <virtio.h>
 #include <util.h>
 #include <mmu.h>
@@ -491,7 +492,7 @@ void virtio_notify(VirtioDevice *viodev, uint16_t which_queue)
 }
 
 // Select the queue and get its size
-uint64_t virtio_set_queue_and_get_size(VirtioDevice *device, uint16_t which_queue) {
+uint16_t virtio_set_queue_and_get_size(VirtioDevice *device, uint16_t which_queue) {
     if (device->common_cfg->queue_select != which_queue) {
         device->common_cfg->queue_select = which_queue;
     }
@@ -499,7 +500,7 @@ uint64_t virtio_set_queue_and_get_size(VirtioDevice *device, uint16_t which_queu
 
     if (which_queue >= num_queues) {
         warnf("virtio_notify: Provided queue number %d is too big (num_queues=%d)...\n", which_queue, num_queues);
-        return -1ULL;
+        return -1;
     }
 
     return device->common_cfg->queue_size;
@@ -609,10 +610,11 @@ uint16_t virtio_receive_descriptor_chain(VirtioDevice *device, uint16_t which_qu
     // debugf("Descriptor flags: 0x%x = %d\n", descriptor->flags, descriptor->flags);
     // debugf("Descriptor next: 0x%x = %d\n", descriptor->next, descriptor->next);
     i++;
-    device->device_idx = device->device->idx;
+    // device->device_idx = device->device->idx;
     if (i > max_descriptors) {
         warnf("Received %d descriptors, but expected %d or fewer\n", i, max_descriptors);
     }
+    device->device_idx++;
     return i;
 }
 
