@@ -1,4 +1,5 @@
 #include <debug.h>
+#include <stdint.h>
 #include <virtio.h>
 #include <util.h>
 #include <mmu.h>
@@ -249,32 +250,50 @@ uint16_t virtio_get_queue_size(VirtioDevice *dev) {
     return dev->common_cfg->queue_size;
 }
 
-VirtioDevice *virtio_get_device(uint16_t device_type) {
+VirtioDevice *virtio_get_device(uint16_t device_type, uint16_t n) {
+    uint16_t count = 0;
     for (uint16_t i=0; i<virtio_count_saved_devices(); i++) {
         VirtioDevice *dev = virtio_get_nth_saved_device(i);
-        if (virtio_get_device_id(dev) == VIRTIO_PCI_DEVICE_ID(device_type)) {
+        if (virtio_get_device_id(dev) == VIRTIO_PCI_DEVICE_ID(device_type) && count++ == n) {
             return dev;
         }
     }
 
-    warnf("No device could be found");
+    warnf("Device #%d with PCI ID=%d could not be found\n", n, device_type);
     return NULL;
 }
 
 VirtioDevice *virtio_get_rng_device(void) {
-    return virtio_get_device(VIRTIO_PCI_DEVICE_ENTROPY);
+    debugf("Getting RNG device\n");
+    return virtio_get_device(VIRTIO_PCI_DEVICE_ENTROPY, 0);
 }
 
-VirtioDevice *virtio_get_block_device(void) {
-    return virtio_get_device(VIRTIO_PCI_DEVICE_BLOCK);
+VirtioDevice *virtio_get_block_device(uint16_t n) {
+    debugf("Getting block device %d\n", n);
+    VirtioDevice *result = virtio_get_device(VIRTIO_PCI_DEVICE_BLOCK, n);
+    if (result == NULL) {
+        warnf("No block device #%d\n", n);
+    }
+    return result;
 }
 
-VirtioDevice *virtio_get_input_device(void) {
-    return virtio_get_device(VIRTIO_PCI_DEVICE_INPUT);
+VirtioDevice *virtio_get_input_device(uint16_t n) {
+    debugf("Getting input device %d\n", n);
+    VirtioDevice *result = virtio_get_device(VIRTIO_PCI_DEVICE_INPUT, n);
+    if (result == NULL) {
+        warnf("No input device #%d\n", n);
+    }
+    return result;
 }
 
 VirtioDevice *virtio_get_gpu_device(void) {
-    return virtio_get_device(VIRTIO_PCI_DEVICE_GPU);
+    // return virtio_get_device(VIRTIO_PCI_DEVICE_GPU, 0);
+    debugf("Getting GPU device %d\n", 0);
+    VirtioDevice *result = virtio_get_device(VIRTIO_PCI_DEVICE_GPU, 0);
+    if (result == NULL) {
+        warnf("No GPU device #%d\n", 0);
+    }
+    return result;
 }
 
 VirtioDevice *virtio_get_nth_saved_device(uint16_t n) {
@@ -491,7 +510,7 @@ void virtio_notify(VirtioDevice *viodev, uint16_t which_queue)
 }
 
 // Select the queue and get its size
-uint64_t virtio_set_queue_and_get_size(VirtioDevice *device, uint16_t which_queue) {
+uint16_t virtio_set_queue_and_get_size(VirtioDevice *device, uint16_t which_queue) {
     if (device->common_cfg->queue_select != which_queue) {
         device->common_cfg->queue_select = which_queue;
     }
@@ -499,7 +518,7 @@ uint64_t virtio_set_queue_and_get_size(VirtioDevice *device, uint16_t which_queu
 
     if (which_queue >= num_queues) {
         warnf("virtio_notify: Provided queue number %d is too big (num_queues=%d)...\n", which_queue, num_queues);
-        return -1ULL;
+        return -1;
     }
 
     return device->common_cfg->queue_size;
@@ -609,10 +628,11 @@ uint16_t virtio_receive_descriptor_chain(VirtioDevice *device, uint16_t which_qu
     // debugf("Descriptor flags: 0x%x = %d\n", descriptor->flags, descriptor->flags);
     // debugf("Descriptor next: 0x%x = %d\n", descriptor->next, descriptor->next);
     i++;
-    device->device_idx = device->device->idx;
+    // device->device_idx = device->device->idx;
     if (i > max_descriptors) {
         warnf("Received %d descriptors, but expected %d or fewer\n", i, max_descriptors);
     }
+    device->device_idx++;
     return i;
 }
 

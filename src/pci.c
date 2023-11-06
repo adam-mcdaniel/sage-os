@@ -5,6 +5,7 @@
 #include <kmalloc.h>
 #include <csr.h>
 #include <util.h>
+#include <input.h>
 
 // #define PCI_DEBUG
 
@@ -537,7 +538,7 @@ void pci_dispatch_irq(int irq)
 
         else if (virtio_is_input_device(virtdevice)) {
             debugf("input device sent interrupt!\n");
-            input_device_interrupt_handler(virtdevice);
+            input_device_isr(virtdevice);
         }
         // else if (virtio_is_input_device(virtdevice)) {
         //     debugf("Input device sent interrupt!\n");
