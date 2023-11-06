@@ -37,25 +37,26 @@ typedef struct BlockRequestPacket {
     uint8_t status;
 } BlockRequestPacket;
 
-void block_device_send_request(BlockRequestPacket *packet);
+
+void block_device_send_request(VirtioDevice *block_device, BlockRequestPacket *packet);
 
 // THE DATA MUST BE PHYSICALLY CONTIGUOUS!
-void block_device_read_sector(uint64_t sector, uint8_t *data);
+void block_device_read_sector(VirtioDevice *block_device, uint64_t sector, uint8_t *data);
 
 // THE DATA MUST BE PHYSICALLY CONTIGUOUS!
-void block_device_write_sector(uint64_t sector, uint8_t *data);
+void block_device_write_sector(VirtioDevice *block_device, uint64_t sector, uint8_t *data);
 
 // THE DATA MUST BE PHYSICALLY CONTIGUOUS!
-void block_device_read_sectors(uint64_t sector, uint8_t *data, uint64_t count);
+void block_device_read_sectors(VirtioDevice *block_device, uint64_t sector, uint8_t *data, uint64_t count);
 
 // THE DATA MUST BE PHYSICALLY CONTIGUOUS!
-void block_device_write_sectors(uint64_t sector, uint8_t *data, uint64_t count);
+void block_device_write_sectors(VirtioDevice *block_device, uint64_t sector, uint8_t *data, uint64_t count);
 
-uint64_t block_device_get_sector_size(void);
-uint64_t block_device_get_sector_count(void);
-uint64_t block_device_get_bytes(void);
+uint64_t block_device_get_sector_size(VirtioDevice *block_device);
+uint64_t block_device_get_sector_count(VirtioDevice *block_device);
+uint64_t block_device_get_bytes(VirtioDevice *block_device);
 
 // Data does not need to be physically contiguous.
-void block_device_read_bytes(uint64_t byte, uint8_t *data, uint64_t count);
+void block_device_read_bytes(VirtioDevice *block_device, uint64_t byte, uint8_t *data, uint64_t count);
 // Data does not need to be physically contiguous.
-void block_device_write_bytes(uint64_t byte, uint8_t *data, uint64_t count);
+void block_device_write_bytes(VirtioDevice *block_device, uint64_t byte, uint8_t *data, uint64_t count);

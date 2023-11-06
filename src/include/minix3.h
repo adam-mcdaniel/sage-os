@@ -1,3 +1,5 @@
+#pragma once
+
 #include <block.h>
 #include <stdint.h>
 
@@ -90,77 +92,79 @@ typedef struct DirEntry {
    char name[60];
 } DirEntry;
 
-void minix3_init(void);
+void minix3_init(VirtioDevice *block_device, const char *path);
+void minix3_load_device(VirtioDevice *block_device);
 
-SuperBlock minix3_get_superblock(void);
-void minix3_put_superblock(SuperBlock superblock);
+SuperBlock minix3_get_superblock(VirtioDevice *block_device);
+void minix3_put_superblock(VirtioDevice *block_device, SuperBlock superblock);
 
 // Get the block size for the file system.
-uint16_t minix3_get_block_size(void);
+uint16_t minix3_get_block_size(VirtioDevice *block_device);
 // Get the zone size for the file system.
-uint16_t minix3_get_zone_size(void);
+uint16_t minix3_get_zone_size(VirtioDevice *block_device);
 
-size_t minix3_get_inode_bitmap_size(void);
-size_t minix3_get_zone_bitmap_size(void);
+size_t minix3_get_inode_bitmap_size(VirtioDevice *block_device);
+size_t minix3_get_zone_bitmap_size(VirtioDevice *block_device);
 
 // Read the inode bitmap into the given buffer
-void minix3_get_inode_bitmap(uint8_t *bitmap_buf);
+void minix3_get_inode_bitmap(VirtioDevice *block_device, uint8_t *bitmap_buf);
 // Write the inode bitmap from the given buffer
-void minix3_put_inode_bitmap(uint8_t *bitmap_buf);
+void minix3_put_inode_bitmap(VirtioDevice *block_device, uint8_t *bitmap_buf);
 // Read the zone bitmap into the given buffer
-void minix3_get_zone_bitmap(uint8_t *bitmap_buf);
+void minix3_get_zone_bitmap(VirtioDevice *block_device, uint8_t *bitmap_buf);
 // Write the zone bitmap from the given buffer
-void minix3_put_zone_bitmap(uint8_t *bitmap_buf);
+void minix3_put_zone_bitmap(VirtioDevice *block_device, uint8_t *bitmap_buf);
 
-void minix3_get_blocks(uint32_t block, uint8_t *data, uint16_t count);
-void minix3_put_blocks(uint32_t block, uint8_t *data, uint16_t count);
+void minix3_get_blocks(VirtioDevice *block_device, uint32_t block, uint8_t *data, uint16_t count);
+void minix3_put_blocks(VirtioDevice *block_device, uint32_t block, uint8_t *data, uint16_t count);
 
-void minix3_get_block(uint32_t block, uint8_t *data);
-void minix3_put_block(uint32_t block, uint8_t *data);
+void minix3_get_block(VirtioDevice *block_device, uint32_t block, uint8_t *data);
+void minix3_put_block(VirtioDevice *block_device, uint32_t block, uint8_t *data);
 
-bool minix3_has_inode(uint32_t inode);
-bool minix3_take_inode(uint32_t inode);
-uint32_t minix3_get_next_free_inode();
-Inode minix3_get_inode(uint32_t inode);
-uint32_t minix3_get_inode_from_path(const char *path, bool get_parent);
-void minix3_put_inode(uint32_t inode, Inode data);
-Inode *minix3_alloc_inode();
+bool minix3_has_inode(VirtioDevice *block_device, uint32_t inode);
+bool minix3_take_inode(VirtioDevice *block_device, uint32_t inode);
+uint32_t minix3_get_next_free_inode(VirtioDevice *block_device);
+Inode minix3_get_inode(VirtioDevice *block_device, uint32_t inode);
+uint32_t minix3_get_inode_from_path(VirtioDevice *block_device, const char *path, bool get_parent);
+void minix3_put_inode(VirtioDevice *block_device, uint32_t inode, Inode data);
+uint32_t minix3_alloc_inode(VirtioDevice *block_device);
 
-bool minix3_has_zone(uint32_t zone);
-bool minix3_take_zone(uint32_t zone);
-uint32_t minix3_get_next_free_zone();
-void minix3_get_zone(uint32_t zone, uint8_t *data);
-void minix3_put_zone(uint32_t zone, uint8_t *data);
-uint32_t minix3_alloc_zone();
+bool minix3_has_zone(VirtioDevice *block_device, uint32_t zone);
+bool minix3_take_zone(VirtioDevice *block_device, uint32_t zone);
+uint32_t minix3_get_next_free_zone(VirtioDevice *block_device);
+void minix3_get_zone(VirtioDevice *block_device, uint32_t zone, uint8_t *data);
+void minix3_put_zone(VirtioDevice *block_device, uint32_t zone, uint8_t *data);
+uint32_t minix3_alloc_zone(VirtioDevice *block_device);
 
-void minix3_get_data(uint32_t inode, uint8_t *data, uint32_t offset, uint32_t count);
-void minix3_put_data(uint32_t inode, uint8_t *data, uint32_t offset, uint32_t count);
-uint64_t minix3_get_file_size(uint32_t inode);
-void minix3_read_file(uint32_t inode, uint8_t *data, uint32_t count);
+void minix3_get_data(VirtioDevice *block_device, uint32_t inode, uint8_t *data, uint32_t offset, uint32_t count);
+void minix3_put_data(VirtioDevice *block_device, uint32_t inode, uint8_t *data, uint32_t offset, uint32_t count);
+uint64_t minix3_get_file_size(VirtioDevice *block_device, uint32_t inode);
+void minix3_read_file(VirtioDevice *block_device, uint32_t inode, uint8_t *data, uint32_t count);
 
-bool minix3_is_file(uint32_t inode);
-bool minix3_is_dir(uint32_t inode);
+bool minix3_is_file(VirtioDevice *block_device, uint32_t inode);
+bool minix3_is_dir(VirtioDevice *block_device, uint32_t inode);
+bool minix3_is_block_device(VirtioDevice *block_device, uint32_t inode);
 
-uint32_t minix3_find_next_free_dir_entry(uint32_t inode);
+uint32_t minix3_find_next_free_dir_entry(VirtioDevice *block_device, uint32_t inode);
 // Get the directory entry at the given index. If the entry is invalid, return false.
 // Otherwise, return true and put the entry in the given data pointer.
-bool minix3_get_dir_entry(uint32_t inode, uint32_t entry, DirEntry *data);
-void minix3_put_dir_entry(uint32_t inode, uint32_t entry, DirEntry *data);
+bool minix3_get_dir_entry(VirtioDevice *block_device, uint32_t inode, uint32_t entry, DirEntry *data);
+void minix3_put_dir_entry(VirtioDevice *block_device, uint32_t inode, uint32_t entry, DirEntry data);
 
 
 // List all of the entries in the given directory to the given buffer.
 // Return the number of entries retrieved.
-uint32_t minix3_list_dir(uint32_t inode, DirEntry *entries, uint32_t max_entries);
+uint32_t minix3_list_dir(VirtioDevice *block_device, uint32_t inode, DirEntry *entries, uint32_t max_entries);
 // Returns the inode number of the file with the given name in the given directory.
 // If the file does not exist, return INVALID_INODE.
-uint32_t minix3_find_dir_entry(uint32_t inode, const char *name);
+uint32_t minix3_find_dir_entry(VirtioDevice *block_device, uint32_t inode, const char *name);
 
-void minix3_traverse(uint32_t inode, char *root_path, void *data, uint32_t current_depth, uint32_t max_depth, void (*callback)(uint32_t inode, const char *path, char *entry_name, void *data, uint32_t depth));
+void minix3_traverse(VirtioDevice *block_device, uint32_t inode, char *root_path, void *data, uint32_t current_depth, uint32_t max_depth, void (*callback)(VirtioDevice *block_device, uint32_t inode, const char *path, char *entry_name, void *data, uint32_t depth));
 
 // Get the path of the file with the given inode number.
 // The file must be mapped first.
-const char *minix3_inode_to_path(uint32_t inode);
+const char *minix3_inode_to_path(VirtioDevice *block_device, uint32_t inode);
 
 // Get the inode number of the file at the given path.
 // The file must be mapped first.
-uint32_t minix3_path_to_inode(const char *path);
+uint32_t minix3_path_to_inode(VirtioDevice *block_device, const char *path);
