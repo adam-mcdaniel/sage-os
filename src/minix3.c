@@ -212,18 +212,25 @@ void debug_inode(VirtioDevice *block_device, uint32_t i) {
 
 // A struct that keeps some data for this callback
 typedef struct CallbackData {
+    const char *mounted_path;
     uint32_t file_count;
     uint32_t dir_count;
 } CallbackData;
 
 // A callback function for counting up the files and printing them out
-void callback(VirtioDevice *block_device, uint32_t inode, const char *path, char *name, void *data, uint32_t depth) {
+void minix3_init_callback(VirtioDevice *block_device, uint32_t inode, const char *path, char *name, void *data, uint32_t depth) {
     CallbackData *cb_data = (CallbackData *)data;
 
     for (uint32_t i=0; i<depth; i++) {
         infof("   ");
     }
-    infof("%s", name);
+    if (cb_data->mounted_path) {
+        infof("%s", cb_data->mounted_path);
+        cb_data->mounted_path = NULL;
+    } else {
+        infof("%s", name);
+    }
+    // infof("%s", name);
     // infof("name: %s", name);
     
     if (minix3_is_dir(block_device, inode)) {
@@ -342,12 +349,13 @@ void minix3_init(VirtioDevice *block_device, const char *path)
 
     // const char *path = "/home/cosc562";
 
-    CallbackData cb_data2 = {0};
+    CallbackData cb_data = {0};
+    cb_data.mounted_path = path;
     // uint32_t inode = minix3_get_inode_from_path(block_device, path, false);
     // infof("%s has inode %u\n", path, inode);
     
 
-    minix3_traverse(block_device, 1, "/", &cb_data2, 0, 10, callback);
+    minix3_traverse(block_device, 1, "/", &cb_data, 0, 10, minix3_init_callback);
 
     // infof("Found %u files and %u directories in %s\n", cb_data2.file_count, cb_data2.dir_count, path);
 
