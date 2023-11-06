@@ -25,7 +25,7 @@ SYMS=cosc562.sym cosc562.dbg
 QEMU?=qemu-system-riscv64
 QEMU_DEBUG_PIPE=debug.pipe
 # QEMU_HARD_DRIVE_1=hdd1.dsk
-QEMU_HARD_DRIVE_1=minix3_test1.dsk
+QEMU_HARD_DRIVE_1=hdd1.dsk
 QEMU_HARD_DRIVE_2=hdd2.dsk
 QEMU_HARD_DRIVE_3=hdd3.dsk
 QEMU_BIOS=./sbi/sbi.elf
@@ -48,6 +48,10 @@ QEMU_DEVICES+= -device virtio-gpu-pci,bus=bridge2,id=gpu
 # Block device
 QEMU_DEVICES+= -device virtio-blk-pci-non-transitional,drive=hdd1,bus=bridge3,id=blk1
 QEMU_DEVICES+= -drive if=none,format=raw,file=$(QEMU_HARD_DRIVE_1),id=hdd1
+QEMU_DEVICES+= -device virtio-blk-pci-non-transitional,drive=hdd2,bus=bridge3,id=blk2
+QEMU_DEVICES+= -drive if=none,format=raw,file=$(QEMU_HARD_DRIVE_2),id=hdd2
+QEMU_DEVICES+= -device virtio-blk-pci-non-transitional,drive=hdd3,bus=bridge3,id=blk3
+QEMU_DEVICES+= -drive if=none,format=raw,file=$(QEMU_HARD_DRIVE_3),id=hdd3
 # Network device (do not uncomment unless necessary)
 #QEMU_DEVICES+= -device virtio-net-pci-non-transitional,netdev=net1,bus=bridge4,id=net
 #QEMU_DEVICES+= -netdev user,id=net1,hostfwd=tcp::35555-:22
