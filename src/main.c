@@ -15,7 +15,7 @@
 #include <trap.h>
 #include <block.h>
 #include <rng.h>
-#include <minix3.h>
+#include <vfs.h>
 
 // Global MMU table for the kernel. This is used throughout
 // the kernel.
@@ -233,6 +233,15 @@ void main(unsigned int hart)
     VirtioDevice *block_device = virtio_get_block_device(0);
     // minix3_init(block_device, "/");
     vfs_init();
+
+    File *file = vfs_open("/dev/sda/root.txt", 0, O_RDONLY, VFS_TYPE_FILE);
+    uint8_t *buffer = kzalloc(1024);
+    vfs_read(file, buffer, 1024);
+    logf(LOG_INFO, "Read from file /dev/sda/root.txt: %s\n", buffer);
+
+    vfs_print_mounted_devices();
+
+
     console();
 #else
     extern uint32_t *elfcon;

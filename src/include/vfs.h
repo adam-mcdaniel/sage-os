@@ -1,3 +1,5 @@
+#pragma once
+
 #include <minix3.h>
 #include <stat.h>
 #include <stdint.h>
@@ -58,6 +60,7 @@ typedef struct File {
 
 void vfs_init(void);
 void vfs_print_mounted_devices(void);
+void vfs_print_open_files(void);
 void vfs_mount(VirtioDevice *block_device, const char *path);
 File *vfs_open(const char *path, flags_t flags, mode_t mode, type_t type);
 void vfs_close(File *file);

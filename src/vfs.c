@@ -117,21 +117,56 @@ void vfs_print_mounted_devices() {
     if (mounted_devices == NULL) {
         mounted_devices = map_new();
     }
-    debugf("vfs_print_mounted_devices: %u mounted devices\n", map_size(mounted_devices));
-    if (map_size(mounted_devices) == 0) {
-        debugf("vfs_print_mounted_devices: no mounted devices\n");
-        return;
-    }
 
     List *keys = map_get_keys(mounted_devices);
-    ListElem *key;
+    list_sort(keys, list_sort_string_comparator_ascending);
+    ListElem *key = NULL;
+    size_t count = 0;
+    infof("Printing mounted drives:\n");
     list_for_each(keys, key) {
         VirtioDevice *block_device;
         map_get(mounted_devices, list_elem_value(key), &block_device);
-        debugf("vfs_print_mounted_devices: %s -> %p\n", list_elem_value(key), block_device);
+        infof("Mounted device: %s at disk #%u\n", list_elem_value(key), count);
+        count++;
+    }
+    map_free_get_keys(keys);
+
+    if (count == 0) {
+        warnf("There are no mounted devices\n");
+    } else {
+        infof("There are %u mounted drives\n", count);
+    }
+}
+
+const char *vfs_path_from_mounted_device(VirtioDevice *mounted_device) {
+    if (mounted_devices == NULL) {
+        mounted_devices = map_new();
     }
 
+    List *keys = map_get_keys(mounted_devices);
+    list_sort(keys, list_sort_string_comparator_ascending);
+    ListElem *key = NULL;
+    size_t count = 1;
+
+    VirtioDevice *result;
+    list_for_each(keys, key) {
+        VirtioDevice *block_device;
+        map_get(mounted_devices, list_elem_value(key), &block_device);
+        if (block_device == mounted_device) {
+            infof("Mounted device: %s at disk #%u\n", list_elem_value(key), count);
+            result = list_elem_value(key);
+        }
+        count++;
+    }
     map_free_get_keys(keys);
+
+    if (count == 0) {
+        warnf("There are no mounted devices\n");
+    } else {
+        infof("There are %u mounted drives\n", count);
+    }
+
+    return result;
 }
 
 void vfs_print_open_files() {
@@ -139,20 +174,24 @@ void vfs_print_open_files() {
         open_files = map_new();
     }
 
-    debugf("vfs_print_open_files: %u open files\n", map_size(open_files));
-    if (map_size(open_files) == 0) {
-        debugf("vfs_print_open_files: no open files\n");
-        return;
-    }
-
+    infof("Printing open files:\n");
     List *keys = map_get_keys(open_files);
-    ListElem *key;
+    ListElem *key = NULL;
+    size_t count = 0;
     list_for_each(keys, key) {
         File *file;
         map_get(open_files, list_elem_value(key), &file);
-        debugf("vfs_print_open_files: %s -> %p\n", list_elem_value(key), file);
+        const char *device_name = vfs_path_from_mounted_device(file->dev);
+        infof("Open file %s on device %s\n", list_elem_value(key), device_name);
+        count++;
     }
     map_free_get_keys(keys);
+
+    if (count == 0) {
+        infof("There are no open files\n");
+    } else {
+        infof("There are %u open files\n", count);
+    }
 }
 
 void vfs_mount_callback(VirtioDevice *block_device, uint32_t inode, const char *path, char *name, void *data, uint32_t depth) {
@@ -177,13 +216,14 @@ void vfs_mount_callback(VirtioDevice *block_device, uint32_t inode, const char *
 
 void vfs_init(void) {
     mounted_devices = map_new();
+    mounted_device_count = 0;
     VirtioDevice *block_device = virtio_get_block_device(0);
     vfs_print_mounted_devices();
     vfs_mount(block_device, "/");
     
     minix3_traverse(block_device, 1, "/", NULL, 0, 10, vfs_mount_callback);
-
     vfs_print_mounted_devices();
+    vfs_print_open_files();
     infof("vfs_init: mounted %u devices\n", mounted_device_count);
 }
 
@@ -535,6 +575,7 @@ File *vfs_open(const char *path, flags_t flags, mode_t mode, type_t type) {
     // Insert the file into the open files map
     map_set(open_files, path, file);
     // debugf("vfs_open: %d files open\n", map_size(open_files));
+    debug_file(file);
     vfs_print_open_files();
     return file;
 }
