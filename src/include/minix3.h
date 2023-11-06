@@ -93,7 +93,7 @@ typedef struct DirEntry {
 } DirEntry;
 
 void minix3_init(VirtioDevice *block_device, const char *path);
-void minix3_load_bitmaps(VirtioDevice *block_device);
+void minix3_load_device(VirtioDevice *block_device);
 
 SuperBlock minix3_get_superblock(VirtioDevice *block_device);
 void minix3_put_superblock(VirtioDevice *block_device, SuperBlock superblock);
