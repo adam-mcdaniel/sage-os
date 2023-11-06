@@ -1,8 +1,9 @@
 #pragma once
 
 #include <lock.h>
-#include <virtio.h>
 #include <input-event-codes.h>
+#include <stdint.h>
+#include <virtio.h>
 
 #define INPUT_EVENT_BUFFER_SIZE 64
 
@@ -17,25 +18,24 @@ typedef enum virtio_input_config_select {
 } InputConfigSelect;
 
 
-struct virtio_input_event {
+typedef struct VirtioInputEvent {
     uint16_t type;
     uint16_t code;
     uint32_t value;
-};
+} VirtioInputEvent;
 
 typedef struct InputDevice {
     Mutex lock;
-    VirtioDevice *virtio_dev;
-    struct virtio_input_event event_buffer[INPUT_EVENT_BUFFER_SIZE];
+    VirtioDevice *viodev;
+    VirtioInputEvent event_buffer[INPUT_EVENT_BUFFER_SIZE];
     int head;
     int tail;
-    int size;
+    int buffer_size;
 } InputDevice;
 
-void input_device_init();
-
-void input_device_interrupt_handler(VirtioDevice *device);
-
-// void set_input_device_config(VirtioDevice *device, uint8_t select, uint8_t subsel, uint8_t size);
-
-// InputDevice *get_input_device(void);
+void input_device_init(VirtioDevice *device);
+void get_input_device_config(VirtioDevice *device, uint8_t select, uint8_t subsel, uint8_t size);
+void input_device_receive_buffer_init(InputDevice *input_dev);
+uint16_t input_device_get_prod_id(volatile VirtioInputConfig *config);
+void input_device_isr(VirtioDevice *device);
+// InputDevice *get_input_device_by_vdev(VirtioDevice *vdev);
