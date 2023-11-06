@@ -11,6 +11,7 @@
 #define O_WRONLY 1
 #define O_RDWR   2
 #define O_CREAT  8
+#define O_TRUNC  16
 
 #define VFS_TYPE_FILE 0
 #define VFS_TYPE_DIR  1
@@ -28,6 +29,8 @@ typedef signed long    off_t;
 typedef unsigned short mode_t;
 typedef unsigned long flags_t;
 
+bool vfs_should_create_if_doesnt_exist(flags_t flags, mode_t mode, type_t type);
+bool vfs_should_truncate(flags_t flags, mode_t mode, type_t type);
 
 typedef struct File {
     VirtioDevice *dev;
@@ -52,7 +55,10 @@ typedef struct File {
     uint16_t minor;
 } File;
 
-File *vfs_open(const char *path, flags_t flags, mode_t mode);
+void vfs_init(void);
+void vfs_print_mounted_devices(void);
+void vfs_mount(VirtioDevice *block_device, const char *path);
+File *vfs_open(const char *path, flags_t flags, mode_t mode, type_t type);
 void vfs_close(File *file);
 
 int vfs_read(File *file, void *buf, int count);

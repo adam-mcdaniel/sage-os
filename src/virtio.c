@@ -250,14 +250,15 @@ uint16_t virtio_get_queue_size(VirtioDevice *dev) {
 }
 
 VirtioDevice *virtio_get_device(uint16_t device_type, uint16_t n) {
+    uint16_t count = 0;
     for (uint16_t i=0; i<virtio_count_saved_devices(); i++) {
         VirtioDevice *dev = virtio_get_nth_saved_device(i);
-        if (virtio_get_device_id(dev) == VIRTIO_PCI_DEVICE_ID(device_type) && n-- == 0) {
+        if (virtio_get_device_id(dev) == VIRTIO_PCI_DEVICE_ID(device_type) && count++ == n) {
             return dev;
         }
     }
 
-    warnf("No device could be found");
+    warnf("Device #%d with PCI ID=%d could not be found\n", n, device_type);
     return NULL;
 }
 
@@ -268,16 +269,30 @@ VirtioDevice *virtio_get_rng_device(void) {
 
 VirtioDevice *virtio_get_block_device(uint16_t n) {
     debugf("Getting block device %d\n", n);
-    return virtio_get_device(VIRTIO_PCI_DEVICE_BLOCK, n);
+    VirtioDevice *result = virtio_get_device(VIRTIO_PCI_DEVICE_BLOCK, n);
+    if (result == NULL) {
+        warnf("No block device #%d\n", n);
+    }
+    return result;
 }
 
 VirtioDevice *virtio_get_input_device(uint16_t n) {
     debugf("Getting input device %d\n", n);
-    return virtio_get_device(VIRTIO_PCI_DEVICE_INPUT, n);
+    VirtioDevice *result = virtio_get_device(VIRTIO_PCI_DEVICE_INPUT, n);
+    if (result == NULL) {
+        warnf("No input device #%d\n", n);
+    }
+    return result;
 }
 
 VirtioDevice *virtio_get_gpu_device(void) {
-    return virtio_get_device(VIRTIO_PCI_DEVICE_GPU, 0);
+    // return virtio_get_device(VIRTIO_PCI_DEVICE_GPU, 0);
+    debugf("Getting GPU device %d\n", 0);
+    VirtioDevice *result = virtio_get_device(VIRTIO_PCI_DEVICE_GPU, 0);
+    if (result == NULL) {
+        warnf("No GPU device #%d\n", 0);
+    }
+    return result;
 }
 
 VirtioDevice *virtio_get_nth_saved_device(uint16_t n) {
