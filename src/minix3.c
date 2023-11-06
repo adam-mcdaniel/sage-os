@@ -225,8 +225,9 @@ void minix3_init_callback(VirtioDevice *block_device, uint32_t inode, const char
         infof("   ");
     }
     if (cb_data->mounted_path) {
-        infof("%s", cb_data->mounted_path);
+        infof("%s\n", cb_data->mounted_path);
         cb_data->mounted_path = NULL;
+        return;
     } else {
         infof("%s", name);
     }
@@ -251,20 +252,20 @@ void minix3_init_callback(VirtioDevice *block_device, uint32_t inode, const char
 void minix3_init(VirtioDevice *block_device, const char *path)
 {
     // Initialize the filesystem
-    infof("Initializing Minix3 filesystem on device %p at %s\n", block_device, path);
+    debugf("Initializing Minix3 filesystem on device %p at %s\n", block_device, path);
     minix3_get_superblock(block_device);
-    infof("Filesystem block size: %d\n", minix3_get_block_size(block_device));
-    infof("Superblock:\n");
-    infof("   num_inodes: %d\n", sb.num_inodes);
-    infof("   imap_blocks: %d\n", sb.imap_blocks);
-    infof("   zmap_blocks: %d\n", sb.zmap_blocks);
-    infof("   first_data_zone: %d\n", sb.first_data_zone);
-    infof("   log_zone_size: %d\n", sb.log_zone_size);
-    infof("   max_size: 0x%x (%d)\n", sb.max_size, sb.max_size);
-    infof("   num_zones: 0x%x (%d)\n", sb.num_zones, sb.num_zones);
-    infof("   magic: 0x%x\n", sb.magic);
-    infof("   block_size: %d\n", sb.block_size);
-    infof("   disk_version: %d\n", sb.disk_version);
+    debugf("Filesystem block size: %d\n", minix3_get_block_size(block_device));
+    debugf("Superblock:\n");
+    debugf("   num_inodes: %d\n", sb.num_inodes);
+    debugf("   imap_blocks: %d\n", sb.imap_blocks);
+    debugf("   zmap_blocks: %d\n", sb.zmap_blocks);
+    debugf("   first_data_zone: %d\n", sb.first_data_zone);
+    debugf("   log_zone_size: %d\n", sb.log_zone_size);
+    debugf("   max_size: 0x%x (%d)\n", sb.max_size, sb.max_size);
+    debugf("   num_zones: 0x%x (%d)\n", sb.num_zones, sb.num_zones);
+    debugf("   magic: 0x%x\n", sb.magic);
+    debugf("   block_size: %d\n", sb.block_size);
+    debugf("   disk_version: %d\n", sb.disk_version);
 
     if (sb.magic != MINIX3_MAGIC) {
         // We need to initialize the superblock
