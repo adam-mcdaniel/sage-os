@@ -13,13 +13,14 @@
 #define O_CREAT  8
 #define O_TRUNC  16
 
-#define VFS_TYPE_FILE 0
-#define VFS_TYPE_DIR  1
-#define VFS_TYPE_LINK 2
-#define VFS_TYPE_CHAR 3
-#define VFS_TYPE_BLOCK 4
-#define VFS_TYPE_PIPE 5
-#define VFS_TYPE_SOCKET 6
+#define VFS_TYPE_INFER 0
+#define VFS_TYPE_FILE 1
+#define VFS_TYPE_DIR  2
+#define VFS_TYPE_LINK 4
+#define VFS_TYPE_CHAR 8
+#define VFS_TYPE_BLOCK 16
+#define VFS_TYPE_PIPE 32
+#define VFS_TYPE_SOCKET 64
 
 typedef uint16_t type_t;
 
