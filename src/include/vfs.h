@@ -12,20 +12,34 @@
 #define O_RDWR   2
 #define O_CREAT  8
 
+#define VFS_TYPE_FILE 0
+#define VFS_TYPE_DIR  1
+#define VFS_TYPE_LINK 2
+#define VFS_TYPE_CHAR 3
+#define VFS_TYPE_BLOCK 4
+#define VFS_TYPE_PIPE 5
+#define VFS_TYPE_SOCKET 6
+
+typedef uint16_t type_t;
+
 // typedef unsigned long  size_t;
 // typedef signed long    ssize_t;
 typedef signed long    off_t;
 typedef unsigned short mode_t;
-typedef unsigned long  dev_t;
+typedef unsigned long flags_t;
+
 
 typedef struct File {
     VirtioDevice *dev;
+
+    type_t type;
 
     Inode inode_data;
     uint32_t inode;
     off_t offset;
     mode_t mode;
     size_t size;
+    flags_t flags;
 
     const char *path;
     bool is_dir;
@@ -38,7 +52,7 @@ typedef struct File {
     uint16_t minor;
 } File;
 
-File *vfs_open(const char *path, int flags, mode_t mode);
+File *vfs_open(const char *path, flags_t flags, mode_t mode);
 void vfs_close(File *file);
 
 int vfs_read(File *file, void *buf, int count);
@@ -47,15 +61,8 @@ int vfs_write(File *file, const char *buf, int count);
 int vfs_seek(File *file, int offset, int whence);
 int vfs_tell(File *file);
 
-#define VFS_TYPE_FILE 0
-#define VFS_TYPE_DIR  1
-#define VFS_TYPE_LINK 2
-#define VFS_TYPE_CHAR 3
-#define VFS_TYPE_BLOCK 4
-#define VFS_TYPE_PIPE 5
-#define VFS_TYPE_SOCKET 6
 
-int vfs_create(const char *path, uint16_t type);
+int vfs_create(const char *path, type_t type);
 int vfs_stat_path(const char *path, Stat *stat);
 int vfs_stat(File *file, Stat *stat);
 bool vfs_link(File *file1, File *file2);

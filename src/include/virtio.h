@@ -280,9 +280,9 @@ VirtioDevice *virtio_get_nth_saved_device(uint16_t n);
 // Get the RNG device from the list of virtio devices.
 VirtioDevice *virtio_get_rng_device();
 // Get the Block device from the list of virtio devices.
-VirtioDevice *virtio_get_block_device();
+VirtioDevice *virtio_get_block_device(uint16_t n);
 // Get the Input device from the list of virtio devices.
-VirtioDevice *virtio_get_input_device();
+VirtioDevice *virtio_get_input_device(uint16_t n);
 // Get the GPU device from the list of virtio devices.
 VirtioDevice *virtio_get_gpu_device();
 

@@ -230,7 +230,8 @@ void main(unsigned int hart)
 
     // This is defined above main()
 #ifdef RUN_INTERNAL_CONSOLE
-    minix3_init();
+    VirtioDevice *block_device = virtio_get_block_device(0);
+    minix3_init(block_device);
     console();
 #else
     extern uint32_t *elfcon;
