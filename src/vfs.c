@@ -111,10 +111,10 @@ void vfs_init(void) {
     VirtioDevice *block_device = virtio_get_block_device(0);
     vfs_print_mounted_devices();
     vfs_mount(block_device, "/");
-    vfs_print_mounted_devices();
 
     vfs_open("/dev/sda", O_CREAT, 0, VFS_TYPE_BLOCK);
 
+    vfs_print_mounted_devices();
     infof("vfs_init: mounted %u devices\n", mounted_device_count);
 }
 
