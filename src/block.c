@@ -30,7 +30,6 @@ void block_device_init() {
     // device_active_jobs = vector_new();
     // block_device = virtio_get_block_device();
     block_device_mutex = MUTEX_UNLOCKED;
-    debugf("Block device init done for device at %p\n", block_device->pcidev->ecam_header);
     for (uint16_t n; n < 8; n++) {
         // debugf("BAR %d: %x\n", n, pci_get_bar(block_device->pcidev, n));
         VirtioDevice *block_device = virtio_get_block_device(n);
@@ -49,6 +48,7 @@ void block_device_init() {
         debugf("Block #%d device has %d capacity\n", n, config->capacity);
         debugf("Block #%d device has %d cylinders\n", n, config->geometry.cylinders);
         debugf("Block #%d device has %d heads\n", n, config->geometry.heads);
+        debugf("Block device init done for device at %p\n", block_device->pcidev->ecam_header);
     }
 }
 
