@@ -126,7 +126,7 @@ void vfs_print_mounted_devices() {
     list_for_each(keys, key) {
         VirtioDevice *block_device;
         map_get(mounted_devices, list_elem_value(key), &block_device);
-        infof("Mounted device: %s at disk #%u\n", list_elem_value(key), count);
+        infof("    %s at disk #%u\n", list_elem_value(key), count);
         count++;
     }
     map_free_get_keys(keys);
@@ -175,7 +175,7 @@ void vfs_print_open_files() {
         File *file;
         map_get(open_files, list_elem_value(key), &file);
         const char *device_name = vfs_path_from_mounted_device(file->dev);
-        infof("Open file %s on device %s\n", list_elem_value(key), device_name);
+        infof("   %s on device %s\n", list_elem_value(key), device_name);
         count++;
     }
     map_free_get_keys(keys);
