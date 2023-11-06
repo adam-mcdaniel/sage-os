@@ -6,7 +6,7 @@
 #include <map.h>
 #include <list.h>
 
-#define VFS_DEBUG
+// #define VFS_DEBUG
 
 #ifdef VFS_DEBUG
 #define debugf(...) debugf(__VA_ARGS__)
