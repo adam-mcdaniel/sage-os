@@ -6,6 +6,8 @@
 #include <process.h>
 #include <sbi.h>
 #include <vector.h>
+#include <stddef.h>
+#include <stdint.h>
 
 extern const unsigned long trampoline_thread_start;
 extern const unsigned long trampoline_trap_start;
@@ -13,6 +15,11 @@ extern const unsigned long trampoline_trap_start;
 #define STACK_PAGES 2
 #define STACK_SIZE  (STACK_PAGES * PAGE_SIZE)
 #define STACK_TOP   0xfffffffc0ffee000UL
+
+unsigned short generate_unique_pid(void) {
+    static unsigned short pid = 1; // Start from 1, 0 is reserved
+    return pid++;
+}
 
 struct process *process_new(process_mode mode)
 {
@@ -35,7 +42,12 @@ struct process *process_new(process_mode mode)
 
     p->fds = vector_new_with_capacity(5);
     p->pages = list_new();
+    // Assign a unique PID
+    p->pid = generate_unique_pid();
 
+    // Initialize the Resource Control Block
+    p->rcb.image_pages = list_new();
+    p->rcb.heap_pages = list_new();
     // We need to keep track of the stack itself in the kernel, so we can free it
     // later, but the user process will interact with the stack via the SP register.
     p->frame.xregs[XREG_SP] = STACK_TOP + STACK_SIZE;

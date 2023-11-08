@@ -48,6 +48,14 @@ struct page_table;
 struct List;
 struct Vector;
 
+unsigned short generate_unique_pid(void);
+
+// Resource Control Block
+struct RCB {
+    struct List *image_pages;
+    struct List *heap_pages;
+};
+
 struct process {
     unsigned short pid;
     unsigned int hart;
@@ -65,6 +73,7 @@ struct process {
 
     struct List *pages;
     struct Vector *fds;
+    struct RCB rcb;
 };
 
 /**
@@ -75,3 +84,4 @@ struct process *process_new(process_mode mode);
 int process_free(struct process *p);
 
 bool process_run(struct process *p, unsigned int hart);
+
