@@ -14,6 +14,8 @@ Every week, you will need to write entries in this journal. Include brief inform
 * any complications that you've fixed and how you did it.
 
 Sort your entries in descending order (newest entries at the top).
+# 7-Nov-2023
+- `ttahmid`: Added `Resource Control Block` and unique id generation to processes. Added more functions for scheduling like function to choose the next process to run based on CFS, `sched_choose_next`; Function to update the vruntime of a process, `sched_update_vruntime`; Function to handle the timer interrupt for context switching, `sched_handle_timer_interrupt`; as well as template functions for `context_switch`.
 
 # 5-Nov-2023
 - `amcdan23`: Expanded the block driver to work with any block device connected to the machine. Added functionality for: mounting devices on the VFS, opening `File*` objects on arbitrary mounted devices on the VFS (multiple open files on multiple drives simultaneously), reading/writing files on VFS, and automatically populating mounted drives in `/dev` folder on the base drive \#0 at `/`. Wrote `vfs_read`, `vfs_write`, `vfs_init`, `vfs_open`, `vfs_close`, `vfs_mount`, `vfs_print_mounted_devices`, `vfs_print_open_files`, many more private VFS helper functions in `vfs.c`, and rewrote all the block driver functions with devices as parameters in `block.c`. Added a PCI function for getting the Nth device of a given type.
