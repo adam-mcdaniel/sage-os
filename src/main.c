@@ -109,7 +109,7 @@ static void init_systems(void)
     CSR_WRITE("stvec", trampoline_trap_start);
     debugf("STVEC: 0x%p, 0x%p\n", stvec, trampoline_trap_start);
 
-    Trapframe *sscratch = kzalloc(sizeof(Trapframe) * 0x1000);
+    Trapframe *sscratch = kzalloc(sizeof(Trapframe) * 4);
     
     CSR_READ(sscratch->sepc, "sepc");
     CSR_READ(sscratch->sstatus, "sstatus");
@@ -117,7 +117,7 @@ static void init_systems(void)
     CSR_READ(sscratch->satp, "satp");
     CSR_READ(sscratch->stvec, "stvec");
     CSR_READ(sscratch->trap_satp, "satp");
-    sscratch->trap_stack = (uint64_t)kmalloc(0x4000);
+    sscratch->trap_stack = (uint64_t)kmalloc(0x10000);
     CSR_WRITE("sscratch", sscratch);
 
     virtio_init();
