@@ -21,9 +21,9 @@ unsigned short generate_unique_pid(void) {
     return pid++;
 }
 
-struct process *process_new(process_mode mode)
+Process *process_new(ProcessMode mode)
 {
-    struct process *p       = (struct process *)kzalloc(sizeof(*p));
+    Process *p       = (Process *)kzalloc(sizeof(*p));
 
     p->hart                 = -1U;
     p->ptable               = mmu_table_create();
@@ -73,7 +73,7 @@ struct process *process_new(process_mode mode)
     return p;
 }
 
-int process_free(struct process *p)
+int process_free(Process *p)
 {
     struct ListElem *e;
     unsigned int i;
@@ -110,7 +110,7 @@ int process_free(struct process *p)
     return 0;
 }
 
-bool process_run(struct process *p, unsigned int hart)
+bool process_run(Process *p, unsigned int hart)
 {
     void process_asm_run(void *frame_addr);
     unsigned int me = sbi_whoami();

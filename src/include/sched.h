@@ -11,33 +11,33 @@ Scheduler header
 void sched_init();
 
 //adds node to scheduler tree
-void sched_add(struct process *p);
+void sched_add(Process *p);
 
 //removes node from scheduler tree - used if process gets manually killed
-void sched_remove_process(struct process *p);
+void sched_remove_process(Process *p);
 
 //get process with the lowest vruntime
-struct process *sched_get_next();
+Process *sched_get_next();
 
 // Get the currently running process
-struct process *sched_get_current(void);
+Process *sched_get_current(void);
 
 // Get the time slice for the current process
 unsigned long get_time_slice(void);
 
 // Perform a context switch from one process to another
-void context_switch(struct process *from, struct process *to);
+void context_switch(Process *from, Process *to);
 
 // Save the state of the current process
-void save_state(struct trap_frame *state);
+void save_state(TrapFrame *state);
 
 // Load the state of the next process
-void load_state(struct trap_frame *state);
+void load_state(TrapFrame *state);
 
 // Set the current process in the scheduler
-void set_current_process(struct process *proc);
+void set_current_process(Process *proc);
 
 // Perform the actual switch to the new process state
-void switch_to(struct trap_frame *state);
+void switch_to(TrapFrame *state);
 
 #endif // SCHED_H

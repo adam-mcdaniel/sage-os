@@ -11,77 +11,77 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stdint.h>
+#include <list.h>
+#include <vector.h>
+#include <mmu.h>
 
 #define HART_NONE        (-1U)
 #define ON_HART_NONE(p)  (p->hart == HART_NONE)
 
-typedef enum {
+typedef enum ProcessMode {
     PM_USER,
     PM_SUPERVISOR
-} process_mode;
+} ProcessMode;
 
-typedef enum {
+typedef enum ProcessState {
     PS_DEAD,
     PS_WAITING,
     PS_SLEEPING,
     PS_RUNNING
-} process_state;
+} ProcessState;
 
 // Do NOT move or change the fields below. The
 // trampoline code expects these to be in the right
 // place.
-struct trap_frame {
-    signed long xregs[32];
+typedef struct TrapFrame {
+    int64_t xregs[32];
     double fregs[32];
-    unsigned long sepc;
-    unsigned long sstatus;
-    unsigned long sie;
-    unsigned long satp;
-    unsigned long sscratch;
-    unsigned long stvec;
-    unsigned long trap_satp;
-    unsigned long trap_stack;
-};
+    uint64_t sepc;
+    uint64_t sstatus;
+    uint64_t sie;
+    uint64_t satp;
+    uint64_t sscratch;
+    uint64_t stvec;
+    uint64_t trap_satp;
+    uint64_t trap_stack;
+} TrapFrame;
 
-struct page_table;
-
-struct List;
-struct Vector;
-
-unsigned short generate_unique_pid(void);
+uint16_t generate_unique_pid(void);
 
 // Resource Control Block
-struct RCB {
-    struct List *image_pages;
-    struct List *heap_pages;
-};
+typedef struct RCB {
+    List *image_pages;
+    List *heap_pages;
+} RCB;
 
-struct process {
-    unsigned short pid;
-    unsigned int hart;
-    process_mode mode;
-    process_state state;
-    unsigned long sleep_until;
-    unsigned long runtime;
-    unsigned long ran_at;
-    unsigned long priority;
+typedef struct Process {
+    uint16_t pid;
+    uint32_t hart;
+    ProcessMode mode;
+    ProcessState state;
+    uint64_t sleep_until;
+    uint64_t runtime;
+    uint64_t ran_at;
+    uint64_t priority;
+    uint64_t quantum;
     
-    unsigned long break_size;
+    uint64_t break_size;
 
-    struct trap_frame frame;
-    struct page_table *ptable;
+    TrapFrame frame;
+    PageTable *ptable;
 
-    struct List *pages;
-    struct Vector *fds;
-    struct RCB rcb;
-};
+    List *pages;
+    Vector *fds;
+    RCB rcb;
+} Process;
 
 /**
  * Create a new process and return it.
  * mode - Either PM_USER or PM_SUPERVISOR to determine what mode to run in.
 */
-struct process *process_new(process_mode mode);
-int process_free(struct process *p);
+Process *process_new(ProcessMode mode);
+int process_free(Process *p);
 
-bool process_run(struct process *p, unsigned int hart);
+bool process_run(Process *p, uint32_t hart);
 

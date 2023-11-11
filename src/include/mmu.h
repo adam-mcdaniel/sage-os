@@ -48,31 +48,31 @@
 #define SATP(table, asid) (SATP_MODE_SV39 | SATP_SET_PPN(table) | SATP_SET_ASID(asid))
 #define SATP_KERNEL       SATP(kernel_mmu_table, KERNEL_ASID)
 
-struct page_table {
+typedef struct PageTable {
     unsigned long entries[PAGE_SIZE_4K / sizeof(unsigned long)];
-};
+} PageTable;
 
 #define MMU_TRANSLATE_PAGE_FAULT  (-1UL)
 
 // Declared in src/main.c
-extern struct page_table *kernel_mmu_table;
+extern struct PageTable *kernel_mmu_table;
 
-struct page_table *mmu_table_create(void);
-unsigned long mmu_map_range(struct page_table *tab, 
+struct PageTable *mmu_table_create(void);
+unsigned long mmu_map_range(struct PageTable *tab, 
                        unsigned long start_virt, 
                        unsigned long end_virt, 
                        unsigned long start_phys,
                        unsigned char lvl, 
                        unsigned long bits);
-uintptr_t mmu_translate(const struct page_table *tab, 
+uintptr_t mmu_translate(const struct PageTable *tab, 
                             uintptr_t vaddr);
 uintptr_t kernel_mmu_translate(uintptr_t vaddr);
 
-bool mmu_map(struct page_table *tab, 
+bool mmu_map(struct PageTable *tab, 
              uintptr_t vaddr, 
              uintptr_t paddr, 
              unsigned char lvl, 
              uintptr_t bits);
-void mmu_free(struct page_table *tab);
+void mmu_free(struct PageTable *tab);
 
-void debug_page_table(struct page_table *tab, uint8_t lvl);
+void debug_page_table(struct PageTable *tab, uint8_t lvl);
