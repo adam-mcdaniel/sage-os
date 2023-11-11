@@ -23,18 +23,18 @@ void sched_init(){
 }
 
 //adds node to scheduler tree
-void sched_add(struct process *p) {  
+void sched_add(Process *p) {  
     mutex_spinlock(sched_mutex);  
-    //NOTE: process key is runtime * priority
+    //NOTE: Process key is runtime * priority
     rb_insert(sched_tree, p->runtime * p->priority, p);
     mutex_unlock(sched_mutex);
 }
 
-//get (pop) process with the lowest vruntime
-struct process *sched_get_next(){
+//get (pop) Process with the lowest vruntime
+Process *sched_get_next(){
     mutex_spinlock(sched_mutex);
-    struct process *min_process;
-    //implementation of async process freeing
+    Process *min_process;
+    //implementation of async Process freeing
     while(min_process->state != PS_DEAD){
         bool search_success = rb_min_val_ptr(sched_tree, min_process);
         rb_delete(sched_tree, min_process->runtime * min_process->priority);
@@ -47,17 +47,17 @@ struct process *sched_get_next(){
     return min_process;
 }
 /*
- NOTE: async process freeing is where if the process is killed while it is idle 
+ NOTE: async Process freeing is where if the Process is killed while it is idle 
  (its still in the CFS tree) the system just sets its status to dead. The scheduler
- encounters it while getting the next process to schedule, sees the status, then removes it 
- and finds another process.
+ encounters it while getting the next Process to schedule, sees the status, then removes it 
+ and finds another Process.
 */
 
 /* Duplicate purpose of above method*/
-// Function to choose the next process to run based on CFS
-// struct process *sched_choose_next() {
+// Function to choose the next Process to run based on CFS
+// Process *sched_choose_next() {
 //     mutex_spinlock(sched_mutex);
-//     struct process *next_process;
+//     Process *next_process;
 //     if (rb_min_val_ptr(sched_tree, &next_process)) {
 //         rb_delete(sched_tree, next_process->runtime);
 //         mutex_unlock(sched_mutex);
@@ -65,19 +65,19 @@ struct process *sched_get_next(){
 //     }
     
 //     mutex_unlock(sched_mutex);
-//     return NULL; // No process is ready to run
+//     return NULL; // No Process is ready to run
 // }
 
 
-/* for scheduling, we pop a process from the CFS tree when we want to run.
- when the hart get interrupted, we should put the process back into the tree with 
+/* for scheduling, we pop a Process from the CFS tree when we want to run.
+ when the hart get interrupted, we should put the Process back into the tree with 
  its new run time. That way, we don't need to update vruntime while it's in the tree.
  
  Also, this method changes the runtime before removing from the tree, 
  which messes up the search
   */
-// Function to update the vruntime of a process
-// void sched_update_vruntime(struct process *p, unsigned long delta_time) {
+// Function to update the vruntime of a Process
+// void sched_update_vruntime(Process *p, unsigned long delta_time) {
 //     p->runtime += delta_time;
 //     // Rebalance the tree if necessary
 //     rb_delete(sched_tree, p->runtime);
@@ -87,40 +87,40 @@ struct process *sched_get_next(){
 // Function to handle the timer interrupt for context switching
 void sched_handle_timer_interrupt(int hart) {
 
-    //put process currently on the hart back in the scheduler to recalc priority
+    //put Process currently on the hart back in the scheduler to recalc priority
     sched_add(hart);
 
-    //get an idle process
-    struct process *next_process = sched_get_next(); // Implement this function to get the currently running process
+    //get an idle Process
+    Process *next_process = sched_get_next(); // Implement this function to get the currently running Process
 
-    //execute process until next interrupt
+    //execute Process until next interrupt
     if(next_process != NULL){
         //set timer
         sbi_add_timer(hart, CONTEXT_SWITCH_TIMER * next_process->quantum);
         process_run(next_process, hart);
     }
     else{
-        //run idle process (WFI loop)
+        //run idle Process (WFI loop)
         sbi_add_timer(hart, CONTEXT_SWITCH_TIMER);
         WFI();
     }
 
     // unsigned long time_slice = get_time_slice(); // Implement this function based on the timer configuration
     // sched_update_vruntime(current_process, time_slice);
-    // struct process *next_process = sched_choose_next();
+    // Process *next_process = sched_choose_next();
     // if (next_process != current_process) {
     //     context_switch(current_process, next_process); // Implement context_switch function
     // }
 }
 
-void context_switch(struct process *from, struct process *to) {
-    // Save the state of the current process
+void context_switch(Process *from, Process *to) {
+    // Save the state of the current Process
     save_state(&from->frame);
 
-    // Load the state of the next process
+    // Load the state of the next Process
     load_state(&to->frame);
 
-    // Update the current process pointer
+    // Update the current Process pointer
     set_current_process(to);
 
     // Perform the actual switch
@@ -128,24 +128,23 @@ void context_switch(struct process *from, struct process *to) {
 }
 
 
-void save_state(struct trap_frame *state) {
+void save_state(TrapFrame *state) {
 }
 
-void load_state(struct trap_frame *state) {
+void load_state(TrapFrame *state) {
 }
 
-void switch_to(struct trap_frame *state) {
+void switch_to(TrapFrame *state) {
 }
 
-struct process *sched_get_current(void) {
+Process *sched_get_current(void) {
 }
 
 //amount of time before hart is interrupted
 unsigned long get_time_slice(void) {
-    return 
 }
 
-void set_current_process(struct process *proc) {
+void set_current_process(Process *proc) {
 }
 
 

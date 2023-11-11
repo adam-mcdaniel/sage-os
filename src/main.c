@@ -20,7 +20,7 @@
 // Global MMU table for the kernel. This is used throughout
 // the kernel.
 // Defined in src/include/mmu.h
-struct page_table *kernel_mmu_table;
+PageTable *kernel_mmu_table;
 
 static void init_systems(void)
 {
