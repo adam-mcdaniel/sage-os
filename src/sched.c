@@ -9,7 +9,6 @@ Scheduler - uses completely fair scheduler approach
 #include <stdint.h>
 #include <lock.h>
 #include <sbi.h>
-#include <hart.h>
 #include <csr.h>
 
 
@@ -26,7 +25,7 @@ void sched_init(){
 void sched_add(Process *p) {  
     mutex_spinlock(sched_mutex);  
     //NOTE: Process key is runtime * priority
-    rb_insert(sched_tree, p->runtime * p->priority, p);
+    rb_insert(sched_tree, p->runtime * p->priority, (uint64_t)p);
     mutex_unlock(sched_mutex);
 }
 
@@ -88,7 +87,9 @@ Process *sched_get_next(){
 void sched_handle_timer_interrupt(int hart) {
 
     //put Process currently on the hart back in the scheduler to recalc priority
-    sched_add(hart);
+    uint16_t pid = pid_harts_map_get(hart);
+    Process *current_proc = process_map_get(pid);
+    sched_add(current_proc);
 
     //get an idle Process
     Process *next_process = sched_get_next(); // Implement this function to get the currently running Process
