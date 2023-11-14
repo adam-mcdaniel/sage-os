@@ -6,6 +6,7 @@
 #include <page.h>
 #include <process.h>
 #include <sbi.h>
+#include <stdbool.h>
 #include <vector.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -35,6 +36,8 @@ Process *process_new(ProcessMode mode)
     p->hart = -1U;
     p->mode = mode;
     p->state = PS_WAITING;
+    
+    process_map_set(p);
 
     // Initialize the Resource Control Block
     p->rcb.image_pages = list_new();
@@ -136,6 +139,7 @@ bool process_run(Process *p, unsigned int hart)
     unsigned int me = sbi_whoami();
 
     if (me == hart) {
+        pid_harts_map_set(hart, p->pid);
         process_asm_run(&p->frame);
         // process_asm_run should not return, but if it does
         // something went wrong.
@@ -143,4 +147,56 @@ bool process_run(Process *p, unsigned int hart)
     }
 
     return sbi_hart_start(hart, trampoline_thread_start, (unsigned long)&p->frame, p->frame.satp);
+}
+
+// Map of all the processes, key is PID.
+static Map *processes;
+
+// Initialize the processes map, needs to be called before creating the
+// first process.
+void process_map_init()
+{
+    processes = map_new();
+}
+
+// Store a process on a map as its PID as the key.
+void process_map_set(Process *p)
+{
+    map_set_int(processes, p->pid, (MapValue)p);
+}
+
+// Get process stored on the process map using the PID as the key.
+Process *process_map_get(uint16_t pid) 
+{
+    MapValue *val;
+    map_get_int(processes, pid, val);
+    return (Process *)*val; 
+}
+
+// Keep track of the PIDs running on each hart.
+static Map *pid_on_harts;
+
+// Initialize the PID on harts map, needs to be called before creating the
+// first process.
+void pid_harts_map_init()
+{
+    pid_on_harts = map_new();
+}
+
+// Associate the PID running to hart
+void pid_harts_map_set(uint32_t hart, uint16_t pid)
+{
+    if (hart > MAX_NUM_HARTS - 1)
+        fatalf("set_pid_on_hart: Invalid hart number\n");
+    map_set_int(pid_on_harts, hart, pid);
+}
+
+// Get the PID running on hart
+uint16_t pid_harts_map_get(uint32_t hart)
+{
+    if (hart > MAX_NUM_HARTS - 1)
+        fatalf("get_pid_on_hart: Invalid hart number\n");
+    MapValue *val;
+    map_get_int(pid_on_harts, hart, val);
+    return (uint16_t)*val;
 }
