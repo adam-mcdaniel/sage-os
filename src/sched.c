@@ -14,7 +14,7 @@ Scheduler - uses completely fair scheduler approach
 
 
 static RBTree *sched_tree;
-uint64_t sched_mutex;
+Mutex *sched_mutex;
 
 
 //initialize scheduler tree
@@ -94,15 +94,14 @@ void sched_handle_timer_interrupt(int hart) {
     Process *next_process = sched_get_next(); // Implement this function to get the currently running Process
 
     //execute Process until next interrupt
-    if(next_process != NULL){
+    if (next_process != NULL) {
         //set timer
         sbi_add_timer(hart, CONTEXT_SWITCH_TIMER * next_process->quantum);
         process_run(next_process, hart);
-    }
-    else{
+    } else {
         //run idle Process (WFI loop)
         sbi_add_timer(hart, CONTEXT_SWITCH_TIMER);
-        WFI();
+        WFI_LOOP();
     }
 
     // unsigned long time_slice = get_time_slice(); // Implement this function based on the timer configuration
