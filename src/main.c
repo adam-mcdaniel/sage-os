@@ -16,6 +16,7 @@
 #include <block.h>
 #include <rng.h>
 #include <vfs.h>
+#include <process.h>
 
 // Global MMU table for the kernel. This is used throughout
 // the kernel.
@@ -181,6 +182,10 @@ static void init_systems(void)
     */
     // TEST GPU
     debugf("GPU init %s\n", gpu_test() ? "successful" : "failed");
+
+    // Process init
+    process_map_init();
+    pid_harts_map_init();
 #endif
 }
 
