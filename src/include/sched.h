@@ -19,6 +19,8 @@ void sched_remove_process(Process *p);
 //get process with the lowest vruntime
 Process *sched_get_next();
 
+void sched_handle_timer_interrupt(int hart);
+
 // Get the currently running process
 Process *sched_get_current(void);
 
