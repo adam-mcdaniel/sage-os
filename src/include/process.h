@@ -14,10 +14,13 @@
 #include <stdint.h>
 #include <list.h>
 #include <vector.h>
+#include <map.h>
 #include <mmu.h>
 
 #define HART_NONE        (-1U)
 #define ON_HART_NONE(p)  (p->hart == HART_NONE)
+
+#define PID_LIMIT (0xFFFF) // Reserved for the kernel
 
 typedef enum ProcessMode {
     PM_USER,
@@ -47,12 +50,14 @@ typedef struct TrapFrame {
     uint64_t trap_stack;
 } TrapFrame;
 
-uint16_t generate_unique_pid(void);
-
 // Resource Control Block
 typedef struct RCB {
     List *image_pages;
+    List *stack_pages;
     List *heap_pages;
+    List *file_descriptors;
+    Map *environemnt;
+    PageTable *ptable;
 } RCB;
 
 typedef struct Process {
@@ -60,20 +65,18 @@ typedef struct Process {
     uint32_t hart;
     ProcessMode mode;
     ProcessState state;
+    TrapFrame frame;
+    
+    // Process stats
     uint64_t sleep_until;
     uint64_t runtime;
     uint64_t ran_at;
     uint64_t priority;
     uint64_t quantum;
     
-    uint64_t break_size;
-
-    TrapFrame frame;
-    PageTable *ptable;
-
-    List *pages;
-    Vector *fds;
+    // Resources
     RCB rcb;
+    uint64_t break_size;
 } Process;
 
 /**
@@ -82,6 +85,6 @@ typedef struct Process {
 */
 Process *process_new(ProcessMode mode);
 int process_free(Process *p);
-
 bool process_run(Process *p, uint32_t hart);
 
+static uint16_t generate_unique_pid(void);
