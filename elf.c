@@ -776,6 +776,51 @@ void elf_debug_header(Elf64_Ehdr header) {
     printf("   Section header string table index:  %u\n", header.e_shstrndx);
 }
 
+Elf64_Phdr elf_get_text_section(Elf64_Ehdr elf_header, Elf64_Phdr *program_headers) {
+    // Find the `text` header
+    for (uint32_t i = 0; i < elf_header.e_phnum; i++) {
+        if (program_headers[i].p_type == PT_LOAD && program_headers[i].p_flags & PF_X) {
+            return program_headers[i];
+        }
+    }
+}
+
+Elf64_Phdr elf_get_bss_section(Elf64_Ehdr elf_header, Elf64_Phdr *program_headers) {
+    // Find the `bss` header
+    for (uint32_t i = 0; i < elf_header.e_phnum; i++) {
+        if (program_headers[i].p_type == PT_LOAD && program_headers[i].p_flags & PF_W) {
+            return program_headers[i];
+        }
+    }
+}
+
+Elf64_Phdr elf_get_data_section(Elf64_Ehdr elf_header, Elf64_Phdr *program_headers) {
+    // Find the `data` header
+    for (uint32_t i = 0; i < elf_header.e_phnum; i++) {
+        if (program_headers[i].p_type == PT_LOAD && program_headers[i].p_flags & PF_W && !(program_headers[i].p_flags & PF_X)) {
+            return program_headers[i];
+        }
+    }
+}
+
+Elf64_Phdr elf_get_rodata_section(Elf64_Ehdr elf_header, Elf64_Phdr *program_headers) {
+    // Find the `rodata` header
+    for (uint32_t i = 0; i < elf_header.e_phnum; i++) {
+        if (program_headers[i].p_type == PT_LOAD && !(program_headers[i].p_flags & PF_W) && !(program_headers[i].p_flags & PF_X)) {
+            return program_headers[i];
+        }
+    }
+}
+
+Elf64_Phdr elf_get_dynamic_section(Elf64_Ehdr elf_header, Elf64_Phdr *program_headers) {
+    // Find the `dynamic` header
+    for (uint32_t i = 0; i < elf_header.e_phnum; i++) {
+        if (program_headers[i].p_type == PT_DYNAMIC) {
+            return program_headers[i];
+        }
+    }
+}
+
 void elf_debug_program_header(Elf64_Phdr header) {
     printf("Program Header:\n");
     // printf("   Type:             0x%x\n", header.p_type);

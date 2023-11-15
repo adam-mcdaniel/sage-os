@@ -28,6 +28,46 @@ static uint16_t generate_unique_pid(void) {
     return pid++;
 }
 
+void rcb_debug(RCB *rcb) {
+    debugf("RCB:\n");
+    // List *image_pages;
+    // List *stack_pages;
+    // List *heap_pages;
+    // List *file_descriptors;
+    // Map *environemnt;
+    // PageTable *ptable;
+    debugf("  image_pages:\n");
+    struct ListElem *e;
+    list_for_each(rcb->image_pages, e) {
+        debugf("    %p\n", list_elem_value_ptr(e));
+    }
+    debugf("  stack_pages:\n");
+    list_for_each(rcb->stack_pages, e) {
+        debugf("    %p\n", list_elem_value_ptr(e));
+    }
+    debugf("  heap_pages:\n");
+    list_for_each(rcb->heap_pages, e) {
+        debugf("    %p\n", list_elem_value_ptr(e));
+    }
+    debugf("  file_descriptors:\n");
+    list_for_each(rcb->file_descriptors, e) {
+        debugf("    %p\n", list_elem_value_ptr(e));
+    }
+    debugf("  environemnt:\n");
+    struct List *keys = map_get_keys(rcb->environemnt);
+    struct ListElem *k;
+    list_for_each(keys, k) {
+        char *key = list_elem_value_ptr(k);
+        char *value;
+        map_get(rcb->environemnt, key, (MapValue *)&value);
+        debugf("    %s=%s\n", key, value);
+    }
+    map_free_get_keys(keys);
+    debugf("  ptable:\n");
+    debugf("    %p\n", rcb->ptable);
+    
+}
+
 void trap_frame_debug(TrapFrame *tf) {
     debugf("TrapFrame:\n");
     // int64_t xregs[32];
@@ -91,16 +131,26 @@ void process_debug(Process *p) {
     // uint64_t rodata_size;
     // uint8_t *data;
     // uint64_t data_size;
-    debugf("  text: %p\n", p->text);
-    debugf("  text_size: %d\n", p->text_size);
-    debugf("  bss: %p\n", p->bss);
-    debugf("  rodata: %p\n", p->rodata);
-    debugf("  rodata_size: %d\n", p->rodata_size);
-    debugf("  data: %p\n", p->data);
-    debugf("  data_size: %d\n", p->data_size);
+    if (p->text) {
+        debugf("  text: %p (virt address=%p -> %p)\n", p->text, p->text_vaddr, mmu_translate(p->rcb.ptable, (uintptr_t)p->text_vaddr));
+        debugf("  text_size: %d\n", p->text_size);
+    }
+    if (p->bss) {
+        debugf("  bss: %p (virt address=%p -> %p)\n", p->bss, p->bss_vaddr, mmu_translate(p->rcb.ptable, (uintptr_t)p->bss_vaddr));
+        debugf("  bss_size: %d\n", p->bss_size);
+    }
+    if (p->rodata) {
+        debugf("  rodata: %p (virt address=%p -> %p)\n", p->rodata, p->rodata_vaddr, mmu_translate(p->rcb.ptable, (uintptr_t)p->rodata_vaddr));
+        debugf("  rodata_size: %d\n", p->rodata_size);
+    }
+    if (p->data) {
+        debugf("  data: %p  (virt address=%p -> %p)\n", p->data, p->data_vaddr, mmu_translate(p->rcb.ptable, (uintptr_t)p->data_vaddr));
+        debugf("  data_size: %d\n", p->data_size);
+    }
 
     // // Resources
     // RCB rcb;
+    rcb_debug(&p->rcb);
     // uint64_t break_size;
 }
 
