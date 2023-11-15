@@ -28,6 +28,82 @@ static uint16_t generate_unique_pid(void) {
     return pid++;
 }
 
+void trap_frame_debug(TrapFrame *tf) {
+    debugf("TrapFrame:\n");
+    // int64_t xregs[32];
+    // double fregs[32];
+    // uint64_t sepc;
+    // uint64_t sstatus;
+    // uint64_t sie;
+    // uint64_t satp;
+    // uint64_t sscratch;
+    // uint64_t stvec;
+    // uint64_t trap_satp;
+    // uint64_t trap_stack;
+    debugf("  xregs:\n");
+    for (int i = 0; i < 32; i++) {
+        debugf("    x%d: %d\n", i, tf->xregs[i]);
+    }
+    debugf("  fregs:\n");
+    for (int i = 0; i < 32; i++) {
+        debugf("    f%d: %d\n", i, tf->fregs[i]);
+    }
+    debugf("  sepc: %d\n", tf->sepc);
+    debugf("  sstatus: %d\n", tf->sstatus);
+    debugf("  sie: %d\n", tf->sie);
+    debugf("  satp: %d\n", tf->satp);
+    debugf("  sscratch: %d\n", tf->sscratch);
+    debugf("  stvec: %d\n", tf->stvec);
+    debugf("  trap_satp: %d\n", tf->trap_satp);
+    debugf("  trap_stack: %d\n", tf->trap_stack);
+}
+
+void process_debug(Process *p) {
+    debugf("Process:\n");
+    // uint16_t pid;
+    // uint32_t hart;
+    // ProcessMode mode;
+    // ProcessState state;
+    // TrapFrame frame;
+    debugf("  pid: %d\n", p->pid);
+    debugf("  hart: %d\n", p->hart);
+    debugf("  mode: %d\n", p->mode);
+    debugf("  state: %d\n", p->state);
+    trap_frame_debug(&p->frame);
+    
+    // // Process stats
+    // uint64_t sleep_until;
+    // uint64_t runtime;
+    // uint64_t ran_at;
+    // uint64_t priority;
+    // uint64_t quantum;
+    debugf("  sleep_until: %d\n", p->sleep_until);
+    debugf("  runtime: %d\n", p->runtime);
+    debugf("  ran_at: %d\n", p->ran_at);
+    debugf("  priority: %d\n", p->priority);
+    debugf("  quantum: %d\n", p->quantum);
+
+    // uint8_t *text;
+    // uint64_t text_size;
+    // uint8_t *bss;
+    // uint64_t bss_size;
+    // uint8_t *rodata;
+    // uint64_t rodata_size;
+    // uint8_t *data;
+    // uint64_t data_size;
+    debugf("  text: %p\n", p->text);
+    debugf("  text_size: %d\n", p->text_size);
+    debugf("  bss: %p\n", p->bss);
+    debugf("  rodata: %p\n", p->rodata);
+    debugf("  rodata_size: %d\n", p->rodata_size);
+    debugf("  data: %p\n", p->data);
+    debugf("  data_size: %d\n", p->data_size);
+
+    // // Resources
+    // RCB rcb;
+    // uint64_t break_size;
+}
+
 Process *process_new(ProcessMode mode)
 {
     Process *p = (Process *)kzalloc(sizeof(*p));

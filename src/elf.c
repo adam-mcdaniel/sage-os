@@ -1,7 +1,9 @@
 #include <elf.h>
+#include <page.h>
 #include <util.h>
 #include <kmalloc.h>
 #include <stdbool.h>
+#include <process.h>
 
 #define ELF_DEBUG
 #ifdef ELF_DEBUG
@@ -516,4 +518,144 @@ void elf_debug_program_header(Elf64_Phdr header) {
     debugf("   File Size:        0x%lx\n", header.p_filesz);
     debugf("   Memory Size:      0x%lx\n", header.p_memsz);
     debugf("   Alignment:        0x%lx\n", header.p_align);
+}
+
+
+Elf64_Phdr elf_get_text_section(Elf64_Ehdr elf_header, Elf64_Phdr *program_headers) {
+    // Find the `text` header
+    for (uint32_t i = 0; i < elf_header.e_phnum; i++) {
+        if (program_headers[i].p_type == PT_LOAD && program_headers[i].p_flags & PF_X) {
+            return program_headers[i];
+        }
+    }
+}
+
+Elf64_Phdr elf_get_bss_section(Elf64_Ehdr elf_header, Elf64_Phdr *program_headers) {
+    // Find the `bss` header
+    for (uint32_t i = 0; i < elf_header.e_phnum; i++) {
+        if (program_headers[i].p_type == PT_LOAD && program_headers[i].p_flags & PF_W) {
+            return program_headers[i];
+        }
+    }
+}
+
+Elf64_Phdr elf_get_data_section(Elf64_Ehdr elf_header, Elf64_Phdr *program_headers) {
+    // Find the `data` header
+    for (uint32_t i = 0; i < elf_header.e_phnum; i++) {
+        if (program_headers[i].p_type == PT_LOAD && program_headers[i].p_flags & PF_W && !(program_headers[i].p_flags & PF_X)) {
+            return program_headers[i];
+        }
+    }
+}
+
+Elf64_Phdr elf_get_rodata_section(Elf64_Ehdr elf_header, Elf64_Phdr *program_headers) {
+    // Find the `rodata` header
+    for (uint32_t i = 0; i < elf_header.e_phnum; i++) {
+        if (program_headers[i].p_type == PT_LOAD && !(program_headers[i].p_flags & PF_W) && !(program_headers[i].p_flags & PF_X)) {
+            return program_headers[i];
+        }
+    }
+}
+
+Elf64_Phdr elf_get_dynamic_section(Elf64_Ehdr elf_header, Elf64_Phdr *program_headers) {
+    // Find the `dynamic` header
+    for (uint32_t i = 0; i < elf_header.e_phnum; i++) {
+        if (program_headers[i].p_type == PT_DYNAMIC) {
+            return program_headers[i];
+        }
+    }
+}
+
+void elf_create_process(Process *p, const uint8_t *elf) {
+    // Read the ELF header
+    Elf64_Ehdr header;
+    memcpy(&header, elf, sizeof(header));
+    if (!elf_is_valid_header(header)) {
+        debugf("Invalid ELF header\n");
+        return 1;
+    }
+    elf_debug_header(header);
+    
+    // Read the program headers
+    Elf64_Phdr *program_headers = kmalloc(header.e_phentsize * header.e_phnum);
+    memcpy(program_headers, elf + header.e_phoff, header.e_phentsize * header.e_phnum);
+    for (uint32_t i = 0; i < header.e_phnum; i++) {
+        if (!elf_is_valid_program_header(program_headers[i])) {
+            debugf("Invalid program header #%u\n", i);
+        }
+
+        elf_debug_program_header(program_headers[i]);
+    }
+
+
+    uint8_t *text;
+    uint64_t text_size;
+    uint8_t *bss;
+    uint64_t bss_size;
+    uint8_t *rodata;
+    uint64_t rodata_size;
+    uint8_t *data;
+    uint64_t data_size;
+    // Go through the program headers and find the text, bss, rodata, srodata, and data segments
+    Elf64_Phdr text_header = elf_get_text_section(header, program_headers);
+    debugf("Text header:\n");
+    elf_debug_program_header(text_header);
+    if (text_header.p_type != PT_LOAD) {
+        debugf("No text section found\n");
+        text = NULL;
+        text_size = 0;
+    } else {
+        text = (uint8_t*)page_nalloc(text_header.p_memsz / PAGE_SIZE + 1);
+        memcpy(text, elf + text_header.p_offset, text_header.p_filesz);
+        text_size = text_header.p_memsz;
+    }
+
+    Elf64_Phdr bss_header = elf_get_bss_section(header, program_headers);
+    debugf("BSS header:\n");
+    elf_debug_program_header(bss_header);
+    if (bss_header.p_type != PT_LOAD) {
+        debugf("No bss section found\n");
+        bss = NULL;
+        bss_size = 0;
+    } else {
+        bss = (uint8_t*)page_nalloc(bss_header.p_memsz / PAGE_SIZE + 1);
+        memset(bss, 0, bss_header.p_memsz);
+        bss_size = bss_header.p_memsz;
+    }
+
+    Elf64_Phdr rodata_header = elf_get_rodata_section(header, program_headers);
+    debugf("RODATA header:\n");
+    elf_debug_program_header(rodata_header);
+    if (rodata_header.p_type != PT_LOAD) {
+        debugf("No rodata section found\n");
+        rodata = NULL;
+        rodata_size = 0;
+    } else {
+        rodata = (uint8_t*)page_nalloc(rodata_header.p_memsz / PAGE_SIZE + 1);
+        memcpy(rodata, elf + rodata_header.p_offset, rodata_header.p_filesz);
+        rodata_size = rodata_header.p_memsz;
+    }
+
+    Elf64_Phdr data_header = elf_get_data_section(header, program_headers);
+    debugf("DATA header:\n");
+    elf_debug_program_header(data_header);
+    if (data_header.p_type != PT_LOAD) {
+        debugf("No data section found\n");
+        data = NULL;
+        data_size = 0;
+    } else {
+        data = (uint8_t*)page_nalloc(data_header.p_memsz / PAGE_SIZE + 1);
+        memcpy(data, elf + data_header.p_offset, data_header.p_filesz);
+        data_size = data_header.p_memsz;
+    }
+
+    // Create the process
+    p->text = text;
+    p->text_size = text_size;
+    p->bss = bss;
+    p->bss_size = bss_size;
+    p->rodata = rodata;
+    p->rodata_size = rodata_size;
+    p->data = data;
+    p->data_size = data_size;
 }

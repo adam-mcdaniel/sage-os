@@ -18,6 +18,7 @@
 #include <kmalloc.h>
 #include <util.h>
 #include <stdint.h>
+#include <process.h>
 
 struct process;
 /**
@@ -392,3 +393,5 @@ bool elf_is_valid_program_header(Elf64_Phdr header);
 void elf_debug_header(Elf64_Ehdr header);
 
 void elf_debug_program_header(Elf64_Phdr header);
+
+void elf_create_process(Process *p, const uint8_t *elf);
