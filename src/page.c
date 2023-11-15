@@ -6,7 +6,12 @@
 #include <symbols.h>
 #include <debug.h>
 
-// #define DEBUG_PAGE
+// #define PAGE_DEBUG
+#ifdef PAGE_DEBUG
+#define debugf(...) debugf(__VA_ARGS__)
+#else
+#define debugf(...)
+#endif
 
 // Do NOT hold the lock any longer than you have to!
 Mutex page_lock;

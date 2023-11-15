@@ -277,8 +277,6 @@ void main(unsigned int hart)
     elf_create_process(&p, elfcon);
     process_debug(&p);
 
-    debugf("Done with elf_create_process()\n");
-
     console();
 #else
     extern uint32_t *elfcon;
