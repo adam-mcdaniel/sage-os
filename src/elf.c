@@ -5,6 +5,8 @@
 #include <stdbool.h>
 #include <process.h>
 #include <mmu.h>
+#include <list.h>
+#include <map.h>
 
 #define ELF_DEBUG
 #ifdef ELF_DEBUG
@@ -583,9 +585,15 @@ bool elf_is_valid_text(Elf64_Phdr text) {
 }
 
 void elf_create_process(Process *p, const uint8_t *elf) {
+    // Check if the process has a page table
     if (p->rcb.ptable == NULL) {
         debugf("Process does not have a page table\n");
-        return;
+        // Create a page table
+        p->rcb.ptable = mmu_table_create();
+        if (p->rcb.ptable == NULL) {
+            debugf("Failed to create page table\n");
+            return;
+        }
     }
 
     // Read the ELF header
@@ -643,8 +651,10 @@ void elf_create_process(Process *p, const uint8_t *elf) {
     uint64_t total_size = text_size + rodata_size + bss_size + data_size;
     debugf("Total size: %lu\n", total_size);
     // Allocate the memory for the segments
-    uint8_t *segments = (uint8_t*)page_nalloc(total_size / PAGE_SIZE + 1);
+    uint8_t *segments = (uint8_t*)page_nalloc(ALIGN_UP_POT(total_size, PAGE_SIZE_4K) / PAGE_SIZE_4K);
     memset(segments, 0, total_size);
+    p->image = segments;
+    p->image_size = total_size;
 
     // Get the pointers to the segments
     uint8_t *text = segments;
@@ -736,4 +746,48 @@ void elf_create_process(Process *p, const uint8_t *elf) {
     debugf("DATA: %p\n", p->data);
     debugf("DATA vaddr: %p\n", p->data_vaddr);
     debugf("DATA size: %lu\n", p->data_size);
+
+    // Set the fields of the RCB
+    if (!p->rcb.image_pages) {
+        p->rcb.image_pages = list_new();
+    }
+    // Store all the pages in the `segments` array
+    for (uint64_t i = 0; i < total_size / PAGE_SIZE; i++) {
+        list_add(p->rcb.image_pages, (void*)(segments + i * PAGE_SIZE));
+    }
+
+    // Allocate stack and heap
+    if (!p->rcb.heap_pages) {
+        p->rcb.heap_pages = list_new();
+    }
+    p->heap_size = DEFAULT_HEAP_SIZE;
+    p->heap = page_nalloc(ALIGN_UP_POT(p->heap_size, PAGE_SIZE_4K) / PAGE_SIZE_4K);
+    
+    memset(p->heap, 0, p->heap_size);
+    for (uint64_t i = 0; i < p->heap_size / PAGE_SIZE; i++) {
+        list_add(p->rcb.heap_pages, (void*)(p->heap + i * PAGE_SIZE));
+    }
+
+    if (!p->rcb.stack_pages) {
+        p->rcb.stack_pages = list_new();
+    }
+    p->stack_size = DEFAULT_STACK_SIZE;
+    p->stack = page_nalloc(ALIGN_UP_POT(p->stack_size, PAGE_SIZE_4K) / PAGE_SIZE_4K);
+    memset(p->stack, 0, p->stack_size);
+    for (uint64_t i = 0; i < p->stack_size / PAGE_SIZE; i++) {
+        list_add(p->rcb.stack_pages, (void*)(p->stack + i * PAGE_SIZE));
+    }
+
+    // Create the environment
+    if (!p->rcb.environemnt) {
+        p->rcb.environemnt = map_new();
+    }
+
+    // Create the file descriptors
+    if (!p->rcb.file_descriptors) {
+        p->rcb.file_descriptors = list_new();
+    }
+
+    p->entry = header.e_entry;
+    debugf("Entry: %p\n", p->entry);
 }

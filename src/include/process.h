@@ -17,6 +17,9 @@
 #include <map.h>
 #include <mmu.h>
 
+#define DEFAULT_HEAP_SIZE (0x10000) // 16 KB
+#define DEFAULT_STACK_SIZE (0x2000) // 8 KB
+
 #define MAX_NUM_HARTS    (8) // We are gonna be scheduling 8 harts at most.
 #define HART_NONE        (-1U)
 #define ON_HART_NONE(p)  (p->hart == HART_NONE)
@@ -63,6 +66,8 @@ typedef struct RCB {
     PageTable *ptable;
 } RCB;
 
+void rcb_debug(RCB *rcb);
+
 typedef struct Process {
     uint16_t pid;
     uint32_t hart;
@@ -77,6 +82,13 @@ typedef struct Process {
     uint64_t priority;
     uint64_t quantum;
 
+    // Entry point
+    uint64_t entry;
+
+    // Memory
+    uint8_t *image;
+    uint64_t image_size;
+
     uint8_t *text, *text_vaddr;
     uint64_t text_size;
     uint8_t *bss, *bss_vaddr;
@@ -85,6 +97,11 @@ typedef struct Process {
     uint64_t rodata_size;
     uint8_t *data, *data_vaddr;
     uint64_t data_size;
+
+    uint8_t *stack, *stack_vaddr;
+    uint64_t stack_size;
+    uint8_t *heap, *heap_vaddr;
+    uint64_t heap_size;
     
     // Resources
     RCB rcb;
