@@ -4,6 +4,7 @@
 #include <kmalloc.h>
 #include <stdbool.h>
 #include <process.h>
+#include <mmu.h>
 
 #define ELF_DEBUG
 #ifdef ELF_DEBUG
@@ -329,8 +330,7 @@ void elf_debug_header(Elf64_Ehdr header) {
     for (int i = 0; i < EI_NIDENT; i++) {
         debugf("%02x ", header.e_ident[i]);
     }
-
-    debugf("\n");
+    debugf("(valid)\n");
     debugf("   Class:                              ");
     switch (header.e_ident[EI_CLASS]) {
     case 0:
@@ -566,7 +566,28 @@ Elf64_Phdr elf_get_dynamic_section(Elf64_Ehdr elf_header, Elf64_Phdr *program_he
     }
 }
 
+bool elf_is_valid_rodata(Elf64_Phdr rodata) {
+    return rodata.p_type == PT_LOAD && !(rodata.p_flags & PF_W) && !(rodata.p_flags & PF_X);
+}
+
+bool elf_is_valid_bss(Elf64_Phdr bss) {
+    return bss.p_type == PT_LOAD && bss.p_flags & PF_W && !(bss.p_flags & PF_X);
+}
+
+bool elf_is_valid_data(Elf64_Phdr data) {
+    return data.p_type == PT_LOAD && data.p_flags & PF_W && !(data.p_flags & PF_X);
+}
+
+bool elf_is_valid_text(Elf64_Phdr text) {
+    return text.p_type == PT_LOAD && text.p_flags & PF_X;
+}
+
 void elf_create_process(Process *p, const uint8_t *elf) {
+    if (p->rcb.ptable == NULL) {
+        debugf("Process does not have a page table\n");
+        return;
+    }
+
     // Read the ELF header
     Elf64_Ehdr header;
     memcpy(&header, elf, sizeof(header));
@@ -588,74 +609,131 @@ void elf_create_process(Process *p, const uint8_t *elf) {
     }
 
 
-    uint8_t *text;
-    uint64_t text_size;
-    uint8_t *bss;
-    uint64_t bss_size;
-    uint8_t *rodata;
-    uint64_t rodata_size;
-    uint8_t *data;
-    uint64_t data_size;
     // Go through the program headers and find the text, bss, rodata, srodata, and data segments
+    debugf("Text header:\n");
+
+
+    uint64_t permission_bits = PB_READ | PB_EXECUTE | PB_WRITE | PB_USER;
+
+    // Get sum of the sizes of all the segments
     Elf64_Phdr text_header = elf_get_text_section(header, program_headers);
+    Elf64_Phdr rodata_header = elf_get_rodata_section(header, program_headers);
+    Elf64_Phdr bss_header = elf_get_bss_section(header, program_headers);
+    Elf64_Phdr data_header = elf_get_data_section(header, program_headers);
     debugf("Text header:\n");
     elf_debug_program_header(text_header);
-    if (text_header.p_type != PT_LOAD) {
-        debugf("No text section found\n");
-        text = NULL;
-        text_size = 0;
-    } else {
-        text = (uint8_t*)page_nalloc(text_header.p_memsz / PAGE_SIZE + 1);
-        memcpy(text, elf + text_header.p_offset, text_header.p_filesz);
-        text_size = text_header.p_memsz;
-    }
-
-    Elf64_Phdr bss_header = elf_get_bss_section(header, program_headers);
-    debugf("BSS header:\n");
-    elf_debug_program_header(bss_header);
-    if (bss_header.p_type != PT_LOAD) {
-        debugf("No bss section found\n");
-        bss = NULL;
-        bss_size = 0;
-    } else {
-        bss = (uint8_t*)page_nalloc(bss_header.p_memsz / PAGE_SIZE + 1);
-        memset(bss, 0, bss_header.p_memsz);
-        bss_size = bss_header.p_memsz;
-    }
-
-    Elf64_Phdr rodata_header = elf_get_rodata_section(header, program_headers);
     debugf("RODATA header:\n");
     elf_debug_program_header(rodata_header);
-    if (rodata_header.p_type != PT_LOAD) {
-        debugf("No rodata section found\n");
-        rodata = NULL;
-        rodata_size = 0;
-    } else {
-        rodata = (uint8_t*)page_nalloc(rodata_header.p_memsz / PAGE_SIZE + 1);
-        memcpy(rodata, elf + rodata_header.p_offset, rodata_header.p_filesz);
-        rodata_size = rodata_header.p_memsz;
-    }
-
-    Elf64_Phdr data_header = elf_get_data_section(header, program_headers);
+    debugf("BSS header:\n");
+    elf_debug_program_header(bss_header);
     debugf("DATA header:\n");
     elf_debug_program_header(data_header);
-    if (data_header.p_type != PT_LOAD) {
-        debugf("No data section found\n");
-        data = NULL;
-        data_size = 0;
-    } else {
-        data = (uint8_t*)page_nalloc(data_header.p_memsz / PAGE_SIZE + 1);
+
+    // Get the sizes of the segments
+    debugf("Getting sizes of segments\n");
+    uint64_t text_size = elf_is_valid_text(text_header)? text_header.p_memsz : 0;
+    debugf("Text size: %lu\n", text_size);
+    uint64_t rodata_size = elf_is_valid_rodata(rodata_header)? rodata_header.p_memsz : 0;
+    debugf("RODATA size: %lu\n", rodata_size);
+    uint64_t bss_size = elf_is_valid_bss(bss_header)? bss_header.p_memsz : 0;
+    debugf("BSS size: %lu\n", bss_size);
+    uint64_t data_size = elf_is_valid_data(data_header)? data_header.p_memsz : 0;
+    debugf("DATA size: %lu\n", data_size);
+
+    uint64_t total_size = text_size + rodata_size + bss_size + data_size;
+    debugf("Total size: %lu\n", total_size);
+    // Allocate the memory for the segments
+    uint8_t *segments = (uint8_t*)page_nalloc(total_size / PAGE_SIZE + 1);
+    memset(segments, 0, total_size);
+
+    // Get the pointers to the segments
+    uint8_t *text = segments;
+    uint8_t *rodata = text + text_size;
+    uint8_t *bss = rodata + rodata_size;
+    uint8_t *data = bss + bss_size;
+    if (!text_size) text = NULL;
+    if (!rodata_size) rodata = NULL;
+    if (!bss_size) bss = NULL;
+    if (!data_size || data_header.p_vaddr == bss_header.p_vaddr) data = NULL;
+
+    // Copy the segments into the allocated memory
+    if (text) {
+        debugf("Copying text segment\n");
+        memcpy(text, elf + text_header.p_offset, text_header.p_filesz);
+    }
+    if (rodata) {
+        debugf("Copying rodata segment\n");
+        memcpy(rodata, elf + rodata_header.p_offset, rodata_header.p_filesz);
+    }
+    if (data) {
+        debugf("Copying data segment\n");
         memcpy(data, elf + data_header.p_offset, data_header.p_filesz);
-        data_size = data_header.p_memsz;
     }
 
+    // Map the segments into the page table
+    if (text) {
+        debugf("Mapping text segment\n");
+        mmu_map_range(p->rcb.ptable, 
+                    text_header.p_vaddr, 
+                    text_header.p_vaddr + text_size, 
+                    (uint64_t)text, 
+                    MMU_LEVEL_4K,
+                    permission_bits);
+    }
+    if (rodata) {
+        debugf("Mapping rodata segment\n");
+        mmu_map_range(p->rcb.ptable, 
+                    rodata_header.p_vaddr, 
+                    rodata_header.p_vaddr + rodata_size, 
+                    (uint64_t)rodata, 
+                    MMU_LEVEL_4K,
+                    permission_bits);
+    }
+    if (bss) {
+        debugf("Mapping bss segment\n");
+        mmu_map_range(p->rcb.ptable, 
+                    bss_header.p_vaddr, 
+                    bss_header.p_vaddr + bss_size, 
+                    (uint64_t)bss, 
+                    MMU_LEVEL_4K,
+                    permission_bits);
+    }
+    if (data) {
+        debugf("Mapping data segment\n");
+        mmu_map_range(p->rcb.ptable, 
+                    data_header.p_vaddr, 
+                    data_header.p_vaddr + data_size, 
+                    (uint64_t)data, 
+                    MMU_LEVEL_4K,
+                    permission_bits);
+    }
     // Create the process
     p->text = text;
+    p->text_vaddr = text? text_header.p_vaddr : NULL;
     p->text_size = text_size;
+    debugf("Text: %p\n", p->text);
+    debugf("Text vaddr: %p\n", p->text_vaddr);
+    debugf("Text size: %lu\n", p->text_size);
+    
     p->bss = bss;
+    p->bss_vaddr = bss? bss_header.p_vaddr : NULL;
     p->bss_size = bss_size;
+    debugf("BSS: %p\n", p->bss);
+    debugf("BSS vaddr: %p\n", p->bss_vaddr);
+    debugf("BSS size: %lu\n", p->bss_size);
+    
+
     p->rodata = rodata;
+    p->rodata_vaddr = rodata? rodata_header.p_vaddr : NULL;
     p->rodata_size = rodata_size;
+    debugf("RODATA: %p\n", p->rodata);
+    debugf("RODATA vaddr: %p\n", p->rodata_vaddr);
+    debugf("RODATA size: %lu\n", p->rodata_size);
+
     p->data = data;
+    p->data_vaddr = data? data_header.p_vaddr : NULL;
     p->data_size = data_size;
+    debugf("DATA: %p\n", p->data);
+    debugf("DATA vaddr: %p\n", p->data_vaddr);
+    debugf("DATA size: %lu\n", p->data_size);
 }

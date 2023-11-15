@@ -268,6 +268,12 @@ void main(unsigned int hart)
 
 
     Process p;
+    p.rcb.image_pages = list_new();
+    p.rcb.stack_pages = list_new();
+    p.rcb.heap_pages = list_new();
+    p.rcb.file_descriptors = list_new();
+    p.rcb.environemnt = map_new();
+    p.rcb.ptable = mmu_table_create();
     elf_create_process(&p, elfcon);
     process_debug(&p);
 

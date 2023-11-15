@@ -77,13 +77,13 @@ typedef struct Process {
     uint64_t priority;
     uint64_t quantum;
 
-    uint8_t *text;
+    uint8_t *text, *text_vaddr;
     uint64_t text_size;
-    uint8_t *bss;
+    uint8_t *bss, *bss_vaddr;
     uint64_t bss_size;
-    uint8_t *rodata;
+    uint8_t *rodata, *rodata_vaddr;
     uint64_t rodata_size;
-    uint8_t *data;
+    uint8_t *data, *data_vaddr;
     uint64_t data_size;
     
     // Resources
