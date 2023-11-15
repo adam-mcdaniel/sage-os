@@ -75,7 +75,7 @@ bool mmu_map(PageTable *tab, uint64_t vaddr, uint64_t paddr, uint8_t lvl, uint64
             }
             debugf("mmu_map: create a new page table at 0x%08lx\n", new_pt);
             if (pt->entries[vpn[i]]) {
-                infof("Warning: overwriting page table entry at 0x%08lx = %p\n", &pt->entries[vpn[i]], pt->entries[vpn[i]]);
+                debugf("Warning: overwriting page table entry at 0x%08lx = %p\n", &pt->entries[vpn[i]], pt->entries[vpn[i]]);
             }
             pt->entries[vpn[i]] = (unsigned long)new_pt >> 2 | PB_VALID;
             debugf("mmu_map: set entry %d in page table at 0x%08lx as lvl %d branch to 0x%08lx\n", vpn[i], pt, i, new_pt);
@@ -91,7 +91,7 @@ bool mmu_map(PageTable *tab, uint64_t vaddr, uint64_t paddr, uint8_t lvl, uint64
     
     debugf("mmu_map: ppn_leaf == 0x%x\n", (ppn_leaf << 2));
     if (pt->entries[vpn[i]] != (ppn_leaf | bits | PB_VALID) && pt->entries[vpn[i]] != 0) {
-        infof("Warning: overwriting page table entry at 0x%08lx (was %p, now %p)\n", &pt->entries[vpn[i]], pt->entries[vpn[i]], ppn_leaf | bits | PB_VALID);
+        debugf("Warning: overwriting page table entry at 0x%08lx (was %p, now %p)\n", &pt->entries[vpn[i]], pt->entries[vpn[i]], ppn_leaf | bits | PB_VALID);
     }
     pt->entries[vpn[i]] = ppn_leaf | bits | PB_VALID;
 
@@ -191,28 +191,28 @@ uint64_t mmu_map_range(PageTable *tab,
                        uint64_t bits)
 {
     debugf("mmu_map_range: page table at 0x%08lx\n", tab);
-    infof("mmu_map_range: start_virt = 0x%08lx\n", start_virt);
-    infof("mmu_map_range: start_phys = 0x%08lx\n", start_phys);
+    debugf("mmu_map_range: start_virt = 0x%08lx\n", start_virt);
+    debugf("mmu_map_range: start_phys = 0x%08lx\n", start_phys);
     
     start_virt            = ALIGN_DOWN_POT(start_virt, PAGE_SIZE_AT_LVL(lvl));
-    infof("mmu_map_range: start_virt = 0x%08lx\n", start_virt);
+    debugf("mmu_map_range: start_virt = 0x%08lx\n", start_virt);
     start_phys            = ALIGN_DOWN_POT(start_phys, PAGE_SIZE_AT_LVL(lvl));
-    infof("mmu_map_range: start_phys = 0x%08lx\n", start_phys);
+    debugf("mmu_map_range: start_phys = 0x%08lx\n", start_phys);
     end_virt              = ALIGN_UP_POT(end_virt, PAGE_SIZE_AT_LVL(lvl));
     uint64_t num_bytes    = end_virt - start_virt;
-    infof("mmu_map_range: mapping = %d bytes\n", num_bytes);
+    debugf("mmu_map_range: mapping = %d bytes\n", num_bytes);
     uint64_t pages_mapped = 0;
 
     uint64_t i;
     for (i = 0; i < num_bytes; i += PAGE_SIZE_AT_LVL(lvl)) {
         debugf("mmu_map_range: mapping %d bytes for page %d\n", PAGE_SIZE_AT_LVL(lvl), i / PAGE_SIZE_AT_LVL(lvl));
         if (!mmu_map(tab, start_virt + i, start_phys + i, lvl, bits)) {
-            infof("mmu_map_range: failed to map page %d\n", i / PAGE_SIZE_AT_LVL(lvl));
+            debugf("mmu_map_range: failed to map page %d\n", i / PAGE_SIZE_AT_LVL(lvl));
             break;
         }
         pages_mapped += 1;
     }
-    infof("mmu_map_range: mapped %d pages\n", pages_mapped);
+    debugf("mmu_map_range: mapped %d pages\n", pages_mapped);
     debugf("mmu_map_range: mapped %d pages\n", pages_mapped);
     SFENCE_ALL();
     return pages_mapped;

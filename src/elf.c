@@ -8,7 +8,7 @@
 #include <list.h>
 #include <map.h>
 
-#define ELF_DEBUG
+// #define ELF_DEBUG
 #ifdef ELF_DEBUG
 #define debugf(...) debugf(__VA_ARGS__)
 #else
@@ -640,16 +640,16 @@ void elf_create_process(Process *p, const uint8_t *elf) {
     // Get the sizes of the segments
     debugf("Getting sizes of segments\n");
     uint64_t text_size = elf_is_valid_text(text_header)? text_header.p_memsz : 0;
-    debugf("Text size: %lu\n", text_size);
+    debugf("Text size: %x\n", text_size);
     uint64_t rodata_size = elf_is_valid_rodata(rodata_header)? rodata_header.p_memsz : 0;
-    debugf("RODATA size: %lu\n", rodata_size);
+    debugf("RODATA size: %x\n", rodata_size);
     uint64_t bss_size = elf_is_valid_bss(bss_header)? bss_header.p_memsz : 0;
-    debugf("BSS size: %lu\n", bss_size);
+    debugf("BSS size: %x\n", bss_size);
     uint64_t data_size = elf_is_valid_data(data_header)? data_header.p_memsz : 0;
-    debugf("DATA size: %lu\n", data_size);
+    debugf("DATA size: %x\n", data_size);
 
     uint64_t total_size = text_size + rodata_size + bss_size + data_size;
-    debugf("Total size: %lu\n", total_size);
+    debugf("Total size: %x\n", total_size);
     // Allocate the memory for the segments
     uint8_t *segments = (uint8_t*)page_nalloc(ALIGN_UP_POT(total_size, PAGE_SIZE_4K) / PAGE_SIZE_4K);
     memset(segments, 0, total_size);
