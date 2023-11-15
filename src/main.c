@@ -16,6 +16,8 @@
 #include <block.h>
 #include <rng.h>
 #include <vfs.h>
+#include <stat.h>
+#include <elf.h>
 #include <process.h>
 
 // Global MMU table for the kernel. This is used throughout
@@ -254,6 +256,22 @@ void main(unsigned int hart)
 
     vfs_close(file);
     vfs_close(file2);
+
+    // Read in /home/cosc562/console.elf
+    File *elf_file = vfs_open("/home/cosc562/console.elf", 0, O_RDONLY, VFS_TYPE_FILE);
+    Stat stat;
+    vfs_stat(elf_file, &stat);
+    logf(LOG_INFO, "Console file size: %lu\n", stat.size);
+    uint8_t *elfcon = kzalloc(elf_file->size);
+    vfs_read(elf_file, elfcon, elf_file->size);
+    vfs_close(elf_file);
+
+
+    Process p;
+    elf_create_process(&p, elfcon);
+    process_debug(&p);
+
+    debugf("Done with elf_create_process()\n");
 
     console();
 #else

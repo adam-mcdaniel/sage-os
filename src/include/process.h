@@ -51,6 +51,8 @@ typedef struct TrapFrame {
     uint64_t trap_stack;
 } TrapFrame;
 
+void trap_frame_debug(TrapFrame *frame);
+
 // Resource Control Block
 typedef struct RCB {
     List *image_pages;
@@ -74,11 +76,22 @@ typedef struct Process {
     uint64_t ran_at;
     uint64_t priority;
     uint64_t quantum;
+
+    uint8_t *text;
+    uint64_t text_size;
+    uint8_t *bss;
+    uint64_t bss_size;
+    uint8_t *rodata;
+    uint64_t rodata_size;
+    uint8_t *data;
+    uint64_t data_size;
     
     // Resources
     RCB rcb;
     uint64_t break_size;
 } Process;
+
+void process_debug(Process *p);
 
 /**
  * Create a new process and return it.
