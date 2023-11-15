@@ -10,7 +10,9 @@
 #include <vector.h>
 #include <stddef.h>
 #include <stdint.h>
-#include "map.h"
+#include <map.h>
+#include <util.h>
+
 
 extern const unsigned long trampoline_thread_start;
 extern const unsigned long trampoline_trap_start;
@@ -65,8 +67,8 @@ void rcb_debug(RCB *rcb) {
     map_free_get_keys(keys);
     debugf("  ptable:\n");
     debugf("    %p\n", rcb->ptable);
-    
 }
+
 
 void trap_frame_debug(TrapFrame *tf) {
     debugf("TrapFrame:\n");
@@ -123,29 +125,39 @@ void process_debug(Process *p) {
     debugf("  priority: %d\n", p->priority);
     debugf("  quantum: %d\n", p->quantum);
 
-    // uint8_t *text;
-    // uint64_t text_size;
-    // uint8_t *bss;
-    // uint64_t bss_size;
-    // uint8_t *rodata;
-    // uint64_t rodata_size;
-    // uint8_t *data;
-    // uint64_t data_size;
+
+    debugf("  entry: %p\n", p->entry);
+    if (p->image) {
+        debugf("  image: %p\n", p->image);
+        debugf("  image_size: 0x%X (%d pages)\n", p->image_size, ALIGN_UP_POT(p->image_size, PAGE_SIZE_4K) / PAGE_SIZE_4K);
+    } else {
+        debugf("  image: NULL\n");
+    }
     if (p->text) {
-        debugf("  text: %p (virt address=%p -> %p)\n", p->text, p->text_vaddr, mmu_translate(p->rcb.ptable, (uintptr_t)p->text_vaddr));
-        debugf("  text_size: %d\n", p->text_size);
+        debugf("  text: %p (physical address = %p)\n", p->text_vaddr, mmu_translate(p->rcb.ptable, (uintptr_t)p->text_vaddr));
+        debugf("  text_size: 0x%X (%d pages)\n", p->text_size, ALIGN_UP_POT(p->text_size, PAGE_SIZE_4K) / PAGE_SIZE_4K);
+    } else {
+        debugf("  text: NULL\n");
     }
     if (p->bss) {
-        debugf("  bss: %p (virt address=%p -> %p)\n", p->bss, p->bss_vaddr, mmu_translate(p->rcb.ptable, (uintptr_t)p->bss_vaddr));
-        debugf("  bss_size: %d\n", p->bss_size);
+        debugf("  bss: %p (physical address = %p)\n", p->bss_vaddr, mmu_translate(p->rcb.ptable, (uintptr_t)p->bss_vaddr));
+        // debugf("  bss_size: 0x%X (%d pages)\n", p->bss_size, p->bss_size / PAGE_SIZE);
+        debugf("  bss_size: 0x%X (%d pages)\n", p->bss_size, ALIGN_UP_POT(p->bss_size, PAGE_SIZE_4K) / PAGE_SIZE_4K);
+        
+    } else {
+        debugf("  bss: NULL\n");
     }
     if (p->rodata) {
-        debugf("  rodata: %p (virt address=%p -> %p)\n", p->rodata, p->rodata_vaddr, mmu_translate(p->rcb.ptable, (uintptr_t)p->rodata_vaddr));
-        debugf("  rodata_size: %d\n", p->rodata_size);
+        debugf("  rodata: %p (physical address = %p)\n", p->rodata_vaddr, mmu_translate(p->rcb.ptable, (uintptr_t)p->rodata_vaddr));
+        debugf("  rodata_size: 0x%X (%d pages)\n", p->rodata_size, ALIGN_UP_POT(p->rodata_size, PAGE_SIZE_4K) / PAGE_SIZE_4K);
+    } else {
+        debugf("  rodata: NULL\n");
     }
     if (p->data) {
-        debugf("  data: %p  (virt address=%p -> %p)\n", p->data, p->data_vaddr, mmu_translate(p->rcb.ptable, (uintptr_t)p->data_vaddr));
-        debugf("  data_size: %d\n", p->data_size);
+        debugf("  data: %p (physical address = %p)\n", p->data_vaddr, mmu_translate(p->rcb.ptable, (uintptr_t)p->data_vaddr));
+        debugf("  data_size: 0x%X (%d pages)\n", p->data_size, ALIGN_UP_POT(p->data_size, PAGE_SIZE_4K) / PAGE_SIZE_4K);
+    } else {
+        debugf("  data: NULL\n");
     }
 
     // // Resources
