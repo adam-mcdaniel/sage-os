@@ -55,24 +55,28 @@ typedef struct PageTable {
 #define MMU_TRANSLATE_PAGE_FAULT  (-1UL)
 
 // Declared in src/main.c
-extern struct PageTable *kernel_mmu_table;
+extern PageTable *kernel_mmu_table;
 
-struct PageTable *mmu_table_create(void);
-unsigned long mmu_map_range(struct PageTable *tab, 
-                       unsigned long start_virt, 
-                       unsigned long end_virt, 
-                       unsigned long start_phys,
-                       unsigned char lvl, 
-                       unsigned long bits);
-uintptr_t mmu_translate(const struct PageTable *tab, 
-                            uintptr_t vaddr);
+PageTable *mmu_table_create(void);
+
+unsigned long mmu_map_range(PageTable *tab, 
+                            unsigned long start_virt, 
+                            unsigned long end_virt, 
+                            unsigned long start_phys,
+                            unsigned char lvl, 
+                            unsigned long bits);
+
+uintptr_t mmu_translate(const PageTable *tab, 
+                        uintptr_t vaddr);
+
 uintptr_t kernel_mmu_translate(uintptr_t vaddr);
 
-bool mmu_map(struct PageTable *tab, 
+bool mmu_map(PageTable *tab, 
              uintptr_t vaddr, 
              uintptr_t paddr, 
              unsigned char lvl, 
              uintptr_t bits);
-void mmu_free(struct PageTable *tab);
 
-void debug_page_table(struct PageTable *tab, uint8_t lvl);
+void mmu_free(PageTable *tab);
+
+void debug_page_table(PageTable *tab, uint8_t lvl);

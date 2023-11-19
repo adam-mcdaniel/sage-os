@@ -35,7 +35,7 @@ static void init_systems(void)
     debugf("page_init() done\n");
 
 #ifdef USE_MMU
-    struct page_table *pt = mmu_table_create();
+    PageTable *pt = mmu_table_create();
     kernel_mmu_table = pt;
 
     debugf("Kernel page table at %p\n", pt);
