@@ -192,7 +192,7 @@ char *elf_get_os_abi(Elf64_Ehdr header) {
         // NonStop Kernel
         return "HP NonStop Kernel";
     default:
-        if (header.e_ident[EI_OSABI] >= 64 && header.e_ident[EI_OSABI] <= 255) {
+        if (header.e_ident[EI_OSABI] >= 64) {
             return "Architecture-specific value";
         } else {
             return NULL;
@@ -584,7 +584,7 @@ bool elf_is_valid_text(Elf64_Phdr text) {
     return text.p_type == PT_LOAD && text.p_flags & PF_X;
 }
 
-void elf_create_process(Process *p, const uint8_t *elf) {
+int elf_create_process(Process *p, const uint8_t *elf) {
     // Check if the process has a page table
     if (p->rcb.ptable == NULL) {
         debugf("Process does not have a page table\n");
@@ -592,7 +592,7 @@ void elf_create_process(Process *p, const uint8_t *elf) {
         p->rcb.ptable = mmu_table_create();
         if (p->rcb.ptable == NULL) {
             debugf("Failed to create page table\n");
-            return;
+            return 1;
         }
     }
 
@@ -719,14 +719,14 @@ void elf_create_process(Process *p, const uint8_t *elf) {
     }
     // Create the process
     p->text = text;
-    p->text_vaddr = text? text_header.p_vaddr : NULL;
+    p->text_vaddr = text ? (uint8_t *)text_header.p_vaddr : NULL;
     p->text_size = text_size;
     debugf("Text: %p\n", p->text);
     debugf("Text vaddr: %p\n", p->text_vaddr);
     debugf("Text size: %lu\n", p->text_size);
     
     p->bss = bss;
-    p->bss_vaddr = bss? bss_header.p_vaddr : NULL;
+    p->bss_vaddr = bss ? (uint8_t *)bss_header.p_vaddr : NULL;
     p->bss_size = bss_size;
     debugf("BSS: %p\n", p->bss);
     debugf("BSS vaddr: %p\n", p->bss_vaddr);
@@ -734,14 +734,14 @@ void elf_create_process(Process *p, const uint8_t *elf) {
     
 
     p->rodata = rodata;
-    p->rodata_vaddr = rodata? rodata_header.p_vaddr : NULL;
+    p->rodata_vaddr = rodata ? (uint8_t *)rodata_header.p_vaddr : NULL;
     p->rodata_size = rodata_size;
     debugf("RODATA: %p\n", p->rodata);
     debugf("RODATA vaddr: %p\n", p->rodata_vaddr);
     debugf("RODATA size: %lu\n", p->rodata_size);
 
     p->data = data;
-    p->data_vaddr = data? data_header.p_vaddr : NULL;
+    p->data_vaddr = data ? (uint8_t *)data_header.p_vaddr : NULL;
     p->data_size = data_size;
     debugf("DATA: %p\n", p->data);
     debugf("DATA vaddr: %p\n", p->data_vaddr);
@@ -753,7 +753,7 @@ void elf_create_process(Process *p, const uint8_t *elf) {
     }
     // Store all the pages in the `segments` array
     for (uint64_t i = 0; i < total_size / PAGE_SIZE; i++) {
-        list_add(p->rcb.image_pages, (void*)(segments + i * PAGE_SIZE));
+        list_add_ptr(p->rcb.image_pages, segments + i * PAGE_SIZE);
     }
 
     // Allocate stack and heap
@@ -765,7 +765,7 @@ void elf_create_process(Process *p, const uint8_t *elf) {
     
     memset(p->heap, 0, p->heap_size);
     for (uint64_t i = 0; i < p->heap_size / PAGE_SIZE; i++) {
-        list_add(p->rcb.heap_pages, (void*)(p->heap + i * PAGE_SIZE));
+        list_add_ptr(p->rcb.heap_pages, p->heap + i * PAGE_SIZE);
     }
 
     if (!p->rcb.stack_pages) {
@@ -775,7 +775,7 @@ void elf_create_process(Process *p, const uint8_t *elf) {
     p->stack = page_nalloc(ALIGN_UP_POT(p->stack_size, PAGE_SIZE_4K) / PAGE_SIZE_4K);
     memset(p->stack, 0, p->stack_size);
     for (uint64_t i = 0; i < p->stack_size / PAGE_SIZE; i++) {
-        list_add(p->rcb.stack_pages, (void*)(p->stack + i * PAGE_SIZE));
+        list_add_ptr(p->rcb.stack_pages, p->stack + i * PAGE_SIZE);
     }
 
     // Create the environment
@@ -790,4 +790,5 @@ void elf_create_process(Process *p, const uint8_t *elf) {
 
     p->entry = header.e_entry;
     debugf("Entry: %p\n", p->entry);
+    return 0;
 }
