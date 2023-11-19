@@ -394,4 +394,4 @@ void elf_debug_header(Elf64_Ehdr header);
 
 void elf_debug_program_header(Elf64_Phdr header);
 
-void elf_create_process(Process *p, const uint8_t *elf);
+int elf_create_process(Process *p, const uint8_t *elf);
