@@ -125,5 +125,3 @@ Process *process_map_get(uint16_t pid);
 void pid_harts_map_init();
 void pid_harts_map_set(uint32_t hart, uint16_t pid);
 uint16_t pid_harts_map_get(uint32_t hart);
-
-static uint16_t generate_unique_pid(void);

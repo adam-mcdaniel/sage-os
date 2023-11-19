@@ -24,10 +24,10 @@ extern const unsigned long trampoline_trap_start;
 static uint16_t pid = 1; // Start from 1, 0 is reserved
 
 static uint16_t generate_unique_pid(void) {
-    pid++;
+    ++pid;
     if (pid == PID_LIMIT)
-        warnf("process (generate_unique_pid): Reached PID_LIMIT\n");
-    return pid++;
+        warnf("process.c (generate_unique_pid): Reached PID_LIMIT\n");
+    return pid;
 }
 
 void rcb_debug(RCB *rcb) {
@@ -306,9 +306,9 @@ void process_map_set(Process *p)
 // Get process stored on the process map using the PID as the key.
 Process *process_map_get(uint16_t pid) 
 {
-    MapValue *val;
-    map_get_int(processes, pid, val);
-    return (Process *)*val; 
+    MapValue val;
+    map_get_int(processes, pid, &val);
+    return (Process *)val;
 }
 
 // Keep track of the PIDs running on each hart.
@@ -334,7 +334,7 @@ uint16_t pid_harts_map_get(uint32_t hart)
 {
     if (hart > MAX_NUM_HARTS - 1)
         fatalf("get_pid_on_hart: Invalid hart number\n");
-    MapValue *val;
-    map_get_int(pid_on_harts, hart, val);
-    return (uint16_t)*val;
+    MapValue val;
+    map_get_int(pid_on_harts, hart, &val);
+    return (uint16_t)val;
 }
