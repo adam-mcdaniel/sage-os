@@ -38,6 +38,26 @@ void gpu_device_init() {
     debugf("GPU device has %d scanouts\n", config->num_scanouts);
 }
 
+// Return the respective response message string
+static char *gpu_get_resp_string(VirtioGpuCtrlType type) {
+    switch (type) {
+        // Success responses
+        case VIRTIO_GPU_RESP_OK_NODATA: return "VIRTIO_GPU_RESP_OK_NODATA";
+        case VIRTIO_GPU_RESP_OK_DISPLAY_INFO: return "VIRTIO_GPU_RESP_OK_DISPLAY_INFO";
+        case VIRTIO_GPU_RESP_OK_CAPSET_INFO: return "VIRTIO_GPU_RESP_OK_CAPSET_INFO";
+        case VIRTIO_GPU_RESP_OK_CAPSET: return "VIRTIO_GPU_RESP_OK_CAPSET";
+        case VIRTIO_GPU_RESP_OK_EDID: return "VIRTIO_GPU_RESP_OK_EDID";
+        // Error responses
+        case VIRTIO_GPU_RESP_ERR_UNSPEC: return "VIRTIO_GPU_RESP_ERR_UNSPEC";
+        case VIRTIO_GPU_RESP_ERR_OUT_OF_MEMORY: return "VIRTIO_GPU_RESP_ERR_OUT_OF_MEMORY";
+        case VIRTIO_GPU_RESP_ERR_INVALID_SCANOUT_ID: return "VIRTIO_GPU_RESP_ERR_INVALID_SCANOUT_ID";
+        case VIRTIO_GPU_RESP_ERR_INVALID_RESOURCE_ID: return "VIRTIO_GPU_RESP_ERR_INVALID_RESOURCE_ID";
+        case VIRTIO_GPU_RESP_ERR_INVALID_CONTEXT_ID: return "VIRTIO_GPU_RESP_ERR_INVALID_CONTEXT_ID";
+        case VIRTIO_GPU_RESP_ERR_INVALID_PARAMETER: return "VIRTIO_GPU_RESP_ERR_INVALID_PARAMETER";
+        default: return "Invalid type argument to gpu_get_resp_string"; break;
+    }
+}
+
 // TODO: Implement checking for error responses
 bool gpu_init(VirtioDevice *gpu_device) {
     VirtioGpuDispInfoResp disp_info;
@@ -81,9 +101,8 @@ bool gpu_init(VirtioDevice *gpu_device) {
     resp_hdr.type = 0;
     
     gpu_send_command(gpu_device, 0, &attach_backing, sizeof(attach_backing), &mem, sizeof(mem), &resp_hdr, sizeof(resp_hdr));
-
     if (resp_hdr.type == VIRTIO_GPU_RESP_OK_NODATA) {
-        debugf("gpu_init: Attach backing OK\n");
+        debugf("gpu_init: Attach backing OK (%s)\n", gpu_get_resp_string(resp_hdr.type));
     } else {
         // debugf("gpu_init: Attach backing failed with %s\n", gpu_get_resp_string(resp_hdr.type));
         // return false;
@@ -254,7 +273,7 @@ void fill_rect(uint32_t screen_width,
     uint32_t right = rect->x + rect->width;
     uint32_t row;
     uint32_t col;
-    uint32_t offset;
+    // uint32_t offset;
 
     if (bottom > screen_height) {
         bottom = screen_height;
@@ -309,24 +328,4 @@ void stroke_rect(uint32_t screen_width,
     RVALS(&r, rect->x + rect->width, rect->y,
               line_size, rect->height + line_size);
     fill_rect(screen_width, screen_height, frame_buf, &r, line_color);
-}
-
-// Return the respective response message string
-static char *gpu_get_resp_string(VirtioGpuCtrlType type) {
-    switch (type) {
-        // Success responses
-        case VIRTIO_GPU_RESP_OK_NODATA: return "VIRTIO_GPU_RESP_OK_NODATA";
-        case VIRTIO_GPU_RESP_OK_DISPLAY_INFO: return "VIRTIO_GPU_RESP_OK_DISPLAY_INFO";
-        case VIRTIO_GPU_RESP_OK_CAPSET_INFO: return "VIRTIO_GPU_RESP_OK_CAPSET_INFO";
-        case VIRTIO_GPU_RESP_OK_CAPSET: return "VIRTIO_GPU_RESP_OK_CAPSET";
-        case VIRTIO_GPU_RESP_OK_EDID: return "VIRTIO_GPU_RESP_OK_EDID";
-        // Error responses
-        case VIRTIO_GPU_RESP_ERR_UNSPEC: return "VIRTIO_GPU_RESP_ERR_UNSPEC";
-        case VIRTIO_GPU_RESP_ERR_OUT_OF_MEMORY: return "VIRTIO_GPU_RESP_ERR_OUT_OF_MEMORY";
-        case VIRTIO_GPU_RESP_ERR_INVALID_SCANOUT_ID: return "VIRTIO_GPU_RESP_ERR_INVALID_SCANOUT_ID";
-        case VIRTIO_GPU_RESP_ERR_INVALID_RESOURCE_ID: return "VIRTIO_GPU_RESP_ERR_INVALID_RESOURCE_ID";
-        case VIRTIO_GPU_RESP_ERR_INVALID_CONTEXT_ID: return "VIRTIO_GPU_RESP_ERR_INVALID_CONTEXT_ID";
-        case VIRTIO_GPU_RESP_ERR_INVALID_PARAMETER: return "VIRTIO_GPU_RESP_ERR_INVALID_PARAMETER";
-        default: return "Invalid type argument to gpu_get_resp_string"; break;
-    }
 }

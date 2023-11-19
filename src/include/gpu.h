@@ -163,15 +163,9 @@ void fill_rect(uint32_t screen_width,
                Pixel *frame_buf,
                const Rectangle *rect,
                const Pixel *fill_color);
-static inline void RVALS(Rectangle *r,
-                         uint32_t x,
-                         uint32_t y,
-                         uint32_t width,
-                         uint32_t height);
 void stroke_rect(uint32_t screen_width,
                  uint32_t screen_height,
                  Pixel *frame_buf,
                  const Rectangle *rect,
                  const Pixel *line_color,
                  uint32_t line_size);
-static char *gpu_get_resp_string(VirtioGpuCtrlType type);
