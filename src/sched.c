@@ -13,7 +13,7 @@ Scheduler - uses completely fair scheduler approach
 
 
 static RBTree *sched_tree;
-Mutex *sched_mutex;
+Mutex sched_lock;
 
 
 //initialize scheduler tree
@@ -23,26 +23,26 @@ void sched_init(){
 
 //adds node to scheduler tree
 void sched_add(Process *p) {  
-    mutex_spinlock(sched_mutex);  
+    mutex_spinlock(&sched_lock);  
     //NOTE: Process key is runtime * priority
     rb_insert(sched_tree, p->runtime * p->priority, (uint64_t)p);
-    mutex_unlock(sched_mutex);
+    mutex_unlock(&sched_lock);
 }
 
 //get (pop) Process with the lowest vruntime
 Process *sched_get_next(){
-    mutex_spinlock(sched_mutex);
+    mutex_spinlock(&sched_lock);
     Process *min_process;
     //implementation of async Process freeing
-    while(min_process->state != PS_DEAD){
+    while (min_process->state != PS_DEAD) {
         bool search_success = rb_min_val_ptr(sched_tree, min_process);
         rb_delete(sched_tree, min_process->runtime * min_process->priority);
-        if (!search_success){
+        if (!search_success) {
             min_process = NULL;
             break;
         }
     }
-    mutex_unlock(sched_mutex);
+    mutex_unlock(&sched_lock);
     return min_process;
 }
 /*
@@ -55,15 +55,15 @@ Process *sched_get_next(){
 /* Duplicate purpose of above method*/
 // Function to choose the next Process to run based on CFS
 // Process *sched_choose_next() {
-//     mutex_spinlock(sched_mutex);
+//     mutex_spinlock(&sched_lock);
 //     Process *next_process;
 //     if (rb_min_val_ptr(sched_tree, &next_process)) {
 //         rb_delete(sched_tree, next_process->runtime);
-//         mutex_unlock(sched_mutex);
+//         mutex_unlock(&sched_lock);
 //         return next_process;
 //     }
     
-//     mutex_unlock(sched_mutex);
+//     mutex_unlock(&sched_lock);
 //     return NULL; // No Process is ready to run
 // }
 
