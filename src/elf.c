@@ -788,7 +788,8 @@ int elf_create_process(Process *p, const uint8_t *elf) {
         p->rcb.file_descriptors = list_new();
     }
 
-    p->entry = header.e_entry;
-    debugf("Entry: %p\n", p->entry);
+    // Set sepc of the process's trap frame
+    p->frame.sepc = header.e_entry;
+    debugf("SEPC: %p\n", p->frame.sepc);
     return 0;
 }
