@@ -90,14 +90,14 @@ void trap_frame_debug(TrapFrame *tf) {
     for (int i = 0; i < 32; i++) {
         debugf("    f%d: %d\n", i, tf->fregs[i]);
     }
-    debugf("  sepc: %d\n", tf->sepc);
-    debugf("  sstatus: %d\n", tf->sstatus);
-    debugf("  sie: %d\n", tf->sie);
-    debugf("  satp: %d\n", tf->satp);
-    debugf("  sscratch: %d\n", tf->sscratch);
-    debugf("  stvec: %d\n", tf->stvec);
-    debugf("  trap_satp: %d\n", tf->trap_satp);
-    debugf("  trap_stack: %d\n", tf->trap_stack);
+    debugf("  sepc: 0x%08x\n", tf->sepc);
+    debugf("  sstatus: 0x%08x\n", tf->sstatus);
+    debugf("  sie: 0x%08x\n", tf->sie);
+    debugf("  satp: 0x%08x\n", tf->satp);
+    debugf("  sscratch: 0x%08x\n", tf->sscratch);
+    debugf("  stvec: 0x%08x\n", tf->stvec);
+    debugf("  trap_satp: 0x%08x\n", tf->trap_satp);
+    debugf("  trap_stack: 0x%08x\n", tf->trap_stack);
 }
 
 void process_debug(Process *p) {
@@ -125,8 +125,6 @@ void process_debug(Process *p) {
     debugf("  priority: %d\n", p->priority);
     debugf("  quantum: %d\n", p->quantum);
 
-
-    debugf("  entry: %p\n", p->entry);
     if (p->image) {
         debugf("  image: %p\n", p->image);
         debugf("  image_size: 0x%X (%d pages)\n", p->image_size, ALIGN_UP_POT(p->image_size, PAGE_SIZE_4K) / PAGE_SIZE_4K);
