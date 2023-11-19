@@ -14,6 +14,19 @@ Every week, you will need to write entries in this journal. Include brief inform
 * any complications that you've fixed and how you did it.
 
 Sort your entries in descending order (newest entries at the top).
+
+# 15-Nov-2023
+
+- `amcdan23`: Read an ELF file from the disk and map its sections into memory with its own page table. Added functions for getting each section for the program from the bytes of an ELF file. Added initialization for the RCB, and added virtual and physical pointers to each of the sections in the `Process` struct.
+
+# 11-Nov-2023
+
+- `amcdan23`: Fixed small bug with the kernel trap frame allocation; fixed compilation errors and changed type names to be consistent with our styling.
+
+# 8-Nov-2023
+
+- `amcdan23`: Created `elf.c` and created functions for parsing the headers and getting the segment data. Added functions for printing out all the information about a file.
+
 # 7-Nov-2023
 - `ttahmid`: Added `Resource Control Block` and unique id generation to processes. Added more functions for scheduling like function to choose the next process to run based on CFS, `sched_choose_next`; Function to update the vruntime of a process, `sched_update_vruntime`; Function to handle the timer interrupt for context switching, `sched_handle_timer_interrupt`; as well as template functions for `context_switch`.
 
