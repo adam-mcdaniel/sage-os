@@ -8,6 +8,7 @@
 #include <compiler.h>
 #include <trap.h>
 #include <sbi.h>
+#include <sched.h>
 
 // #define TRAP_DEBUG
 
@@ -64,33 +65,33 @@ void os_trap_handler(void)
     debugf("Is async: %d\n", SCAUSE_IS_ASYNC(cause));
 
     if (SCAUSE_IS_ASYNC(cause)) {
-        debugf("Is async!\n");
+        debugf("os_trap_handler: Is async!\n");
         cause = SCAUSE_NUM(cause);
         switch (cause) {
+            case CAUSE_SSIP:
+                debugf("os_trap_handerl: Supervisor software interrupt!\n");
+                // TODO
+                break;
             case CAUSE_STIP:
                 // Ack timer will reset the timer to INFINITE
                 // In src/sbi.c
-                debugf("HANDLING TIMER!!!!!!!!!!!!!!!\n");
-                CSR_CLEAR("sip");
+                debugf("os_trap_handler: Supervisor timer interrupt!\n");
+                // CSR_CLEAR("sip");
                 sbi_ack_timer();
                 // We typically invoke our scheduler if we get a timer
-                // sched_invoke(hart);
+                sched_handle_timer_interrupt(hart);
                 break;
             case CAUSE_SEIP:
+                debugf("os_trap_handler: Supervisor external interrupt!\n");
                 // Forward to src/plic.c
-                debugf("Entering plic handle\n");
                 plic_handle_irq(hart);
-                debugf("Left plic handle\n");
-                
-                // fatalf("Could not return from trap\n");
                 break;
             default:
-                fatalf("Unhandled Asynchronous interrupt %ld\n", cause);
+                fatalf("os_trap_handler: Unhandled Asynchronous interrupt %ld\n", cause);
                 WFI_LOOP();
                 break;
         }
-    }
-    else {
+    } else {
         debugf("Is sync!\n");
         switch (cause) {
             case CAUSE_ILLEGAL_INSTRUCTION:

@@ -3,6 +3,8 @@
 #include <sbi.h>
 #include <stdint.h>
 #include <util.h>
+#include <debug.h>
+#include <process.h>
 
 #define XREG(x)             (scratch[XREG_##x])
 #define SYSCALL_RETURN_TYPE void
@@ -20,6 +22,17 @@ SYSCALL(exit)
     SYSCALL_ENTER();
     // Kill the current process on this HART and schedule the next
     // one.
+    debugf("HELLO\n");
+    
+    // Get the current process running on hart
+    Process *p = process_map_get(pid_harts_map_get(hart));
+    
+    // Kill process
+    // ...
+
+    // Free process
+    if (process_free(p)) 
+        fatalf("syscall.c (exit): process_free failed\n");
 }
 
 SYSCALL(putchar)
