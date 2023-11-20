@@ -14,11 +14,19 @@ Every week, you will need to write entries in this journal. Include brief inform
 * any complications that you've fixed and how you did it.
 
 Sort your entries in descending order (newest entries at the top).
+# 19-Nov-2023
+- `jpark78`: Debugged running the program loaded by the ELF load. Added trap_stack allocation and mapped the process's trap_frame to the user's page table. Also, fixed how the mutex was being used in sched.c. Made sure we were storing the entry point in the process's SEPC. Fixed miscellaneous compiler warnings on types and unused functions.
 
 # 15-Nov-2023
 
 - `gmorale1`: Changed scheduler code so only hart 0 is put in a WFI loop if no more processes are ready to run. Other harts will be stopped.
 - `amcdan23`: Read an ELF file from the disk and map its sections into memory with its own page table. Added functions for getting each section for the program from the bytes of an ELF file. Added initialization for the RCB, and added virtual and physical pointers to each of the sections in the `Process` struct.
+
+# 14-Nov-2023
+- `jpark78`: Added additional data structures to store processes and keep track of which process is on which hart.
+
+# 13-Nov-2023
+- `jpark78`: Added additional fields to RCB. Fixed `generate_unique_pid`.
 
 # 11-Nov-2023
 
