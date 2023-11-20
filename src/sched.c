@@ -100,9 +100,15 @@ void sched_handle_timer_interrupt(int hart) {
         sbi_add_timer(hart, CONTEXT_SWITCH_TIMER * next_process->quantum);
         process_run(next_process, hart);
     } else {
-        //run idle Process (WFI loop)
-        sbi_add_timer(hart, CONTEXT_SWITCH_TIMER);
-        WFI_LOOP();
+        
+        if(hart == 0){
+            //run idle Process (WFI loop)
+            sbi_add_timer(hart, CONTEXT_SWITCH_TIMER);
+            WFI_LOOP();
+        }else{
+            sbi_hart_stop();
+        }
+
     }
 
     // unsigned long time_slice = get_time_slice(); // Implement this function based on the timer configuration
