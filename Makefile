@@ -6,7 +6,7 @@ OBJCOPY=$(CROSS_COMPILE)objcopy
 OBJDUMP=$(CROSS_COMPILE)objdump
 
 LDSCRIPT=lds/riscv.lds
-CFLAGS=-g -O0 -Wall -Wextra -march=rv64gc -mabi=lp64d -ffreestanding -nostdlib -nostartfiles -Iutil/include -Isrc/include -mcmodel=medany
+CFLAGS=-g -O0 -Wall -Wextra -march=rv64gc -mabi=lp64d -ffreestanding -nostdlib -nostartfiles -Iutil/include -Isrc/include -Isbi/src/include -mcmodel=medany
 LDFLAGS=-T$(LDSCRIPT) $(CFLAGS) -Lutil/
 LIBS=-lcosc562_util
 ASM_DIR=asm

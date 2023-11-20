@@ -16,11 +16,15 @@
 #include <block.h>
 #include <rng.h>
 #include <vfs.h>
+#include <stat.h>
+#include <elf.h>
+#include <process.h>
+#include <sched.h>
 
 // Global MMU table for the kernel. This is used throughout
 // the kernel.
 // Defined in src/include/mmu.h
-struct page_table *kernel_mmu_table;
+PageTable *kernel_mmu_table;
 
 static void init_systems(void)
 {
@@ -32,7 +36,7 @@ static void init_systems(void)
     debugf("page_init() done\n");
 
 #ifdef USE_MMU
-    struct page_table *pt = mmu_table_create();
+    PageTable *pt = mmu_table_create();
     kernel_mmu_table = pt;
 
     debugf("Kernel page table at %p\n", pt);
@@ -109,7 +113,7 @@ static void init_systems(void)
     CSR_WRITE("stvec", trampoline_trap_start);
     debugf("STVEC: 0x%p, 0x%p\n", stvec, trampoline_trap_start);
 
-    Trapframe *sscratch = kzalloc(sizeof(Trapframe) * 0x1000);
+    Trapframe *sscratch = kzalloc(sizeof(Trapframe) * 4);
     
     CSR_READ(sscratch->sepc, "sepc");
     CSR_READ(sscratch->sstatus, "sstatus");
@@ -117,7 +121,7 @@ static void init_systems(void)
     CSR_READ(sscratch->satp, "satp");
     CSR_READ(sscratch->stvec, "stvec");
     CSR_READ(sscratch->trap_satp, "satp");
-    sscratch->trap_stack = (uint64_t)kmalloc(0x4000);
+    sscratch->trap_stack = (uint64_t)kmalloc(0x10000);
     CSR_WRITE("sscratch", sscratch);
 
     virtio_init();
@@ -181,6 +185,11 @@ static void init_systems(void)
     */
     // TEST GPU
     debugf("GPU init %s\n", gpu_test() ? "successful" : "failed");
+
+    // Process init
+    process_map_init();
+    pid_harts_map_init();
+    sched_init();
 #endif
 }
 
@@ -249,6 +258,22 @@ void main(unsigned int hart)
 
     vfs_close(file);
     vfs_close(file2);
+
+    // Read in /home/cosc562/console.elf
+    File *elf_file = vfs_open("/home/cosc562/console.elf", 0, O_RDONLY, VFS_TYPE_FILE);
+    Stat stat;
+    vfs_stat(elf_file, &stat);
+    logf(LOG_INFO, "Console file size: %lu\n", stat.size);
+    uint8_t *elfcon = kzalloc(elf_file->size);
+    vfs_read(elf_file, elfcon, elf_file->size);
+    vfs_close(elf_file);
+
+
+    Process *p = process_new(PM_USER);
+    elf_create_process(p, elfcon);
+    process_debug(p);
+    sched_add(p);
+    process_run(p, 0);
 
     console();
 #else

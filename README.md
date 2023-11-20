@@ -14,8 +14,32 @@ Every week, you will need to write entries in this journal. Include brief inform
 * any complications that you've fixed and how you did it.
 
 Sort your entries in descending order (newest entries at the top).
+# 19-Nov-2023
+- `jpark78`: Debugged running the program loaded by the ELF load. Added trap_stack allocation and mapped the process's trap_frame to the user's page table. Also, fixed how the mutex was being used in sched.c. Made sure we were storing the entry point in the process's SEPC. Fixed miscellaneous compiler warnings on types and unused functions.
+
+# 15-Nov-2023
+
+- `gmorale1`: Changed scheduler code so only hart 0 is put in a WFI loop if no more processes are ready to run. Other harts will be stopped.
+- `amcdan23`: Read an ELF file from the disk and map its sections into memory with its own page table. Added functions for getting each section for the program from the bytes of an ELF file. Added initialization for the RCB, and added virtual and physical pointers to each of the sections in the `Process` struct.
+
+# 14-Nov-2023
+- `jpark78`: Added additional data structures to store processes and keep track of which process is on which hart.
+
+# 13-Nov-2023
+- `jpark78`: Added additional fields to RCB. Fixed `generate_unique_pid`.
+
+# 11-Nov-2023
+
+- `amcdan23`: Fixed small bug with the kernel trap frame allocation; fixed compilation errors and changed type names to be consistent with our styling.
+
+# 8-Nov-2023
+
+- `amcdan23`: Created `elf.c` and created functions for parsing the headers and getting the segment data. Added functions for printing out all the information about a file.
+
 # 7-Nov-2023
+- `ttahmid`: Added `Resource Control Block` and unique id generation to processes. Added more functions for scheduling like function to choose the next process to run based on CFS, `sched_choose_next`; Function to update the vruntime of a process, `sched_update_vruntime`; Function to handle the timer interrupt for context switching, `sched_handle_timer_interrupt`; as well as template functions for `context_switch`.
 - `gmorale1`: added Process-and-Scheduling branch, added `sched.c` and `sched.h`. Implemented methods for the completely fair scheduler, which use a red-black tree. Methods include the scheduler init, adding a process, removing a process, and selecting the next process.
+
 # 5-Nov-2023
 - `amcdan23`: Expanded the block driver to work with any block device connected to the machine. Added functionality for: mounting devices on the VFS, opening `File*` objects on arbitrary mounted devices on the VFS (multiple open files on multiple drives simultaneously), reading/writing files on VFS, and automatically populating mounted drives in `/dev` folder on the base drive \#0 at `/`. Wrote `vfs_read`, `vfs_write`, `vfs_init`, `vfs_open`, `vfs_close`, `vfs_mount`, `vfs_print_mounted_devices`, `vfs_print_open_files`, many more private VFS helper functions in `vfs.c`, and rewrote all the block driver functions with devices as parameters in `block.c`. Added a PCI function for getting the Nth device of a given type.
 

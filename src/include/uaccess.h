@@ -10,13 +10,14 @@
  */
 #pragma once
 
-struct page_table;
+typedef struct PageTable PageTable;
+
 unsigned long copy_from(void *dst, 
-                        const struct page_table *from_table, 
+                        const PageTable *from_table, 
                         const void *from, 
                         unsigned long size);
 
 unsigned long copy_to(void *to, 
-                      const struct page_table *to_table, 
+                      const PageTable *to_table, 
                       const void *src, 
                       unsigned long size);
