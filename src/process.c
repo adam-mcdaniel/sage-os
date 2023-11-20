@@ -90,14 +90,14 @@ void trap_frame_debug(TrapFrame *tf) {
     for (int i = 0; i < 32; i++) {
         debugf("    f%d: %d\n", i, tf->fregs[i]);
     }
-    debugf("  sepc: 0x%08x\n", tf->sepc);
-    debugf("  sstatus: 0x%08x\n", tf->sstatus);
-    debugf("  sie: 0x%08x\n", tf->sie);
-    debugf("  satp: 0x%08x\n", tf->satp);
-    debugf("  sscratch: 0x%08x\n", tf->sscratch);
-    debugf("  stvec: 0x%08x\n", tf->stvec);
-    debugf("  trap_satp: 0x%08x\n", tf->trap_satp);
-    debugf("  trap_stack: 0x%08x\n", tf->trap_stack);
+    debugf("  sepc: 0x%p\n", tf->sepc);
+    debugf("  sstatus: 0x%p\n", tf->sstatus);
+    debugf("  sie: 0x%p\n", tf->sie);
+    debugf("  satp: 0x%p\n", tf->satp);
+    debugf("  sscratch: 0x%p\n", tf->sscratch);
+    debugf("  stvec: 0x%p\n", tf->stvec);
+    debugf("  trap_satp: 0x%p\n", tf->trap_satp);
+    debugf("  trap_stack: 0x%p\n", tf->trap_stack);
 }
 
 void process_debug(Process *p) {
@@ -167,6 +167,7 @@ void process_debug(Process *p) {
 Process *process_new(ProcessMode mode)
 {
     Process *p = (Process *)kzalloc(sizeof(*p));
+    debugf("process.c (process_new): Process address: 0x%08x\n", p);
 
     p->pid = generate_unique_pid();
     p->hart = -1U;
@@ -192,6 +193,8 @@ Process *process_new(ProcessMode mode)
     p->frame.stvec = trampoline_trap_start;
     p->frame.trap_satp = SATP_KERNEL;
     // p->frame.trap_stack = filled_in_by_SCHEDULER
+    
+    p->frame.trap_stack = (uint64_t)kmalloc(0x10000); 
 
     // We need to keep track of the stack itself in the kernel, so we can free it
     // later, but the user process will interact with the stack via the SP register.
@@ -212,6 +215,10 @@ Process *process_new(ProcessMode mode)
             PB_READ | PB_EXECUTE);
     mmu_map(p->rcb.ptable, trampoline_trap_start, trans_trampoline_trap, MMU_LEVEL_4K,
             PB_READ | PB_EXECUTE);
+
+    // Map trap frame to user's page table
+    uintptr_t trans_frame = kernel_mmu_translate((uintptr_t)&p->frame);
+    mmu_map(p->rcb.ptable, (uintptr_t)&p->frame, trans_frame, MMU_LEVEL_4K, PB_READ | PB_WRITE | PB_EXECUTE);
 
     SFENCE_ASID(p->pid);
 

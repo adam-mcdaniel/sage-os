@@ -10,14 +10,14 @@ Scheduler - uses completely fair scheduler approach
 #include <lock.h>
 #include <sbi.h>
 #include <csr.h>
-
+#include <debug.h>
 
 static RBTree *sched_tree;
 Mutex sched_lock;
 
 
 //initialize scheduler tree
-void sched_init(){
+void sched_init() {
     sched_tree = rb_new();
 }
 
@@ -25,12 +25,12 @@ void sched_init(){
 void sched_add(Process *p) {  
     mutex_spinlock(&sched_lock);  
     //NOTE: Process key is runtime * priority
-    rb_insert(sched_tree, p->runtime * p->priority, (uint64_t)p);
+    rb_insert_ptr(sched_tree, p->runtime * p->priority, p);
     mutex_unlock(&sched_lock);
 }
 
 //get (pop) Process with the lowest vruntime
-Process *sched_get_next(){
+Process *sched_get_next() {
     mutex_spinlock(&sched_lock);
     Process *min_process;
     //implementation of async Process freeing
@@ -100,15 +100,14 @@ void sched_handle_timer_interrupt(int hart) {
         sbi_add_timer(hart, CONTEXT_SWITCH_TIMER * next_process->quantum);
         process_run(next_process, hart);
     } else {
-        
-        if(hart == 0){
+        if (hart == 0) {
             //run idle Process (WFI loop)
             sbi_add_timer(hart, CONTEXT_SWITCH_TIMER);
+            debugf("sched_handle_timer_interrupt: Running idle process\n");
             WFI_LOOP();
-        }else{
+        } else {
             sbi_hart_stop();
         }
-
     }
 
     // unsigned long time_slice = get_time_slice(); // Implement this function based on the timer configuration
@@ -152,5 +151,3 @@ unsigned long get_time_slice(void) {
 
 void set_current_process(Process *proc) {
 }
-
-

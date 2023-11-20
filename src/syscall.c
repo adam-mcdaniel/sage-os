@@ -22,6 +22,7 @@ SYSCALL(exit)
     SYSCALL_ENTER();
     // Kill the current process on this HART and schedule the next
     // one.
+    debugf("HELLO\n");
     
     // Get the current process running on hart
     Process *p = process_map_get(pid_harts_map_get(hart));
@@ -31,7 +32,7 @@ SYSCALL(exit)
 
     // Free process
     if (process_free(p)) 
-        fatalf("exit(2): Could not free the process...\n");
+        fatalf("syscall.c (exit): process_free failed\n");
 }
 
 SYSCALL(putchar)

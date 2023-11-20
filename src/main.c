@@ -19,6 +19,7 @@
 #include <stat.h>
 #include <elf.h>
 #include <process.h>
+#include <sched.h>
 
 // Global MMU table for the kernel. This is used throughout
 // the kernel.
@@ -271,6 +272,8 @@ void main(unsigned int hart)
     Process *p = process_new(PM_USER);
     elf_create_process(p, elfcon);
     process_debug(p);
+    sched_add(p);
+    process_run(p, 0);
 
     console();
 #else
