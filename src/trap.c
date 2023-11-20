@@ -76,7 +76,7 @@ void os_trap_handler(void)
                 // Ack timer will reset the timer to INFINITE
                 // In src/sbi.c
                 debugf("os_trap_handler: Supervisor timer interrupt!\n");
-                CSR_CLEAR("sip");
+                // CSR_CLEAR("sip");
                 sbi_ack_timer();
                 // We typically invoke our scheduler if we get a timer
                 sched_handle_timer_interrupt(hart);
