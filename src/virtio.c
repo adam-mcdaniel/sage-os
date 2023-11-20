@@ -46,6 +46,10 @@ Job *virtio_get_job(VirtioDevice *dev, uint64_t job_id) {
     for (uint64_t i=0; i<vector_size(dev->jobs); i++) {
         Job *job = NULL;
         vector_get_ptr(dev->jobs, i, &job);
+        if (job == NULL) {
+            debugf("No job\n");
+            continue;
+        }
         if (job->job_id == job_id) {
             return job;
         }
@@ -164,8 +168,12 @@ void virtio_handle_interrupt(VirtioDevice *dev, VirtioDescriptor desc[], uint16_
         warnf("No job found matching interrupt\n");
         return;
     }
-
-    job_set_context(virtio_get_job(dev, job_id), desc, num_descriptors);
+    Job *job = virtio_get_job(dev, job_id);
+    if (job == NULL) {
+        warnf("No job found with ID %d\n", job_id);
+        return;
+    }
+    job_set_context(job, desc, num_descriptors);
 
     virtio_complete_job(dev, job_id);
 }
