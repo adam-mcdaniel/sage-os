@@ -14,6 +14,9 @@ Every week, you will need to write entries in this journal. Include brief inform
 * any complications that you've fixed and how you did it.
 
 Sort your entries in descending order (newest entries at the top).
+# 20-Nov-2023
+- `ttahmid`: Created user-space branch. Modified elf.h and elf.c with elf_load_process, elf_load_file, and elf_load_block_device functions.
+
 # 19-Nov-2023
 - `jpark78`: Debugged running the program loaded by the ELF load. Added trap_stack allocation and mapped the process's trap_frame to the user's page table. Also, fixed how the mutex was being used in sched.c. Made sure we were storing the entry point in the process's SEPC. Fixed miscellaneous compiler warnings on types and unused functions.
 
