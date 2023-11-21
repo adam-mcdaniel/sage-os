@@ -793,3 +793,36 @@ int elf_create_process(Process *p, const uint8_t *elf) {
     debugf("SEPC: %p\n", p->frame.sepc);
     return 0;
 }
+
+int elf_load_process(Process *p, const uint8_t *elf) {
+    // Check if the process has a page table
+    if (p->rcb.ptable == NULL) {
+        debugf("Process does not have a page table\n");
+        // Create a page table
+        p->rcb.ptable = mmu_table_create();
+        if (p->rcb.ptable == NULL) {
+            debugf("Failed to create page table\n");
+            return 1;
+        }
+    }
+
+    // Read the ELF header
+    Elf64_Ehdr header;
+    memcpy(&header, elf, sizeof(header));
+    if (!elf_is_valid_header(header)) {
+        debugf("Invalid ELF header\n");
+        return 1;
+    }
+    elf_debug_header(header);
+    
+    // Read the program headers
+    Elf64_Phdr *program_headers = kmalloc(header.e_phentsize * header.e_phnum);
+    memcpy(program_headers, elf + header.e_phoff, header.e_phentsize * header.e_phnum);
+    for (uint32_t i = 0; i < header.e_phnum; i++) {
+        if (!elf_is_valid_program_header(program_headers[i])) {
+            debugf("Invalid program header #%u\n", i);
+        }
+
+        elf_debug_program_header(program_headers[i]);
+    }
+}
