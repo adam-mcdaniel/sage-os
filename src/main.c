@@ -25,6 +25,7 @@
 // the kernel.
 // Defined in src/include/mmu.h
 PageTable *kernel_mmu_table;
+TrapFrame *kernel_trap_frame;
 
 static void init_systems(void)
 {
@@ -113,16 +114,17 @@ static void init_systems(void)
     CSR_WRITE("stvec", trampoline_trap_start);
     debugf("STVEC: 0x%p, 0x%p\n", stvec, trampoline_trap_start);
 
-    Trapframe *sscratch = kzalloc(sizeof(Trapframe) * 4);
+    kernel_trap_frame = kzalloc(sizeof(Trapframe) * 4);
     
-    CSR_READ(sscratch->sepc, "sepc");
-    CSR_READ(sscratch->sstatus, "sstatus");
-    CSR_READ(sscratch->sie, "sie");
-    CSR_READ(sscratch->satp, "satp");
-    CSR_READ(sscratch->stvec, "stvec");
-    CSR_READ(sscratch->trap_satp, "satp");
-    sscratch->trap_stack = (uint64_t)kmalloc(0x10000);
-    CSR_WRITE("sscratch", sscratch);
+    CSR_READ(kernel_trap_frame->sepc, "sepc");
+    CSR_READ(kernel_trap_frame->sstatus, "sstatus");
+    
+    CSR_READ(kernel_trap_frame->satp, "satp");
+    CSR_READ(kernel_trap_frame->stvec, "stvec");
+    CSR_READ(kernel_trap_frame->trap_satp, "satp");
+    // kernel_trap_frame->satp = kernel_mmu_table
+    kernel_trap_frame->trap_stack = (uint64_t)kmalloc(0x10000);
+    CSR_WRITE("sscratch", kernel_trap_frame);
 
     virtio_init();
     uint8_t buffer[16] = {0};
@@ -272,8 +274,12 @@ void main(unsigned int hart)
     Process *p = process_new(PM_USER);
     elf_create_process(p, elfcon);
     process_debug(p);
-    sched_add(p);
-    process_run(p, 0);
+    // sched_add(p);
+    // process_run(p, 0);
+
+    CSR_READ(kernel_trap_frame->sie, "sie");
+    kernel_trap_frame->sie = SIE_STIE | SIE_SSIE | SIE_SEIE;
+    CSR_WRITE("sie", kernel_trap_frame->sie);
 
     console();
 #else
