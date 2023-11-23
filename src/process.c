@@ -13,7 +13,7 @@
 #include <map.h>
 #include <util.h>
 
-#define DEBUG_PROCESS
+// #define DEBUG_PROCESS
 #ifdef DEBUG_PROCESS
 #define debugf(...) debugf(__VA_ARGS__)
 #else
@@ -288,10 +288,9 @@ bool process_run(Process *p, unsigned int hart)
     unsigned int me = sbi_whoami();
 
     if (me == hart) {
-        process_debug(p);
+        // process_debug(p);
         debugf("process.c (process_run): Running process %d on hart %d\n", p->pid, hart);
         pid_harts_map_set(hart, p->pid);
-        debugf("process.c (process_run): Running process %d on hart %d\n", p->pid, hart);
         process_asm_run(&p->frame);
         
         fatalf("process.c (process_run): process_asm_run returned\n");
