@@ -275,15 +275,16 @@ void main(unsigned int hart)
     elf_create_process(p, elfcon);
 
     // process_debug(p);
-    // p->state = PS_RUNNING;
-    // p->hart = sbi_whoami();
-    // p->frame.sstatus = SSTATUS_SPP_BIT | SSTATUS_SPIE_BIT;
-    // sched_add(p);
+    p->state = PS_RUNNING;
+    p->hart = sbi_whoami();
+    p->frame.sstatus = SSTATUS_SPP_BIT | SSTATUS_SPIE_BIT;
+    sched_add(p);
 
+    // debugf("SIE: 0x%lx\n", kernel_trap_frame->sie);
     CSR_READ(kernel_trap_frame->sie, "sie");
     kernel_trap_frame->sie = SIE_STIE | SIE_SSIE | SIE_SEIE;
     CSR_WRITE("sie", kernel_trap_frame->sie);
-    process_run(p, 0);
+    // process_run(p, 0);
 
     console();
 #else

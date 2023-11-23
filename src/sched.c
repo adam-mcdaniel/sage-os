@@ -17,7 +17,7 @@ Scheduler - uses completely fair scheduler approach
 #include <kmalloc.h>
 #include <lock.h>
 
-#define DEBUG_SCHED
+// #define DEBUG_SCHED
 #ifdef DEBUG_SCHED
 #define debugf(...) debugf(__VA_ARGS__)
 #else
@@ -56,7 +56,6 @@ void sched_init() {
     p->rcb.ptable = kernel_mmu_table;
     p->frame = *kernel_trap_frame;
     p->frame.sepc = (uint64_t) idle_process_main;
-    p->frame.sstatus = SSTATUS_SPP_BIT | SSTATUS_SPIE_BIT;
     // CSR_READ(p->frame.sstatus, "sstatus");
     
     // process_map_set(p);
@@ -66,7 +65,7 @@ void sched_init() {
     sched_add(p);
     mutex_spinlock(&sched_lock);
 
-    process_debug(p);
+    // process_debug(p);
     // Print the next Process to run
     mutex_unlock(&sched_lock);
     Process *next_process = sched_get_next();
@@ -108,10 +107,10 @@ Process *sched_get_next() {
             break;
         }
         // If the process is dead, remove it from the tree
-        // if (min_process->state == PS_DEAD) {
-        //     rb_delete(sched_tree, min_process->runtime * min_process->priority);
-        // }
-        rb_delete(sched_tree, min_process->runtime * min_process->priority);
+        if (min_process->state == PS_DEAD) {
+            rb_delete(sched_tree, min_process->runtime * min_process->priority);
+        }
+        // rb_delete(sched_tree, min_process->runtime * min_process->priority);
     }
     debugf("sched_get_next: Next Process to run is %d\n", min_process->pid);
     mutex_unlock(&sched_lock);
@@ -163,7 +162,7 @@ void sched_handle_timer_interrupt(int hart) {
     Process *current_proc = process_map_get(pid);
     // remove_process(current_proc);
     debugf("sched_handle_timer_interrupt: Putting Process %d back in scheduler\n", current_proc->pid);
-    sched_add(current_proc);
+    // sched_add(current_proc);
     // Print the program counter of the Process that was interrupted
     debugf("pc: %lx\n", current_proc->frame.sepc);
     // Print map size
