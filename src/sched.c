@@ -45,7 +45,6 @@ void sched_init() {
     p->frame.sepc = (uint64_t) idle_process_main;
     CSR_READ(p->frame.sstatus, "sstatus");
     
-
     sched_tree = rb_new();
     set_current_process(p);
     //add idle Process to scheduler tree
