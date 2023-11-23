@@ -11,7 +11,6 @@
 #include <sched.h>
 
 // #define TRAP_DEBUG
-
 #ifdef TRAP_DEBUG
 #define debugf(...) debugf(__VA_ARGS__)
 #else
@@ -75,7 +74,7 @@ void os_trap_handler(void)
             case CAUSE_STIP:
                 // Ack timer will reset the timer to INFINITE
                 // In src/sbi.c
-                debugf("os_trap_handler: Supervisor timer interrupt!\n");
+                infof("os_trap_handler: Supervisor timer interrupt!\n");
                 // CSR_CLEAR("sip");
                 sbi_ack_timer();
                 // We typically invoke our scheduler if we get a timer
