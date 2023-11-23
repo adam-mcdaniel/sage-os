@@ -220,7 +220,7 @@ Process *process_new(ProcessMode mode)
     uintptr_t trans_frame = kernel_mmu_translate((uintptr_t)&p->frame);
     mmu_map(p->rcb.ptable, (uintptr_t)&p->frame, trans_frame, MMU_LEVEL_4K, PB_READ | PB_WRITE | PB_EXECUTE);
 
-    SFENCE_ASID(p->pid);
+    // SFENCE_ASID(p->pid);
 
     return p;
 }
@@ -283,6 +283,7 @@ bool process_run(Process *p, unsigned int hart)
 
     if (me == hart) {
         pid_harts_map_set(hart, p->pid);
+        debugf("process.c (process_run): Running process %d on hart %d\n", p->pid, hart);
         process_asm_run(&p->frame);
         // process_asm_run should not return, but if it does
         // something went wrong.

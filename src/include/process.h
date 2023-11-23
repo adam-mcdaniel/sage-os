@@ -82,6 +82,8 @@ typedef struct Process {
     uint64_t priority;
     uint64_t quantum;
 
+    uint8_t *entry_point;
+
     // Memory
     uint8_t *image;
     uint64_t image_size;
