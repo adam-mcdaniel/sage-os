@@ -15,9 +15,17 @@ Scheduler - uses completely fair scheduler approach
 #include <trap.h>
 #include <debug.h>
 #include <kmalloc.h>
+#include <lock.h>
+
+#define DEBUG_SCHED
+#ifdef DEBUG_SCHED
+#define debugf(...) debugf(__VA_ARGS__)
+#else
+#define debugf(...)
+#endif
 
 static RBTree *sched_tree;
-static Mutex sched_lock;
+static Mutex sched_lock = MUTEX_UNLOCKED;
 
 static Process *idle_process, *current_process;
 
@@ -29,34 +37,48 @@ void idle_process_main() {
 }
 
 
+Process *sched_get_idle_process() {
+    return idle_process;
+}
+
 //initialize scheduler tree
 void sched_init() {
+    mutex_spinlock(&sched_lock);
+    sched_tree = rb_new();
     //create idle Process
     Process *p = process_new(PM_SUPERVISOR);
-    process_map_set(p);
     p->state = PS_RUNNING;
+    p->hart = sbi_whoami();
     debugf("sched_init: Idle Process created with pid %d\n", p->pid);
-    p->runtime = 0;
-    p->priority = 0;
+    p->runtime = 1;
+    p->priority = 1;
     kfree(p->rcb.ptable);
     p->rcb.ptable = kernel_mmu_table;
     p->frame = *kernel_trap_frame;
-    p->frame.sscratch = (uint64_t) p->rcb.ptable;
     p->frame.sepc = (uint64_t) idle_process_main;
-    CSR_READ(p->frame.sstatus, "sstatus");
+    p->frame.sstatus = SSTATUS_SPP_BIT | SSTATUS_SPIE_BIT;
+    // CSR_READ(p->frame.sstatus, "sstatus");
     
-    sched_tree = rb_new();
+    // process_map_set(p);
     set_current_process(p);
     //add idle Process to scheduler tree
+    mutex_unlock(&sched_lock);
     sched_add(p);
+    mutex_spinlock(&sched_lock);
 
+    process_debug(p);
     // Print the next Process to run
+    mutex_unlock(&sched_lock);
     Process *next_process = sched_get_next();
+    mutex_spinlock(&sched_lock);
     if (next_process != NULL) {
         debugf("sched_init: Next Process to run is %d\n", next_process->pid);
     } else {
         debugf("sched_init: No Process to run\n");
     }
+
+    debugf("sched_init: Scheduler initialized\n");
+    mutex_unlock(&sched_lock);
 }
 
 //adds node to scheduler tree
@@ -80,6 +102,7 @@ Process *sched_get_next() {
     //implementation of async Process freeing
     while (min_process != NULL && min_process->state != PS_RUNNING) {
         bool search_success = rb_min_val_ptr(sched_tree, min_process);
+        debugf("sched_get_next: Process %d is not ready to run\n", min_process->pid);
         if (!search_success) {
             min_process = NULL;
             break;
@@ -134,7 +157,7 @@ Process *sched_get_next() {
 
 // Function to handle the timer interrupt for context switching
 void sched_handle_timer_interrupt(int hart) {
-    infof("sched_handle_timer_interrupt: hart %d\n", hart);
+    debugf("sched_handle_timer_interrupt: hart %d\n", hart);
     //put Process currently on the hart back in the scheduler to recalc priority
     uint16_t pid = pid_harts_map_get(hart);
     Process *current_proc = process_map_get(pid);
@@ -143,6 +166,8 @@ void sched_handle_timer_interrupt(int hart) {
     sched_add(current_proc);
     // Print the program counter of the Process that was interrupted
     debugf("pc: %lx\n", current_proc->frame.sepc);
+    // Print map size
+    // debugf("sched_handle_timer_interrupt: Map size is %d\n", process_map_size());
 
     //get an idle Process
     Process *next_process = sched_get_next(); // Implement this function to get the currently running Process

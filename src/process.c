@@ -13,6 +13,12 @@
 #include <map.h>
 #include <util.h>
 
+#define DEBUG_PROCESS
+#ifdef DEBUG_PROCESS
+#define debugf(...) debugf(__VA_ARGS__)
+#else
+#define debugf(...)
+#endif
 
 extern const unsigned long trampoline_thread_start;
 extern const unsigned long trampoline_trap_start;
@@ -282,9 +288,13 @@ bool process_run(Process *p, unsigned int hart)
     unsigned int me = sbi_whoami();
 
     if (me == hart) {
+        process_debug(p);
+        debugf("process.c (process_run): Running process %d on hart %d\n", p->pid, hart);
         pid_harts_map_set(hart, p->pid);
         debugf("process.c (process_run): Running process %d on hart %d\n", p->pid, hart);
         process_asm_run(&p->frame);
+        
+        fatalf("process.c (process_run): process_asm_run returned\n");
         // process_asm_run should not return, but if it does
         // something went wrong.
         return false;
@@ -324,6 +334,7 @@ static Map *pid_on_harts;
 // first process.
 void pid_harts_map_init()
 {
+    // pid_on_harts = map_new_with_slots(0x100);
     pid_on_harts = map_new();
 }
 
