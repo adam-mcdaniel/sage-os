@@ -8,7 +8,6 @@
 #include <list.h>
 #include <map.h>
 #include <virtio.h>
-#include <block.h>
 
 // #define ELF_DEBUG
 #ifdef ELF_DEBUG
@@ -650,7 +649,9 @@ int elf_create_process(Process *p, const uint8_t *elf) {
     uint64_t data_size = elf_is_valid_data(data_header)? data_header.p_memsz : 0;
     debugf("DATA size: %x\n", data_size);
 
-    uint64_t total_size = text_size + rodata_size + bss_size + data_size;
+    p->heap_size = DEFAULT_HEAP_SIZE;
+    p->stack_size = DEFAULT_STACK_SIZE;
+    uint64_t total_size = text_size + rodata_size + bss_size + data_size + p->heap_size + p->stack_size;
     debugf("Total size: %x\n", total_size);
     // Allocate the memory for the segments
     uint8_t *segments = (uint8_t*)page_nalloc(ALIGN_UP_POT(total_size, PAGE_SIZE_4K) / PAGE_SIZE_4K);
@@ -663,6 +664,8 @@ int elf_create_process(Process *p, const uint8_t *elf) {
     uint8_t *rodata = text + text_size;
     uint8_t *bss = rodata + rodata_size;
     uint8_t *data = bss + bss_size;
+    p->heap = data + data_size;
+    p->stack = p->heap + p->heap_size;
     if (!text_size) text = NULL;
     if (!rodata_size) rodata = NULL;
     if (!bss_size) bss = NULL;
@@ -681,44 +684,51 @@ int elf_create_process(Process *p, const uint8_t *elf) {
         debugf("Copying data segment\n");
         memcpy(data, elf + data_header.p_offset, data_header.p_filesz);
     }
+    // Map all the segments into the page table
+    mmu_map_range(p->rcb.ptable, 
+                segments,
+                segments + total_size,
+                (uint64_t)segments,
+                MMU_LEVEL_4K,
+                permission_bits);
 
-    // Map the segments into the page table
-    if (text) {
-        debugf("Mapping text segment\n");
-        mmu_map_range(p->rcb.ptable, 
-                    text_header.p_vaddr, 
-                    text_header.p_vaddr + text_size, 
-                    (uint64_t)text, 
-                    MMU_LEVEL_4K,
-                    permission_bits);
-    }
-    if (rodata) {
-        debugf("Mapping rodata segment\n");
-        mmu_map_range(p->rcb.ptable, 
-                    rodata_header.p_vaddr, 
-                    rodata_header.p_vaddr + rodata_size, 
-                    (uint64_t)rodata, 
-                    MMU_LEVEL_4K,
-                    permission_bits);
-    }
-    if (bss) {
-        debugf("Mapping bss segment\n");
-        mmu_map_range(p->rcb.ptable, 
-                    bss_header.p_vaddr, 
-                    bss_header.p_vaddr + bss_size, 
-                    (uint64_t)bss, 
-                    MMU_LEVEL_4K,
-                    permission_bits);
-    }
-    if (data) {
-        debugf("Mapping data segment\n");
-        mmu_map_range(p->rcb.ptable, 
-                    data_header.p_vaddr, 
-                    data_header.p_vaddr + data_size, 
-                    (uint64_t)data, 
-                    MMU_LEVEL_4K,
-                    permission_bits);
-    }
+    // // Map the segments into the page table
+    // if (text) {
+    //     debugf("Mapping text segment\n");
+    //     mmu_map_range(p->rcb.ptable, 
+    //                 text_header.p_vaddr, 
+    //                 text_header.p_vaddr + text_size, 
+    //                 (uint64_t)text, 
+    //                 MMU_LEVEL_4K,
+    //                 permission_bits);
+    // }
+    // if (rodata) {
+    //     debugf("Mapping rodata segment\n");
+    //     mmu_map_range(p->rcb.ptable, 
+    //                 rodata_header.p_vaddr, 
+    //                 rodata_header.p_vaddr + rodata_size, 
+    //                 (uint64_t)rodata, 
+    //                 MMU_LEVEL_4K,
+    //                 permission_bits);
+    // }
+    // if (bss) {
+    //     debugf("Mapping bss segment\n");
+    //     mmu_map_range(p->rcb.ptable, 
+    //                 bss_header.p_vaddr, 
+    //                 bss_header.p_vaddr + bss_size, 
+    //                 (uint64_t)bss, 
+    //                 MMU_LEVEL_4K,
+    //                 permission_bits);
+    // }
+    // if (data) {
+    //     debugf("Mapping data segment\n");
+    //     mmu_map_range(p->rcb.ptable, 
+    //                 data_header.p_vaddr, 
+    //                 data_header.p_vaddr + data_size, 
+    //                 (uint64_t)data, 
+    //                 MMU_LEVEL_4K,
+    //                 permission_bits);
+    // }
     // Create the process
     p->text = text;
     p->text_vaddr = text ? (uint8_t *)text_header.p_vaddr : NULL;
@@ -762,8 +772,6 @@ int elf_create_process(Process *p, const uint8_t *elf) {
     if (!p->rcb.heap_pages) {
         p->rcb.heap_pages = list_new();
     }
-    p->heap_size = DEFAULT_HEAP_SIZE;
-    p->heap = page_nalloc(ALIGN_UP_POT(p->heap_size, PAGE_SIZE_4K) / PAGE_SIZE_4K);
     
     memset(p->heap, 0, p->heap_size);
     for (uint64_t i = 0; i < p->heap_size / PAGE_SIZE; i++) {
@@ -773,8 +781,6 @@ int elf_create_process(Process *p, const uint8_t *elf) {
     if (!p->rcb.stack_pages) {
         p->rcb.stack_pages = list_new();
     }
-    p->stack_size = DEFAULT_STACK_SIZE;
-    p->stack = page_nalloc(ALIGN_UP_POT(p->stack_size, PAGE_SIZE_4K) / PAGE_SIZE_4K);
     memset(p->stack, 0, p->stack_size);
     for (uint64_t i = 0; i < p->stack_size / PAGE_SIZE; i++) {
         list_add_ptr(p->rcb.stack_pages, p->stack + i * PAGE_SIZE);
@@ -792,6 +798,18 @@ int elf_create_process(Process *p, const uint8_t *elf) {
 
     // Set sepc of the process's trap frame
     p->frame.sepc = header.e_entry;
+    p->frame.trap_satp = SATP_KERNEL;
+
+    // int64_t xregs[32];
+    // double fregs[32];
+    // uint64_t sepc;
+    // uint64_t sstatus;
+    // uint64_t sie;
+    // uint64_t satp;
+    // uint64_t sscratch;
+    // uint64_t stvec;
+    // uint64_t trap_satp;
+    // uint64_t trap_stack;
     debugf("SEPC: %p\n", p->frame.sepc);
     return 0;
 }

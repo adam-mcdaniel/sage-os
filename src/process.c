@@ -12,16 +12,19 @@
 #include <stdint.h>
 #include <map.h>
 #include <util.h>
+#include <trap.h>
 
-// #define DEBUG_PROCESS
+#define DEBUG_PROCESS
 #ifdef DEBUG_PROCESS
 #define debugf(...) debugf(__VA_ARGS__)
 #else
 #define debugf(...)
 #endif
 
-extern const unsigned long trampoline_thread_start;
-extern const unsigned long trampoline_trap_start;
+// extern const unsigned long trampoline_thread_start;
+// extern const unsigned long trampoline_trap_start;
+// extern const unsigned long process_asm_run;
+
 
 #define STACK_PAGES 2
 #define STACK_SIZE  (STACK_PAGES * PAGE_SIZE)
@@ -172,13 +175,15 @@ void process_debug(Process *p) {
 
 Process *process_new(ProcessMode mode)
 {
-    Process *p = (Process *)kzalloc(sizeof(*p));
+    Process *p = (Process *)kzalloc(sizeof(Process));
     debugf("process.c (process_new): Process address: 0x%08x\n", p);
 
     p->pid = generate_unique_pid();
     p->hart = -1U;
     p->mode = mode;
     p->state = PS_WAITING;
+    p->quantum = 10;
+    p->priority = 10;
     
     process_map_set(p);
 
@@ -200,11 +205,11 @@ Process *process_new(ProcessMode mode)
     p->frame.trap_satp = SATP_KERNEL;
     // p->frame.trap_stack = filled_in_by_SCHEDULER
     
-    p->frame.trap_stack = (uint64_t)kmalloc(0x10000); 
+    // p->frame.trap_stack = (uint64_t)kzalloc(0x10000); 
 
     // We need to keep track of the stack itself in the kernel, so we can free it
     // later, but the user process will interact with the stack via the SP register.
-    p->frame.xregs[XREG_SP] = STACK_TOP + STACK_SIZE;
+    p->frame.trap_stack = STACK_TOP + STACK_SIZE;
     for (unsigned long i = 0; i < STACK_PAGES; i += 1) {
         void *stack = page_zalloc();
         list_add_ptr(p->rcb.stack_pages, stack);
@@ -215,13 +220,19 @@ Process *process_new(ProcessMode mode)
     // We need to map certain kernel portions into the user's page table. Notice
     // that the PB_USER is NOT set, but it needs to be there because we need to execute
     // the trap/start instructions while using the user's page table until we change SATP.
+    void process_asm_run(void *frame_addr);
     unsigned long trans_trampoline_start = mmu_translate(kernel_mmu_table, trampoline_thread_start);
     unsigned long trans_trampoline_trap  = mmu_translate(kernel_mmu_table, trampoline_trap_start);
+    unsigned long trans_process_asm_run  = mmu_translate(kernel_mmu_table, process_asm_run);
+    unsigned long trans_os_trap_handler  = mmu_translate(kernel_mmu_table, os_trap_handler);
     mmu_map(p->rcb.ptable, trampoline_thread_start, trans_trampoline_start, MMU_LEVEL_4K,
             PB_READ | PB_EXECUTE);
     mmu_map(p->rcb.ptable, trampoline_trap_start, trans_trampoline_trap, MMU_LEVEL_4K,
             PB_READ | PB_EXECUTE);
-
+    mmu_map(p->rcb.ptable, trans_process_asm_run, trans_process_asm_run, MMU_LEVEL_4K,
+            PB_READ | PB_EXECUTE);
+    mmu_map(p->rcb.ptable, trans_os_trap_handler, os_trap_handler, MMU_LEVEL_4K,
+            PB_READ | PB_EXECUTE);
     // Map trap frame to user's page table
     uintptr_t trans_frame = kernel_mmu_translate((uintptr_t)&p->frame);
     mmu_map(p->rcb.ptable, (uintptr_t)&p->frame, trans_frame, MMU_LEVEL_4K, PB_READ | PB_WRITE | PB_EXECUTE);
@@ -288,9 +299,9 @@ bool process_run(Process *p, unsigned int hart)
     unsigned int me = sbi_whoami();
 
     if (me == hart) {
-        // process_debug(p);
-        debugf("process.c (process_run): Running process %d on hart %d\n", p->pid, hart);
+        process_debug(p);
         pid_harts_map_set(hart, p->pid);
+        debugf("process.c (process_run): Running process %d on hart %d\n", p->pid, hart);
         process_asm_run(&p->frame);
         
         fatalf("process.c (process_run): process_asm_run returned\n");

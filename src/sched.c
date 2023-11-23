@@ -17,7 +17,7 @@ Scheduler - uses completely fair scheduler approach
 #include <kmalloc.h>
 #include <lock.h>
 
-// #define DEBUG_SCHED
+#define DEBUG_SCHED
 #ifdef DEBUG_SCHED
 #define debugf(...) debugf(__VA_ARGS__)
 #else
@@ -30,8 +30,9 @@ static Mutex sched_lock = MUTEX_UNLOCKED;
 static Process *idle_process, *current_process;
 
 void idle_process_main() {
+    infof("idle_process_main: Idle Process started\n");
     while (1) {
-        debugf("idle_process_main: Idle Process started\n");
+        infof("idle_process_main: Idle Process started\n");
         WFI_LOOP();
     }
 }
@@ -50,11 +51,12 @@ void sched_init() {
     p->state = PS_RUNNING;
     p->hart = sbi_whoami();
     debugf("sched_init: Idle Process created with pid %d\n", p->pid);
-    p->runtime = 1;
-    p->priority = 1;
+    p->runtime = 2;
+    p->priority = 2;
     kfree(p->rcb.ptable);
-    p->rcb.ptable = kernel_mmu_table;
-    p->frame = *kernel_trap_frame;
+    // p->rcb.ptable = kernel_mmu_table;
+    // p->frame = *kernel_trap_frame;
+    mmu_map(p->rcb.ptable, idle_process_main, idle_process_main, MMU_LEVEL_4K, PB_READ | PB_WRITE | PB_EXECUTE | PB_USER);
     p->frame.sepc = (uint64_t) idle_process_main;
     // CSR_READ(p->frame.sstatus, "sstatus");
     
@@ -160,6 +162,22 @@ void sched_handle_timer_interrupt(int hart) {
     //put Process currently on the hart back in the scheduler to recalc priority
     uint16_t pid = pid_harts_map_get(hart);
     Process *current_proc = process_map_get(pid);
+
+    CSR_READ(current_proc->frame.sepc, "sepc");
+
+    // Remove the Process from the tree
+    rb_delete(sched_tree, current_proc->runtime * current_proc->priority);
+    // Update the Process's runtime
+    sbi_add_timer(sbi_whoami(), CONTEXT_SWITCH_TIMER * current_proc->quantum);
+
+    current_proc->runtime += CONTEXT_SWITCH_TIMER * current_proc->quantum;
+    current_proc->priority = 1;
+    debugf("sched_handle_timer_interrupt: Process %d quantum is now %d\n", current_proc->pid, current_proc->quantum);
+    debugf("sched_handle_timer_interrupt: Process %d runtime is now %d\n", current_proc->pid, current_proc->runtime);
+    // Add the Process back to the tree
+    debugf("sched_handle_timer_interrupt: Putting Process %d back in scheduler\n", current_proc->pid);
+    rb_insert_ptr(sched_tree, current_proc->runtime * current_proc->priority, current_proc);
+    
     // remove_process(current_proc);
     debugf("sched_handle_timer_interrupt: Putting Process %d back in scheduler\n", current_proc->pid);
     // sched_add(current_proc);

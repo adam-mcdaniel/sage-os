@@ -245,21 +245,21 @@ void main(unsigned int hart)
     // minix3_init(block_device, "/");
     vfs_init();
 
-    File *file = vfs_open("/dev/sda/root.txt", 0, O_RDONLY, VFS_TYPE_FILE);
-    uint8_t *buffer = kzalloc(2048);
-    vfs_read(file, buffer, 1024);
-    logf(LOG_INFO, "Read from file /dev/sda/root.txt: %1024s\n", buffer);
-    // vfs_print_mounted_devices();
+    // File *file = vfs_open("/dev/sda/root.txt", 0, O_RDONLY, VFS_TYPE_FILE);
+    // uint8_t *buffer = kzalloc(2048);
+    // vfs_read(file, buffer, 1024);
+    // logf(LOG_INFO, "Read from file /dev/sda/root.txt: %1024s\n", buffer);
+    // // vfs_print_mounted_devices();
 
 
-    File *file2 = vfs_open("/home/cosc562/subdir1/subdir2/subdir3/subdir4/subdir5/book1.txt", 0, O_RDONLY, VFS_TYPE_FILE);
-    vfs_read(file2, buffer, 1024);
-    logf(LOG_INFO, "Read 1024 bytes from file /home/cosc562/subdir1/subdir2/subdir3/subdir4/subdir5/book1.txt: %1024s\n", buffer);
-    vfs_read(file2, buffer, 1024);
-    logf(LOG_INFO, "Read another 1024 bytes from file /home/cosc562/subdir1/subdir2/subdir3/subdir4/subdir5/book1.txt: %1024s\n", buffer);
+    // File *file2 = vfs_open("/home/cosc562/subdir1/subdir2/subdir3/subdir4/subdir5/book1.txt", 0, O_RDONLY, VFS_TYPE_FILE);
+    // vfs_read(file2, buffer, 1024);
+    // logf(LOG_INFO, "Read 1024 bytes from file /home/cosc562/subdir1/subdir2/subdir3/subdir4/subdir5/book1.txt: %1024s\n", buffer);
+    // vfs_read(file2, buffer, 1024);
+    // logf(LOG_INFO, "Read another 1024 bytes from file /home/cosc562/subdir1/subdir2/subdir3/subdir4/subdir5/book1.txt: %1024s\n", buffer);
 
-    vfs_close(file);
-    vfs_close(file2);
+    // vfs_close(file);
+    // vfs_close(file2);
 
     // Read in /home/cosc562/console.elf
     File *elf_file = vfs_open("/home/cosc562/console.elf", 0, O_RDONLY, VFS_TYPE_FILE);
@@ -274,16 +274,17 @@ void main(unsigned int hart)
     Process *p = process_new(PM_USER);
     elf_create_process(p, elfcon);
 
-    // process_debug(p);
     p->state = PS_RUNNING;
     p->hart = sbi_whoami();
     p->frame.sstatus = SSTATUS_SPP_BIT | SSTATUS_SPIE_BIT;
     sched_add(p);
+    process_debug(p);
 
     // debugf("SIE: 0x%lx\n", kernel_trap_frame->sie);
     CSR_READ(kernel_trap_frame->sie, "sie");
     kernel_trap_frame->sie = SIE_STIE | SIE_SSIE | SIE_SEIE;
     CSR_WRITE("sie", kernel_trap_frame->sie);
+
     // process_run(p, 0);
 
     console();
