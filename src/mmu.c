@@ -221,7 +221,7 @@ uint64_t mmu_map_range(PageTable *tab,
 // This function performs some basic sanity checks on the page table.
 // For each level of the page table, it prints out the entries that are valid.
 void debug_page_table(PageTable *tab, uint8_t lvl) {
-    debugf("debug_page_table: debugging page table at 0x%016lx\n", tab);
+    infof("debug_page_table: debugging page table at 0x%016lx\n", tab);
     uint64_t page_mask = PAGE_SIZE_AT_LVL(lvl) - 1;
 
     for (uint64_t i=0; i < 512; i++) {
@@ -244,25 +244,25 @@ void debug_page_table(PageTable *tab, uint8_t lvl) {
             // Confirm that we can translate the address
             uint64_t translated = mmu_translate(tab, vaddr);
             if (translated != paddr) {
-                debugf("debug_page_table: page table at 0x%08lx is invalid\n", tab);
-                debugf("debug_page_table: expected 0x%08lx, got 0x%08lx\n", paddr, translated);
+                infof("debug_page_table: page table at 0x%08lx is invalid\n", tab);
+                infof("debug_page_table: expected 0x%08lx, got 0x%08lx\n", paddr, translated);
                 fatalf("debug_page_table: entry 0x%x in page table at 0x%08lx is invalid\n", i, tab);
             } else {
-                debugf("debug_page_table: page table at 0x%08lx is valid\n", tab);
+                infof("debug_page_table: page table at 0x%08lx is valid\n", tab);
             }
         } else if (is_branch && lvl > MMU_LEVEL_4K) {
             // Recurse into the next level
-            debugf("debug_page_table: entry %d in page table at 0x%08lx is a branch to 0x%08lx\n", i, tab, (tab->entries[i] & ~0x3FF) << 2);
-            debug_page_table((PageTable *)((tab->entries[i] & ~0x3FF) << 2), lvl - 1);
+            infof("debug_page_table: entry %d in page table at 0x%08lx is a branch to 0x%08lx\n", i, tab, (tab->entries[i] & ~0x3FF) << 2);
+            // debug_page_table((PageTable *)((tab->entries[i] & ~0x3FF) << 2), lvl - 1);
         } else {
             // Invalid entry, confirm that it's all zeroes
             if (tab->entries[i] != 0) {
-                debugf("debug_page_table: page table at 0x%08lx is invalid\n", tab);
-                debugf("debug_page_table: expected all zeroes, got 0x%08lx\n", tab->entries[i]);
+                infof("debug_page_table: page table at 0x%08lx is invalid\n", tab);
+                infof("debug_page_table: expected all zeroes, got 0x%08lx\n", tab->entries[i]);
                 fatalf("debug_page_table: entry 0x%x in page table at 0x%08lx is invalid\n", i, tab);
             }
         }
     }
 
-    debugf("debug_page_table: page table at 0x%08lx is valid\n", tab);
+    infof("debug_page_table: page table at 0x%08lx is valid\n", tab);
 }

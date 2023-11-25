@@ -1,15 +1,27 @@
-#include <elf.h>
-#include <page.h>
-#include <util.h>
+#include <compiler.h>
+#include <config.h>
+#include <csr.h>
+#include <gpu.h>
 #include <kmalloc.h>
-#include <stdbool.h>
-#include <process.h>
-#include <mmu.h>
 #include <list.h>
-#include <map.h>
-#include <virtio.h>
+#include <lock.h>
+#include <sbi.h>  // sbi_xxx()
+#include <symbols.h>
+#include <util.h>  // strcmp
+#include <debug.h>
+#include <mmu.h>
+#include <page.h>
+#include <csr.h>
+#include <trap.h>
+#include <block.h>
+#include <rng.h>
+#include <vfs.h>
+#include <stat.h>
+#include <elf.h>
+#include <process.h>
+#include <sched.h>
 
-// #define ELF_DEBUG
+#define ELF_DEBUG
 #ifdef ELF_DEBUG
 #define debugf(...) debugf(__VA_ARGS__)
 #else
@@ -797,9 +809,30 @@ int elf_create_process(Process *p, const uint8_t *elf) {
     }
 
     // Set sepc of the process's trap frame
-    p->frame.sepc = header.e_entry;
-    p->frame.trap_satp = SATP_KERNEL;
 
+    p->frame.sepc = header.e_entry;
+
+    // mmu_translate(p->rcb.ptable, p->frame.stvec);
+
+    // CSR_READ(p->frame.sie, "sie");
+
+    // Copy the data into the process's memory
+    if (text) {
+        debugf("Copying text segment\n");
+        memcpy(text, elf + text_header.p_offset, text_header.p_filesz);
+    }
+    if (rodata) {
+        debugf("Copying rodata segment\n");
+        memcpy(rodata, elf + rodata_header.p_offset, rodata_header.p_filesz);
+    }
+    if (data) {
+        debugf("Copying data segment\n");
+        memcpy(data, elf + data_header.p_offset, data_header.p_filesz);
+    }
+    if (bss) {
+        debugf("Clearing bss segment\n");
+        memset(bss, 0, bss_size);
+    }
     // int64_t xregs[32];
     // double fregs[32];
     // uint64_t sepc;
@@ -810,6 +843,5 @@ int elf_create_process(Process *p, const uint8_t *elf) {
     // uint64_t stvec;
     // uint64_t trap_satp;
     // uint64_t trap_stack;
-    debugf("SEPC: %p\n", p->frame.sepc);
     return 0;
 }
