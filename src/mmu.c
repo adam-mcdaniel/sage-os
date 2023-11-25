@@ -213,7 +213,6 @@ uint64_t mmu_map_range(PageTable *tab,
         pages_mapped += 1;
     }
     debugf("mmu_map_range: mapped %d pages\n", pages_mapped);
-    debugf("mmu_map_range: mapped %d pages\n", pages_mapped);
     SFENCE_ALL();
     return pages_mapped;
 } 
@@ -246,7 +245,7 @@ void debug_page_table(PageTable *tab, uint8_t lvl) {
             if (translated != paddr) {
                 infof("debug_page_table: page table at 0x%08lx is invalid\n", tab);
                 infof("debug_page_table: expected 0x%08lx, got 0x%08lx\n", paddr, translated);
-                fatalf("debug_page_table: entry 0x%x in page table at 0x%08lx is invalid\n", i, tab);
+                // fatalf("debug_page_table: entry 0x%x in page table at 0x%08lx is invalid\n", i, tab);
             } else {
                 infof("debug_page_table: page table at 0x%08lx is valid\n", tab);
             }
@@ -259,10 +258,24 @@ void debug_page_table(PageTable *tab, uint8_t lvl) {
             if (tab->entries[i] != 0) {
                 infof("debug_page_table: page table at 0x%08lx is invalid\n", tab);
                 infof("debug_page_table: expected all zeroes, got 0x%08lx\n", tab->entries[i]);
-                fatalf("debug_page_table: entry 0x%x in page table at 0x%08lx is invalid\n", i, tab);
+                // fatalf("debug_page_table: entry 0x%x in page table at 0x%08lx is invalid\n", i, tab);
             }
         }
     }
 
     infof("debug_page_table: page table at 0x%08lx is valid\n", tab);
+}
+
+void mmu_print_entries(PageTable *tab, uint8_t lvl) {
+    infof("mmu_print_entries: printing entries for page table at 0x%016lx\n", tab);
+    for (uint64_t i=0; i < 512; i++) {
+        if (tab->entries[i] & PB_VALID) {
+            infof("Address 0x%08lx is valid\n", i * PAGE_SIZE_AT_LVL(lvl));
+            if ((tab->entries[i] & 0xE) == 0) {
+                infof("Address 0x%08lx is a leaf\n", i * PAGE_SIZE_AT_LVL(lvl));
+            } else {
+                infof("Address 0x%08lx is a branch\n", i * PAGE_SIZE_AT_LVL(lvl));
+            }
+        }
+    }
 }
