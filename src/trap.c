@@ -23,7 +23,7 @@ void syscall_handle(int hart, uint64_t epc, int64_t *scratch);
 // Called from asm/spawn.S: _spawn_kthread
 void os_trap_handler(void)
 {
-    // infof("Entering OS trap handler\n");
+    infof("Entering OS trap handler\n");
     SFENCE_ALL();
 
     unsigned long cause;
