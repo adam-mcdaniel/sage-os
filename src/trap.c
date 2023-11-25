@@ -23,7 +23,9 @@ void syscall_handle(int hart, uint64_t epc, int64_t *scratch);
 // Called from asm/spawn.S: _spawn_kthread
 void os_trap_handler(void)
 {
-    debugf("Entering OS trap handler\n");
+    // infof("Entering OS trap handler\n");
+    SFENCE_ALL();
+
     unsigned long cause;
     long *scratch;
     unsigned long epc;
@@ -34,6 +36,7 @@ void os_trap_handler(void)
     CSR_READ(epc, "sepc");
     CSR_READ(tval, "stval");
     CSR_READ(sie, "sie");
+    // CSR_WRITE("sscratch", kernel_trap_frame);
 
     // __asm__ volatile ("savegp");
     // __asm__ volatile ("savefp");
@@ -74,7 +77,7 @@ void os_trap_handler(void)
             case CAUSE_STIP:
                 // Ack timer will reset the timer to INFINITE
                 // In src/sbi.c
-                infof("os_trap_handler: Supervisor timer interrupt!\n");
+                debugf("os_trap_handler: Supervisor timer interrupt!\n");
                 // CSR_CLEAR("sip");
                 sbi_ack_timer();
                 // We typically invoke our scheduler if we get a timer
@@ -108,13 +111,13 @@ void os_trap_handler(void)
                 break;
             case CAUSE_ECALL_U_MODE:  // ECALL U-Mode
                 // Forward to src/syscall.c
-                debugf("Handling syscall\n");
+                infof("Handling syscall\n");
                 syscall_handle(hart, epc, scratch);
                 // We have to move beyond the ECALL instruction, which is exactly 4 bytes.
                 break;
             case CAUSE_ECALL_S_MODE:  // ECALL U-Mode
                 // Forward to src/syscall.c
-                debugf("Handling syscall\n");
+                infof("Handling supervisor syscall\n");
                 syscall_handle(hart, epc, scratch);
                 // We have to move beyond the ECALL instruction, which is exactly 4 bytes.
                 break;

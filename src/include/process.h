@@ -55,6 +55,8 @@ typedef struct TrapFrame {
 } TrapFrame;
 
 void trap_frame_debug(TrapFrame *frame);
+TrapFrame *trap_frame_new(bool is_user, PageTable *page_table);
+void trap_frame_free(TrapFrame *frame);
 
 // Resource Control Block
 typedef struct RCB {
@@ -66,6 +68,10 @@ typedef struct RCB {
     PageTable *ptable;
 } RCB;
 
+void rcb_init(RCB *rcb);
+void rcb_free(RCB *rcb);
+void rcb_map(RCB *rcb, uint64_t vaddr, uint64_t paddr, uint64_t size, uint64_t bits);
+
 void rcb_debug(RCB *rcb);
 
 typedef struct Process {
@@ -73,7 +79,7 @@ typedef struct Process {
     uint32_t hart;
     ProcessMode mode;
     ProcessState state;
-    TrapFrame frame;
+    TrapFrame *frame;
     
     // Process stats
     uint64_t sleep_until;

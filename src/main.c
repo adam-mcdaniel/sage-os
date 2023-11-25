@@ -277,7 +277,7 @@ void main(unsigned int hart)
 
     p->state = PS_RUNNING;
     p->hart = sbi_whoami();
-    p->frame.sstatus = SSTATUS_SPP_BIT | SSTATUS_SPIE_BIT;
+    p->frame->sstatus = SSTATUS_SPP_BIT | SSTATUS_SPIE_BIT;
     sched_add(p);
     process_debug(p);
 
