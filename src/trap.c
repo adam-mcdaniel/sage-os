@@ -64,7 +64,7 @@ void os_trap_handler(void)
     //                 "csrs sie, t1\n");
 
 
-    debugf("Is async: %d\n", SCAUSE_IS_ASYNC(cause));
+    infof("Is async: %d\n", SCAUSE_IS_ASYNC(cause));
 
     if (SCAUSE_IS_ASYNC(cause)) {
         debugf("os_trap_handler: Is async!\n");
