@@ -53,11 +53,69 @@ void sched_init() {
     debugf("sched_init: Idle Process created with pid %d\n", p->pid);
     p->runtime = 2;
     p->priority = 2;
-    kfree(p->rcb.ptable);
+    // kfree(p->rcb.ptable);
     // p->rcb.ptable = kernel_mmu_table;
     // p->frame = *kernel_trap_frame;
+    memset(&p->frame, 0, sizeof(TrapFrame));
+    uint64_t permission_bits = PB_READ | PB_EXECUTE | PB_WRITE | PB_USER;
+    p->frame.sepc = kernel_mmu_translate(idle_process_main);
+    p->frame.sstatus = 0x0000000000000000;
+    p->frame.stvec = trampoline_trap_start;
+    p->frame.sscratch = kernel_mmu_translate(&p->frame);
+    p->frame.satp = SATP(kernel_mmu_translate(&p->rcb.ptable), p->pid % 4094 + 2);
+    p->frame.trap_satp = SATP_KERNEL;
+    p->frame.trap_stack = kzalloc(0x1000);
+    mmu_map_range(p->rcb.ptable, 
+                p->frame.trap_stack, 
+                p->frame.trap_stack + 0x10000, 
+                kernel_mmu_translate(p->frame.trap_stack), 
+                MMU_LEVEL_4K,
+                permission_bits);
+    mmu_map_range(p->rcb.ptable, 
+                p->frame.sscratch, 
+                p->frame.sscratch + 0x10000, 
+                kernel_mmu_translate(p->frame.sscratch),
+                MMU_LEVEL_4K,
+                permission_bits);
+    mmu_map_range(p->rcb.ptable,
+                &p->rcb.ptable,
+                &p->rcb.ptable + 0x10000,
+                // (uint64_t)&p->rcb.ptable,
+                kernel_mmu_translate(&p->rcb.ptable),
+                MMU_LEVEL_4K,
+                permission_bits);
+    mmu_map_range(p->rcb.ptable,
+                &p->frame,
+                &p->frame + 0x10000,
+                kernel_mmu_translate(&p->frame),
+                // (uint64_t)&p->frame,
+                MMU_LEVEL_4K,
+                permission_bits);
+
+    // Add the trap handler to the process's page table
+    mmu_map_range(p->rcb.ptable,
+                p->frame.stvec,
+                p->frame.stvec + 0x10000,
+                kernel_mmu_translate(p->frame.stvec),
+                MMU_LEVEL_4K,
+                permission_bits);
+
+    mmu_translate(p->rcb.ptable, p->frame.stvec);
+    CSR_READ(p->frame.sie, "sie");
+    
+    // uint64_t  gpregs[32]; 
+    // double    fpregs[32]; 
+    // uint64_t  sepc;     
+    // uint64_t  sstatus;  
+    // uint64_t  sie;      
+    // uint64_t  satp;     
+    // uint64_t  sscratch; 
+    // uint64_t  stvec;    
+    // uint64_t  trap_satp;
+    // uint64_t  trap_stack;
+
     mmu_map(p->rcb.ptable, idle_process_main, idle_process_main, MMU_LEVEL_4K, PB_READ | PB_WRITE | PB_EXECUTE | PB_USER);
-    p->frame.sepc = (uint64_t) idle_process_main;
+    // p->frame.sepc = (uint64_t) idle_process_main;
     // CSR_READ(p->frame.sstatus, "sstatus");
     
     // process_map_set(p);
@@ -72,10 +130,11 @@ void sched_init() {
     mutex_unlock(&sched_lock);
     Process *next_process = sched_get_next();
     mutex_spinlock(&sched_lock);
-    if (next_process != NULL) {
-        debugf("sched_init: Next Process to run is %d\n", next_process->pid);
+
+    if (next_process == sched_get_idle_process()) {
+        debugf("sched_init: First Process to run is idle\n");
     } else {
-        debugf("sched_init: No Process to run\n");
+        debugf("sched_init: First Process to run is %d\n", next_process->pid);
     }
 
     debugf("sched_init: Scheduler initialized\n");
@@ -162,6 +221,11 @@ void sched_handle_timer_interrupt(int hart) {
     //put Process currently on the hart back in the scheduler to recalc priority
     uint16_t pid = pid_harts_map_get(hart);
     Process *current_proc = process_map_get(pid);
+    if (current_proc == sched_get_idle_process()) {
+        debugf("sched_handle_timer_interrupt: Idle Process interrupted\n");
+    } else {
+        debugf("sched_handle_timer_interrupt: Process %d interrupted\n", current_proc->pid);
+    }
 
     CSR_READ(current_proc->frame.sepc, "sepc");
 
@@ -188,9 +252,14 @@ void sched_handle_timer_interrupt(int hart) {
 
     //get an idle Process
     Process *next_process = sched_get_next(); // Implement this function to get the currently running Process
-    debugf("sched_handle_timer_interrupt: Next Process to run is %d\n", next_process->pid);
+    if (next_process == sched_get_idle_process()) {
+        debugf("sched_handle_timer_interrupt: Next Process to run is idle\n");
+    } else {
+        debugf("sched_handle_timer_interrupt: Next Process to run is %d\n", next_process->pid);
+    }
     //execute Process until next interrupt
     if (next_process != NULL) {
+        set_current_process(next_process);
         //set timer
         sbi_add_timer(hart, CONTEXT_SWITCH_TIMER * next_process->quantum);
         debugf("sched_handle_timer_interrupt: Running Process %d\n", next_process->pid);
