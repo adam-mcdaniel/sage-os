@@ -23,6 +23,11 @@
 .endm
 
 .section .trampoline
+process_asm_run:
+    # a0 - Trap frame
+    csrw    sscratch, a0
+    tail    _spawn_kthread
+process_asm_run_end:
 _spawn_kthread:
     csrr        t6, sscratch
 
@@ -79,6 +84,7 @@ _spawn_kthread:
 	.endr
 
 	sret
+
 .align 4
 _spawn_kthread_end:
 .size _spawn_kthread, . - _spawn_kthread
@@ -150,19 +156,13 @@ _trap_end:
 .type _trap, function
 
 .section .text
-.global process_asm_run
-process_asm_run:
-    # a0 - Trap frame
-    csrw    sscratch, a0
-    tail    _spawn_kthread
-
-.size process_asm_run, . - process_asm_run
-.type process_asm_run, function
-.weak process_asm_run
-
 # The following exports the symbols of the trampoline code (thread and trap)
 # You will use these in src/process.c and map these into the process' MMU table.
 .section .rodata
+.global process_asm_run
+.type process_asm_run, function
+.weak process_asm_run
+
 .global trampoline_thread_start
 trampoline_thread_start: .dword _spawn_kthread
 .size trampoline_thread_start, . - trampoline_thread_start

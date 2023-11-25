@@ -14,6 +14,7 @@
 #include <util.h>
 #include <symbols.h>
 #include <trap.h>
+#include <sched.h>
 
 #define DEBUG_PROCESS
 #ifdef DEBUG_PROCESS
@@ -121,7 +122,7 @@ void process_debug(Process *p) {
     debugf("  hart: %d\n", p->hart);
     debugf("  mode: %d\n", p->mode);
     debugf("  state: %d\n", p->state);
-    trap_frame_debug(&p->frame);
+    trap_frame_debug(p->frame);
     
     // // Process stats
     // uint64_t sleep_until;
@@ -173,12 +174,95 @@ void process_debug(Process *p) {
     rcb_debug(&p->rcb);
     // uint64_t break_size;
 
-    if (p->frame.sscratch != kernel_mmu_translate((unsigned long)&p->frame)) {
-        warnf("`sscratch` (0x%08lx) is not pointing to the trap frame (0x%08lx)!\n", p->frame.sscratch, (unsigned long)&p->frame);
+    // if (p->frame->sscratch != kernel_mmu_translate((unsigned long)p->frame)) {
+    //     warnf("`sscratch` (0x%08lx) is not pointing to the trap frame (0x%08lx)!\n", p->frame->sscratch, (unsigned long)p->frame);
+    // }
+
+    if (p->frame->trap_satp != SATP_KERNEL) {
+        warnf("  trap_satp: 0x%p (physical address = %p)\n", p->frame->trap_satp, mmu_translate(p->rcb.ptable, (uintptr_t)p->frame->trap_satp));
+    }
+}
+
+TrapFrame *trap_frame_new(bool is_user, PageTable *page_table) {
+    TrapFrame *frame = (TrapFrame *)kzalloc(sizeof(TrapFrame));
+    memset(frame, 0, sizeof(TrapFrame));
+    frame->sstatus = SSTATUS_SPP_BOOL(!is_user) | SSTATUS_FS_INITIAL | SSTATUS_SPIE;
+    frame->satp = SATP(kernel_mmu_translate(page_table), 0);
+    frame->sscratch = frame;
+    frame->stvec = trampoline_trap_start;
+    frame->trap_satp = SATP_KERNEL;
+    frame->trap_stack = (unsigned long)kzalloc(0x10000);
+    uint64_t permission_bits = PB_READ | PB_EXECUTE | PB_WRITE;
+    mmu_map_range(page_table, 
+                frame->trap_stack, 
+                frame->trap_stack + 0x10000, 
+                kernel_mmu_translate(frame->trap_stack), 
+                MMU_LEVEL_4K,
+                permission_bits);
+    mmu_map_range(page_table,
+                frame->sscratch,
+                frame->sscratch + 0x1000,
+                kernel_mmu_translate((unsigned long)frame),
+                MMU_LEVEL_4K,
+                permission_bits);
+    mmu_map_range(page_table,
+                page_table,
+                page_table + 0x1000,
+                kernel_mmu_translate(page_table),
+                MMU_LEVEL_4K,
+                permission_bits);
+    mmu_map_range(page_table,
+                frame,
+                frame + 0x1000,
+                kernel_mmu_translate(frame),
+                // (uint64_t)frame,
+                MMU_LEVEL_4K,
+                permission_bits);
+    mmu_map_range(page_table,
+                trampoline_trap_start,
+                trampoline_trap_start + 0x1000,
+                kernel_mmu_translate(trampoline_trap_start),
+                MMU_LEVEL_4K,
+                permission_bits);
+
+    debugf("process.c (trap_frame_new): TrapFrame address: 0x%08x\n", frame);
+    return frame;
+}
+
+void trap_frame_free(TrapFrame *frame) {
+    kfree((void *)frame->trap_stack);
+    kfree(frame);
+}
+
+void rcb_init(RCB *rcb) {
+    rcb->image_pages = list_new();
+    rcb->stack_pages = list_new();
+    rcb->heap_pages = list_new();
+    rcb->file_descriptors = list_new();
+    rcb->environemnt = map_new();
+    rcb->ptable = mmu_table_create();
+}
+void rcb_free(RCB *rcb) {
+    list_free(rcb->image_pages);
+    list_free(rcb->stack_pages);
+    list_free(rcb->heap_pages);
+    list_free(rcb->file_descriptors);
+    map_free(rcb->environemnt);
+    page_free(rcb->ptable);
+}
+
+void rcb_map(RCB *rcb, uint64_t vaddr, uint64_t paddr, uint64_t size, uint64_t bits) {
+    debugf("rcb_map: vaddr = 0x%08lx, paddr = 0x%08lx, size = 0x%08lx, bits = 0x%08lx\n", vaddr, paddr, size, bits);
+    if (size % PAGE_SIZE_4K != 0) {
+        warnf("rcb_map: size is not a multiple of PAGE_SIZE_4K\n");
+        size = ALIGN_UP_POT(size, PAGE_SIZE_4K);
+        size += PAGE_SIZE_4K;
     }
 
-    if (p->frame.trap_satp != SATP_KERNEL) {
-        warnf("  trap_satp: 0x%p (physical address = %p)\n", p->frame.trap_satp, mmu_translate(p->rcb.ptable, (uintptr_t)p->frame.trap_satp));
+    uint64_t alignment = ~(PAGE_SIZE_4K - 1);
+    for (uint64_t i = 0; i < size; i += PAGE_SIZE_4K) {
+        debugf("rcb_map: Mapping 0x%08lx to 0x%08lx\n", (vaddr + i) & alignment, (paddr + i) & alignment);
+        mmu_map(rcb->ptable, (vaddr + i) & alignment, (paddr + i) & alignment, MMU_LEVEL_4K, bits);
     }
 }
 
@@ -197,41 +281,39 @@ Process *process_new(ProcessMode mode)
     process_map_set(p);
 
     // Initialize the Resource Control Block
-    p->rcb.image_pages = list_new();
-    p->rcb.stack_pages = list_new();
-    p->rcb.heap_pages = list_new();
-    p->rcb.file_descriptors = list_new();
-    p->rcb.environemnt = map_new();
-    p->rcb.ptable = mmu_table_create();
+    rcb_init(&p->rcb);
 
     // Set the trap frame and create all necessary structures.
-    // p->frame.sepc = filled_in_by_ELF_loader
-    p->frame.sstatus = SSTATUS_SPP_BOOL(mode) | SSTATUS_FS_INITIAL | SSTATUS_SPIE;
-    p->frame.satp = SATP(p->rcb.ptable, p->pid);
-    p->frame.sscratch = (unsigned long)&p->frame;
-    p->frame.stvec = trampoline_trap_start;
-    p->frame.trap_satp = SATP_KERNEL;
+    // p->frame->sepc = filled_in_by_ELF_loader
+    // p->frame->sstatus = SSTATUS_SPP_BOOL(mode) | SSTATUS_FS_INITIAL | SSTATUS_SPIE;
+    // p->frame->satp = SATP(p->rcb.ptable, p->pid);
+    // p->frame->sscratch = (unsigned long)&p->frame;
+    // p->frame->stvec = trampoline_trap_start;
+    // p->frame->trap_satp = SATP_KERNEL;
+
+    p->frame = trap_frame_new(mode == PM_USER, p->rcb.ptable);
 
 
-    memset(&p->frame, 0, sizeof(TrapFrame));
-    p->frame.sie = SIE_SEIE | SIE_SSIE | SIE_STIE;
-    p->frame.sstatus = SSTATUS_SPP_BOOL(mode) | SSTATUS_FS_INITIAL | SSTATUS_SPIE;
-    p->frame.stvec = trampoline_trap_start;
-    p->frame.sscratch = kernel_mmu_translate(&p->frame);
-    p->frame.satp = SATP(kernel_mmu_translate(p->rcb.ptable), p->pid % 0xffff);
-    p->frame.trap_satp = SATP_KERNEL;
-    // p->frame.trap_stack = kzalloc(0x1000);
+    // p->frame->sie = SIE_SEIE | SIE_SSIE | SIE_STIE;
+    // p->frame->sstatus = SSTATUS_SPP_BOOL(mode) | SSTATUS_FS_INITIAL | SSTATUS_SPIE;
+    // p->frame->stvec = trampoline_trap_start;
+    // p->frame->sscratch = kernel_mmu_translate(&p->frame);
+    // p->frame->satp = SATP(kernel_mmu_translate(p->rcb.ptable), p->pid % 0xffff);
+    // p->frame->trap_satp = SATP_KERNEL;
+
+
+    // p->frame->trap_stack = kzalloc(0x1000);
     // uint64_t permission_bits = PB_READ | PB_EXECUTE | PB_WRITE | PB_USER;
     // mmu_map_range(p->rcb.ptable, 
-    //             p->frame.trap_stack, 
-    //             p->frame.trap_stack + 0x10000, 
-    //             kernel_mmu_translate(p->frame.trap_stack), 
+    //             p->frame->trap_stack, 
+    //             p->frame->trap_stack + 0x10000, 
+    //             kernel_mmu_translate(p->frame->trap_stack), 
     //             MMU_LEVEL_4K,
     //             permission_bits);
     // mmu_map_range(p->rcb.ptable, 
-    //             p->frame.sscratch, 
-    //             p->frame.sscratch + 0x10000, 
-    //             kernel_mmu_translate(p->frame.sscratch),
+    //             p->frame->sscratch, 
+    //             p->frame->sscratch + 0x10000, 
+    //             kernel_mmu_translate(p->frame->sscratch),
     //             MMU_LEVEL_4K,
     //             permission_bits);
     // mmu_map_range(p->rcb.ptable,
@@ -250,37 +332,46 @@ Process *process_new(ProcessMode mode)
 
     // Add the trap handler to the process's page table
     // mmu_map_range(p->rcb.ptable,
-    //             p->frame.stvec & ~0xfff,
-    //             p->frame.stvec & ~0xfff + 0x1000,
-    //             p->frame.stvec & ~0xfff,
+    //             p->frame->stvec & ~0xfff,
+    //             p->frame->stvec & ~0xfff + 0x1000,
+    //             p->frame->stvec & ~0xfff,
     //             MMU_LEVEL_4K,
     //             permission_bits);
-    // p->frame.trap_stack = filled_in_by_SCHEDULER
+    // p->frame->trap_stack = filled_in_by_SCHEDULER
     
-    // p->frame.trap_stack = (uint64_t)kzalloc(0x10000); 
+    // p->frame->trap_stack = (uint64_t)kzalloc(0x10000); 
 
     // We need to keep track of the stack itself in the kernel, so we can free it
     // later, but the user process will interact with the stack via the SP register.
-    p->frame.trap_stack = (uint64_t)kzalloc(STACK_SIZE);
-    for (unsigned long i = 0; i < STACK_PAGES; i += 1) {
-        void *stack = page_zalloc();
-        list_add_ptr(p->rcb.stack_pages, stack);
-        // mmu_map(p->rcb.ptable, STACK_TOP + PAGE_SIZE * i, (unsigned long)stack,
-        //         MMU_LEVEL_4K, mode == PM_USER ? PB_USER : 0 | PB_READ | PB_WRITE);
-        mmu_map(p->rcb.ptable, STACK_TOP + PAGE_SIZE * i, kernel_mmu_translate((unsigned long)stack),
-                MMU_LEVEL_4K, mode == PM_USER ? PB_USER : 0 | PB_READ | PB_WRITE | PB_VALID);
-    }
+    // for (unsigned long i = 0; i < STACK_PAGES; i += 1) {
+    //     void *stack = page_zalloc();
+    //     list_add_ptr(p->rcb.stack_pages, stack);
+    //     rcb_map(&p->rcb, STACK_TOP + PAGE_SIZE * i, (unsigned long)stack, PAGE_SIZE, PB_READ | PB_WRITE | PB_USER);
+    // }
+
+    // for (unsigned long i = 0; i < STACK_PAGES; i += 1) {
+    //     void *stack = page_zalloc();
+    //     list_add_ptr(p->rcb.stack_pages, stack);
+    //     rcb_map(&p->rcb, STACK_TOP + PAGE_SIZE * i, (unsigned long)stack, PAGE_SIZE, PB_READ | PB_WRITE | PB_USER);
+    // }
+    
 
     // We need to map certain kernel portions into the user's page table. Notice
     // that the PB_USER is NOT set, but it needs to be there because we need to execute
     // the trap/start instructions while using the user's page table until we change SATP.
     void process_asm_run(void *frame_addr);
-    unsigned long trans_trampoline_start = mmu_translate(kernel_mmu_table, trampoline_thread_start);
-    unsigned long trans_trampoline_trap  = mmu_translate(kernel_mmu_table, trampoline_trap_start);
-    unsigned long trans_process_asm_run  = mmu_translate(kernel_mmu_table, process_asm_run);
-    unsigned long trans_os_trap_handler  = mmu_translate(kernel_mmu_table, os_trap_handler);
-    mmu_map_range(p->rcb.ptable, sym_start(text), sym_end(heap), sym_start(text), MMU_LEVEL_4K,
-                  PB_READ | PB_WRITE | PB_EXECUTE | PB_USER | PB_VALID);
+    rcb_map(&p->rcb, trampoline_thread_start, kernel_mmu_translate(trampoline_thread_start), 0x1000, PB_READ | PB_EXECUTE);
+    rcb_map(&p->rcb, trampoline_trap_start, kernel_mmu_translate(trampoline_trap_start), 0x1000, PB_READ | PB_EXECUTE);
+    rcb_map(&p->rcb, process_asm_run, kernel_mmu_translate(process_asm_run), 0x10000, PB_READ | PB_EXECUTE);
+    rcb_map(&p->rcb, os_trap_handler, kernel_mmu_translate(os_trap_handler), 0x1000, PB_READ | PB_EXECUTE);
+    rcb_map(&p->rcb, p->frame, kernel_mmu_translate(p->frame), 0x1000, PB_READ | PB_WRITE | PB_EXECUTE);
+
+    // unsigned long trans_trampoline_start = mmu_translate(kernel_mmu_table, trampoline_thread_start);
+    // unsigned long trans_trampoline_trap  = mmu_translate(kernel_mmu_table, trampoline_trap_start);
+    // unsigned long trans_process_asm_run  = mmu_translate(kernel_mmu_table, process_asm_run);
+    // unsigned long trans_os_trap_handler  = mmu_translate(kernel_mmu_table, os_trap_handler);
+    // mmu_map_range(p->rcb.ptable, sym_start(text), sym_end(heap), sym_start(text), MMU_LEVEL_4K,
+    //               PB_READ | PB_WRITE | PB_EXECUTE | PB_USER | PB_VALID);
     // PLIC
     // debugf("Mapping PLIC\n");
     // mmu_map_range(p->rcb.ptable, 0x0C000000, 0x0C2FFFFF, 0x0C000000, MMU_LEVEL_2M, PB_READ | PB_WRITE);
@@ -305,7 +396,7 @@ Process *process_new(ProcessMode mode)
     //         PB_READ | PB_EXECUTE | PB_USER | PB_VALID);
     // Map trap frame to user's page table
     // uintptr_t trans_frame = kernel_mmu_translate((uintptr_t)&p->frame);
-    // mmu_map(p->rcb.ptable, p->frame.stvec, kernel_mmu_translate(p->frame.stvec), MMU_LEVEL_4K, PB_READ | PB_WRITE | PB_EXECUTE | PB_USER);
+    // mmu_map(p->rcb.ptable, p->frame->stvec, kernel_mmu_translate(p->frame->stvec), MMU_LEVEL_4K, PB_READ | PB_WRITE | PB_EXECUTE | PB_USER);
     // mmu_map(p->rcb.ptable, &p->frame, trans_frame, MMU_LEVEL_4K, PB_READ | PB_WRITE | PB_EXECUTE | PB_USER | PB_VALID);
     // debug_page_table(p->rcb.ptable, MMU_LEVEL_4K);
     // SFENCE_ASID(p->pid);
@@ -371,18 +462,20 @@ bool process_run(Process *p, unsigned int hart)
     unsigned int me = sbi_whoami();
 
     if (me == hart) {
+        set_current_process(p);
         process_debug(p);
         uint64_t satp, sscratch;
         CSR_READ(satp, "satp");
         CSR_READ(sscratch, "sscratch");
         debugf("Old SATP: 0x%08x\n", satp);
         trap_frame_debug((TrapFrame*)sscratch);
-        debugf("New SATP: 0x%08x\n", p->frame.satp);
-        trap_frame_debug(&p->frame);
+        debugf("New SATP: 0x%08x\n", p->frame->satp);
+        trap_frame_debug(p->frame);
         pid_harts_map_set(hart, p->pid);
         debugf("process.c (process_run): Running process %d on hart %d\n", p->pid, hart);
         // trap_frame_debug(&p->frame);
-        process_asm_run(kernel_mmu_translate(&p->frame));
+        debugf("Jumping to 0x%08lx\n", p->frame->sepc);
+        process_asm_run(p->frame);
         
         fatalf("process.c (process_run): process_asm_run returned\n");
         // process_asm_run should not return, but if it does
@@ -390,7 +483,7 @@ bool process_run(Process *p, unsigned int hart)
         return false;
     }
 
-    return sbi_hart_start(hart, trampoline_thread_start, (unsigned long)&p->frame, p->frame.satp);
+    return sbi_hart_start(hart, trampoline_thread_start, (unsigned long)p->frame, p->frame->satp);
 }
 
 // Map of all the processes, key is PID.

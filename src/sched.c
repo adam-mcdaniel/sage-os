@@ -57,14 +57,16 @@ void sched_init() {
     // p->rcb.ptable = kernel_mmu_table;
     // p->frame = *kernel_trap_frame;
     // memset(&p->frame, 0, sizeof(TrapFrame));
-    uint64_t permission_bits = PB_READ | PB_EXECUTE | PB_WRITE | PB_USER;
-    p->frame.sepc = kernel_mmu_translate(idle_process_main);
-    p->frame.sstatus = 0x0000000000000000;
-    p->frame.stvec = trampoline_trap_start;
-    p->frame.sscratch = kernel_mmu_translate(&p->frame);
-    p->frame.satp = SATP(kernel_mmu_translate(p->rcb.ptable), p->pid % 4094 + 2);
-    p->frame.trap_satp = SATP_KERNEL;
-    p->frame.trap_stack = kzalloc(0x1000);
+    // uint64_t permission_bits = PB_READ | PB_EXECUTE | PB_WRITE | PB_USER;
+
+
+    // p->frame.sepc = kernel_mmu_translate(idle_process_main);
+    // p->frame.sstatus = 0x0000000000000000;
+    // p->frame.stvec = trampoline_trap_start;
+    // p->frame.sscratch = kernel_mmu_translate(&p->frame);
+    // p->frame.satp = SATP(kernel_mmu_translate(p->rcb.ptable), p->pid % 4094 + 2);
+    // p->frame.trap_satp = SATP_KERNEL;
+    // p->frametrap_stack = kzalloc(0x1000);
     // mmu_map_range(p->rcb.ptable, 
     //             p->frame.trap_stack, 
     //             p->frame.trap_stack + 0x10000, 
@@ -117,7 +119,7 @@ void sched_init() {
     // mmu_map(p->rcb.ptable, (uintptr_t)&p->frame, trans_frame, MMU_LEVEL_4K, PB_READ | PB_WRITE | PB_EXECUTE | PB_USER);
 
     // mmu_translate(p->rcb.ptable, p->frame.stvec);
-    CSR_READ(p->frame.sie, "sie");
+    CSR_READ(p->frame->sie, "sie");
     
     // uint64_t  gpregs[32]; 
     // double    fpregs[32]; 
@@ -243,7 +245,7 @@ void sched_handle_timer_interrupt(int hart) {
         debugf("sched_handle_timer_interrupt: Process %d interrupted\n", current_proc->pid);
     }
 
-    CSR_READ(current_proc->frame.sepc, "sepc");
+    CSR_READ(current_proc->frame->sepc, "sepc");
 
     // Remove the Process from the tree
     rb_delete(sched_tree, current_proc->runtime * current_proc->priority);
@@ -262,7 +264,7 @@ void sched_handle_timer_interrupt(int hart) {
     debugf("sched_handle_timer_interrupt: Putting Process %d back in scheduler\n", current_proc->pid);
     // sched_add(current_proc);
     // Print the program counter of the Process that was interrupted
-    debugf("pc: %lx\n", current_proc->frame.sepc);
+    debugf("pc: %lx\n", current_proc->frame->sepc);
     // Print map size
     // debugf("sched_handle_timer_interrupt: Map size is %d\n", process_map_size());
 
