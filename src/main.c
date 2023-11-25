@@ -125,6 +125,7 @@ static void init_systems(void)
     // kernel_trap_frame->satp = kernel_mmu_table
     kernel_trap_frame->trap_stack = (uint64_t)kmalloc(0x10000);
     CSR_WRITE("sscratch", kernel_trap_frame);
+    trap_frame_debug(kernel_trap_frame);
 
     virtio_init();
     uint8_t buffer[16] = {0};

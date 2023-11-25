@@ -696,51 +696,25 @@ int elf_create_process(Process *p, const uint8_t *elf) {
         debugf("Copying data segment\n");
         memcpy(data, elf + data_header.p_offset, data_header.p_filesz);
     }
-    // Map all the segments into the page table
-    mmu_map_range(p->rcb.ptable, 
-                segments,
-                segments + total_size,
-                (uint64_t)segments,
-                MMU_LEVEL_4K,
-                permission_bits);
 
-    // // Map the segments into the page table
-    // if (text) {
-    //     debugf("Mapping text segment\n");
-    //     mmu_map_range(p->rcb.ptable, 
-    //                 text_header.p_vaddr, 
-    //                 text_header.p_vaddr + text_size, 
-    //                 (uint64_t)text, 
-    //                 MMU_LEVEL_4K,
-    //                 permission_bits);
-    // }
-    // if (rodata) {
-    //     debugf("Mapping rodata segment\n");
-    //     mmu_map_range(p->rcb.ptable, 
-    //                 rodata_header.p_vaddr, 
-    //                 rodata_header.p_vaddr + rodata_size, 
-    //                 (uint64_t)rodata, 
-    //                 MMU_LEVEL_4K,
-    //                 permission_bits);
-    // }
-    // if (bss) {
-    //     debugf("Mapping bss segment\n");
-    //     mmu_map_range(p->rcb.ptable, 
-    //                 bss_header.p_vaddr, 
-    //                 bss_header.p_vaddr + bss_size, 
-    //                 (uint64_t)bss, 
-    //                 MMU_LEVEL_4K,
-    //                 permission_bits);
-    // }
-    // if (data) {
-    //     debugf("Mapping data segment\n");
-    //     mmu_map_range(p->rcb.ptable, 
-    //                 data_header.p_vaddr, 
-    //                 data_header.p_vaddr + data_size, 
-    //                 (uint64_t)data, 
-    //                 MMU_LEVEL_4K,
-    //                 permission_bits);
-    // }
+    // void process_asm_run(void);
+    // unsigned long trans_trampoline_start = mmu_translate(kernel_mmu_table, trampoline_thread_start);
+    // unsigned long trans_trampoline_trap  = mmu_translate(kernel_mmu_table, trampoline_trap_start);
+    // unsigned long trans_process_asm_run  = mmu_translate(kernel_mmu_table, process_asm_run);
+    // unsigned long trans_os_trap_handler  = mmu_translate(kernel_mmu_table, os_trap_handler);
+    // mmu_map(p->rcb.ptable, trampoline_thread_start, trans_trampoline_start, MMU_LEVEL_4K,
+    //         PB_READ | PB_EXECUTE | PB_USER);
+    // mmu_map(p->rcb.ptable, trampoline_trap_start, trans_trampoline_trap, MMU_LEVEL_4K,
+    //         PB_READ | PB_EXECUTE | PB_USER);
+    // // Map the trap stack
+    // mmu_map(p->rcb.ptable, process_asm_run, trans_process_asm_run, MMU_LEVEL_4K,
+    //         PB_READ | PB_EXECUTE | PB_USER);
+    // mmu_map(p->rcb.ptable, os_trap_handler, trans_os_trap_handler, MMU_LEVEL_4K,
+    //         PB_READ | PB_EXECUTE | PB_USER);
+    // uintptr_t trans_frame = kernel_mmu_translate((uintptr_t)&p->frame);
+    // mmu_map(p->rcb.ptable, trans_frame, trans_frame, MMU_LEVEL_4K, PB_READ | PB_WRITE | PB_EXECUTE | PB_USER);
+    // mmu_map(p->rcb.ptable, p->frame.stvec, p->frame.stvec, MMU_LEVEL_4K, PB_READ | PB_WRITE | PB_EXECUTE | PB_USER);
+
     // Create the process
     p->text = text;
     p->text_vaddr = text ? (uint8_t *)text_header.p_vaddr : NULL;
@@ -815,6 +789,52 @@ int elf_create_process(Process *p, const uint8_t *elf) {
     // mmu_translate(p->rcb.ptable, p->frame.stvec);
 
     // CSR_READ(p->frame.sie, "sie");
+
+    // Map all the segments into the page table
+    mmu_map_range(p->rcb.ptable, 
+                segments,
+                segments + total_size,
+                (uint64_t)segments,
+                MMU_LEVEL_4K,
+                permission_bits);
+
+    // // Map the segments into the page table
+    if (text) {
+        debugf("Mapping text segment\n");
+        mmu_map_range(p->rcb.ptable, 
+                    text_header.p_vaddr, 
+                    text_header.p_vaddr + text_size, 
+                    (uint64_t)text, 
+                    MMU_LEVEL_4K,
+                    permission_bits);
+    }
+    if (rodata) {
+        debugf("Mapping rodata segment\n");
+        mmu_map_range(p->rcb.ptable, 
+                    rodata_header.p_vaddr, 
+                    rodata_header.p_vaddr + rodata_size, 
+                    (uint64_t)rodata, 
+                    MMU_LEVEL_4K,
+                    permission_bits);
+    }
+    if (bss) {
+        debugf("Mapping bss segment\n");
+        mmu_map_range(p->rcb.ptable, 
+                    bss_header.p_vaddr, 
+                    bss_header.p_vaddr + bss_size, 
+                    (uint64_t)bss, 
+                    MMU_LEVEL_4K,
+                    permission_bits);
+    }
+    if (data) {
+        debugf("Mapping data segment\n");
+        mmu_map_range(p->rcb.ptable, 
+                    data_header.p_vaddr, 
+                    data_header.p_vaddr + data_size, 
+                    (uint64_t)data, 
+                    MMU_LEVEL_4K,
+                    permission_bits);
+    }
 
     // Copy the data into the process's memory
     if (text) {

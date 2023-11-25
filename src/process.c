@@ -12,6 +12,7 @@
 #include <stdint.h>
 #include <map.h>
 #include <util.h>
+#include <symbols.h>
 #include <trap.h>
 
 #define DEBUG_PROCESS
@@ -206,7 +207,6 @@ Process *process_new(ProcessMode mode)
     // Set the trap frame and create all necessary structures.
     // p->frame.sepc = filled_in_by_ELF_loader
     p->frame.sstatus = SSTATUS_SPP_BOOL(mode) | SSTATUS_FS_INITIAL | SSTATUS_SPIE;
-    p->frame.sie = SIE_SEIE | SIE_SSIE | SIE_STIE;
     p->frame.satp = SATP(p->rcb.ptable, p->pid);
     p->frame.sscratch = (unsigned long)&p->frame;
     p->frame.stvec = trampoline_trap_start;
@@ -214,39 +214,39 @@ Process *process_new(ProcessMode mode)
 
 
     memset(&p->frame, 0, sizeof(TrapFrame));
-    p->frame.sstatus = 0x0000000000000000;
+    p->frame.sie = SIE_SEIE | SIE_SSIE | SIE_STIE;
+    p->frame.sstatus = SSTATUS_SPP_BOOL(mode) | SSTATUS_FS_INITIAL | SSTATUS_SPIE;
     p->frame.stvec = trampoline_trap_start;
     p->frame.sscratch = kernel_mmu_translate(&p->frame);
-    p->frame.satp = SATP(kernel_mmu_translate(&p->rcb.ptable), p->pid % 0xffff);
+    p->frame.satp = SATP(kernel_mmu_translate(p->rcb.ptable), p->pid % 0xffff);
     p->frame.trap_satp = SATP_KERNEL;
     // p->frame.trap_stack = kzalloc(0x1000);
-    uint64_t permission_bits = PB_READ | PB_EXECUTE | PB_WRITE | PB_USER;
-    mmu_map_range(p->rcb.ptable, 
-                p->frame.trap_stack, 
-                p->frame.trap_stack + 0x10000, 
-                kernel_mmu_translate(p->frame.trap_stack), 
-                MMU_LEVEL_4K,
-                permission_bits);
-    mmu_map_range(p->rcb.ptable, 
-                p->frame.sscratch, 
-                p->frame.sscratch + 0x10000, 
-                kernel_mmu_translate(p->frame.sscratch),
-                MMU_LEVEL_4K,
-                permission_bits);
-    mmu_map_range(p->rcb.ptable,
-                &p->rcb.ptable,
-                &p->rcb.ptable + 0x10000,
-                // (uint64_t)&p->rcb.ptable,
-                kernel_mmu_translate(&p->rcb.ptable),
-                MMU_LEVEL_4K,
-                permission_bits);
-    mmu_map_range(p->rcb.ptable,
-                &p->frame,
-                &p->frame + 0x10000,
-                kernel_mmu_translate(&p->frame),
-                // (uint64_t)&p->frame,
-                MMU_LEVEL_4K,
-                permission_bits);
+    // uint64_t permission_bits = PB_READ | PB_EXECUTE | PB_WRITE | PB_USER;
+    // mmu_map_range(p->rcb.ptable, 
+    //             p->frame.trap_stack, 
+    //             p->frame.trap_stack + 0x10000, 
+    //             kernel_mmu_translate(p->frame.trap_stack), 
+    //             MMU_LEVEL_4K,
+    //             permission_bits);
+    // mmu_map_range(p->rcb.ptable, 
+    //             p->frame.sscratch, 
+    //             p->frame.sscratch + 0x10000, 
+    //             kernel_mmu_translate(p->frame.sscratch),
+    //             MMU_LEVEL_4K,
+    //             permission_bits);
+    // mmu_map_range(p->rcb.ptable,
+    //             p->rcb.ptable,
+    //             p->rcb.ptable + 0x10000,
+    //             kernel_mmu_translate(p->rcb.ptable),
+    //             MMU_LEVEL_4K,
+    //             permission_bits);
+    // mmu_map_range(p->rcb.ptable,
+    //             &p->frame,
+    //             &p->frame + 0x10000,
+    //             kernel_mmu_translate(&p->frame),
+    //             // (uint64_t)&p->frame,
+    //             MMU_LEVEL_4K,
+    //             permission_bits);
 
     // Add the trap handler to the process's page table
     // mmu_map_range(p->rcb.ptable,
@@ -265,8 +265,10 @@ Process *process_new(ProcessMode mode)
     for (unsigned long i = 0; i < STACK_PAGES; i += 1) {
         void *stack = page_zalloc();
         list_add_ptr(p->rcb.stack_pages, stack);
-        mmu_map(p->rcb.ptable, STACK_TOP + PAGE_SIZE * i, (unsigned long)stack,
-                MMU_LEVEL_4K, mode == PM_USER ? PB_USER : 0 | PB_READ | PB_WRITE);
+        // mmu_map(p->rcb.ptable, STACK_TOP + PAGE_SIZE * i, (unsigned long)stack,
+        //         MMU_LEVEL_4K, mode == PM_USER ? PB_USER : 0 | PB_READ | PB_WRITE);
+        mmu_map(p->rcb.ptable, STACK_TOP + PAGE_SIZE * i, kernel_mmu_translate((unsigned long)stack),
+                MMU_LEVEL_4K, mode == PM_USER ? PB_USER : 0 | PB_READ | PB_WRITE | PB_VALID);
     }
 
     // We need to map certain kernel portions into the user's page table. Notice
@@ -277,22 +279,37 @@ Process *process_new(ProcessMode mode)
     unsigned long trans_trampoline_trap  = mmu_translate(kernel_mmu_table, trampoline_trap_start);
     unsigned long trans_process_asm_run  = mmu_translate(kernel_mmu_table, process_asm_run);
     unsigned long trans_os_trap_handler  = mmu_translate(kernel_mmu_table, os_trap_handler);
-    mmu_map(p->rcb.ptable, trampoline_thread_start, trampoline_thread_start, MMU_LEVEL_4K,
-            PB_READ | PB_EXECUTE);
-    mmu_map(p->rcb.ptable, trampoline_trap_start, trampoline_trap_start, MMU_LEVEL_4K,
-            PB_READ | PB_EXECUTE);
-    // Map the trap stack
-    mmu_map(p->rcb.ptable, p->frame.trap_stack, p->frame.trap_stack, MMU_LEVEL_4K,
-            PB_READ | PB_WRITE);
-    mmu_map(p->rcb.ptable, trans_process_asm_run, process_asm_run, MMU_LEVEL_4K,
-            PB_READ | PB_EXECUTE);
-    mmu_map(p->rcb.ptable, os_trap_handler, os_trap_handler, MMU_LEVEL_4K,
-            PB_READ | PB_EXECUTE);
+    mmu_map_range(p->rcb.ptable, sym_start(text), sym_end(heap), sym_start(text), MMU_LEVEL_4K,
+                  PB_READ | PB_WRITE | PB_EXECUTE | PB_USER | PB_VALID);
+    // PLIC
+    // debugf("Mapping PLIC\n");
+    // mmu_map_range(p->rcb.ptable, 0x0C000000, 0x0C2FFFFF, 0x0C000000, MMU_LEVEL_2M, PB_READ | PB_WRITE);
+    // // PCIe ECAM
+    // debugf("Mapping PCIe ECAM\n");
+    // mmu_map_range(p->rcb.ptable, 0x30000000, 0x3FFFFFFF, 0x30000000, MMU_LEVEL_2M, PB_READ | PB_WRITE);
+    // // PCIe MMIO
+    // debugf("Mapping PCIe MMIO\n");
+    // mmu_map_range(p->rcb.ptable, 0x40000000, 0x5FFFFFFF, 0x40000000, MMU_LEVEL_2M, PB_READ | PB_WRITE);
+    // mmu_map(p->rcb.ptable, trampoline_thread_start, trans_trampoline_start, MMU_LEVEL_4K,
+    //         PB_READ | PB_EXECUTE | PB_USER | PB_VALID);
+    // mmu_map(p->rcb.ptable, trampoline_trap_start, trans_trampoline_trap, MMU_LEVEL_4K,
+    //         PB_READ | PB_EXECUTE | PB_USER | PB_VALID);
+    // // Map the trap stack
+    // mmu_map_range(p->rcb.ptable,
+    //             process_asm_run,
+    //             process_asm_run + 0x10000,
+    //             kernel_mmu_translate(process_asm_run),
+    //             MMU_LEVEL_4K,
+    //             PB_READ | PB_EXECUTE | PB_USER | PB_VALID);
+    // mmu_map(p->rcb.ptable, os_trap_handler, trans_os_trap_handler, MMU_LEVEL_4K,
+    //         PB_READ | PB_EXECUTE | PB_USER | PB_VALID);
     // Map trap frame to user's page table
-    uintptr_t trans_frame = kernel_mmu_translate((uintptr_t)&p->frame);
-    mmu_map(p->rcb.ptable, (uintptr_t)&p->frame, trans_frame, MMU_LEVEL_4K, PB_READ | PB_WRITE | PB_EXECUTE);
-
+    // uintptr_t trans_frame = kernel_mmu_translate((uintptr_t)&p->frame);
+    // mmu_map(p->rcb.ptable, p->frame.stvec, kernel_mmu_translate(p->frame.stvec), MMU_LEVEL_4K, PB_READ | PB_WRITE | PB_EXECUTE | PB_USER);
+    // mmu_map(p->rcb.ptable, &p->frame, trans_frame, MMU_LEVEL_4K, PB_READ | PB_WRITE | PB_EXECUTE | PB_USER | PB_VALID);
+    // debug_page_table(p->rcb.ptable, MMU_LEVEL_4K);
     // SFENCE_ASID(p->pid);
+    mmu_print_entries(p->rcb.ptable, MMU_LEVEL_4K);
 
     return p;
 }

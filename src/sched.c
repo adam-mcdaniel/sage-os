@@ -56,51 +56,67 @@ void sched_init() {
     // kfree(p->rcb.ptable);
     // p->rcb.ptable = kernel_mmu_table;
     // p->frame = *kernel_trap_frame;
-    memset(&p->frame, 0, sizeof(TrapFrame));
+    // memset(&p->frame, 0, sizeof(TrapFrame));
     uint64_t permission_bits = PB_READ | PB_EXECUTE | PB_WRITE | PB_USER;
     p->frame.sepc = kernel_mmu_translate(idle_process_main);
     p->frame.sstatus = 0x0000000000000000;
     p->frame.stvec = trampoline_trap_start;
     p->frame.sscratch = kernel_mmu_translate(&p->frame);
-    p->frame.satp = SATP(kernel_mmu_translate(&p->rcb.ptable), p->pid % 4094 + 2);
+    p->frame.satp = SATP(kernel_mmu_translate(p->rcb.ptable), p->pid % 4094 + 2);
     p->frame.trap_satp = SATP_KERNEL;
     p->frame.trap_stack = kzalloc(0x1000);
-    mmu_map_range(p->rcb.ptable, 
-                p->frame.trap_stack, 
-                p->frame.trap_stack + 0x10000, 
-                kernel_mmu_translate(p->frame.trap_stack), 
-                MMU_LEVEL_4K,
-                permission_bits);
-    mmu_map_range(p->rcb.ptable, 
-                p->frame.sscratch, 
-                p->frame.sscratch + 0x10000, 
-                kernel_mmu_translate(p->frame.sscratch),
-                MMU_LEVEL_4K,
-                permission_bits);
-    mmu_map_range(p->rcb.ptable,
-                &p->rcb.ptable,
-                &p->rcb.ptable + 0x10000,
-                // (uint64_t)&p->rcb.ptable,
-                kernel_mmu_translate(&p->rcb.ptable),
-                MMU_LEVEL_4K,
-                permission_bits);
-    mmu_map_range(p->rcb.ptable,
-                &p->frame,
-                &p->frame + 0x10000,
-                kernel_mmu_translate(&p->frame),
-                // (uint64_t)&p->frame,
-                MMU_LEVEL_4K,
-                permission_bits);
+    // mmu_map_range(p->rcb.ptable, 
+    //             p->frame.trap_stack, 
+    //             p->frame.trap_stack + 0x10000, 
+    //             kernel_mmu_translate(p->frame.trap_stack), 
+    //             MMU_LEVEL_4K,
+    //             permission_bits);
+    // mmu_map_range(p->rcb.ptable, 
+    //             p->frame.sscratch, 
+    //             p->frame.sscratch + 0x10000, 
+    //             kernel_mmu_translate(p->frame.sscratch),
+    //             MMU_LEVEL_4K,
+    //             permission_bits);
+    // mmu_map_range(p->rcb.ptable,
+    //             p->rcb.ptable,
+    //             p->rcb.ptable + 0x10000,
+    //             kernel_mmu_translate(p->rcb.ptable),
+    //             MMU_LEVEL_4K,
+    //             permission_bits);
+    // mmu_map_range(p->rcb.ptable,
+    //             &p->frame,
+    //             &p->frame + 0x10000,
+    //             kernel_mmu_translate(&p->frame),
+    //             MMU_LEVEL_4K,
+    //             permission_bits);
 
-    // Add the trap handler to the process's page table
-    mmu_map_range(p->rcb.ptable,
-                p->frame.stvec,
-                p->frame.stvec + 0x10000,
-                kernel_mmu_translate(p->frame.stvec),
-                MMU_LEVEL_4K,
-                permission_bits);
+    // // Add the trap handler to the process's page table
+    // mmu_map_range(p->rcb.ptable,
+    //             p->frame.stvec,
+    //             p->frame.stvec + 0x10000,
+    //             kernel_mmu_translate(p->frame.stvec),
+    //             MMU_LEVEL_4K,
+    //             permission_bits);
 
-    mmu_translate(p->rcb.ptable, p->frame.stvec);
+    // void process_asm_run(void);
+    // unsigned long trans_trampoline_start = mmu_translate(kernel_mmu_table, trampoline_thread_start);
+    // unsigned long trans_trampoline_trap  = mmu_translate(kernel_mmu_table, trampoline_trap_start);
+    // unsigned long trans_process_asm_run  = mmu_translate(kernel_mmu_table, process_asm_run);
+    // unsigned long trans_os_trap_handler  = mmu_translate(kernel_mmu_table, os_trap_handler);
+    // mmu_map(p->rcb.ptable, trampoline_thread_start, trans_trampoline_start, MMU_LEVEL_4K,
+    //         PB_READ | PB_EXECUTE | PB_USER);
+    // mmu_map(p->rcb.ptable, trampoline_trap_start, trans_trampoline_trap, MMU_LEVEL_4K,
+    //         PB_READ | PB_EXECUTE | PB_USER);
+    // // Map the trap stack
+    // mmu_map(p->rcb.ptable, process_asm_run, trans_process_asm_run, MMU_LEVEL_4K,
+    //         PB_READ | PB_EXECUTE | PB_USER);
+    // mmu_map(p->rcb.ptable, os_trap_handler, trans_os_trap_handler, MMU_LEVEL_4K,
+    //         PB_READ | PB_EXECUTE | PB_USER);
+    // // Map trap frame to user's page table
+    // uintptr_t trans_frame = kernel_mmu_translate((uintptr_t)&p->frame);
+    // mmu_map(p->rcb.ptable, (uintptr_t)&p->frame, trans_frame, MMU_LEVEL_4K, PB_READ | PB_WRITE | PB_EXECUTE | PB_USER);
+
+    // mmu_translate(p->rcb.ptable, p->frame.stvec);
     CSR_READ(p->frame.sie, "sie");
     
     // uint64_t  gpregs[32]; 
