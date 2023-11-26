@@ -14,9 +14,10 @@
 #include <util.h>
 #include <symbols.h>
 #include <trap.h>
+#include <lock.h>
 #include <sched.h>
 
-// #define DEBUG_PROCESS
+#define DEBUG_PROCESS
 #ifdef DEBUG_PROCESS
 #define debugf(...) debugf(__VA_ARGS__)
 #else
@@ -187,8 +188,8 @@ TrapFrame *trap_frame_new(bool is_user, PageTable *page_table, uint64_t pid) {
     } else {
         frame->sstatus |= SSTATUS_SPP_SUPERVISOR;
     }
-    frame->satp = SATP(kernel_mmu_translate(page_table), pid % 0xffff);
-    frame->sscratch = frame;
+    frame->satp = SATP(kernel_mmu_translate((uintptr_t)page_table), pid % 0xffff);
+    frame->sscratch = (uintptr_t)frame;
     frame->trap_satp = SATP_KERNEL;
     frame->stvec = kernel_trap_frame->stvec;
     frame->trap_stack = kernel_trap_frame->trap_stack;
@@ -215,17 +216,17 @@ TrapFrame *trap_frame_new(bool is_user, PageTable *page_table, uint64_t pid) {
     //             permission_bits);
     debugf("process.c (trap_frame_new): Mapping page table 0x%08lx:0x%08lx to 0x%08lx\n", page_table, page_table + 0x1000, kernel_mmu_translate(page_table));
     mmu_map_range(page_table,
-                page_table,
-                page_table + 0x1000,
-                kernel_mmu_translate(page_table),
+                (uintptr_t)page_table,
+                (uintptr_t)(page_table + 0x1000),
+                kernel_mmu_translate((uintptr_t)page_table),
                 MMU_LEVEL_4K,
                 permission_bits);
 
     debugf("process.c (trap_frame_new): Mapping trap frame 0x%08lx:0x%08lx to 0x%08lx\n", frame, frame + 0x1000, kernel_mmu_translate(frame));
     mmu_map_range(page_table,
-                frame,
-                frame + 0x1000,
-                kernel_mmu_translate(frame),
+                (uintptr_t)frame,
+                (uintptr_t)(frame + 0x1000),
+                kernel_mmu_translate((uintptr_t)frame),
                 // (uint64_t)frame,
                 MMU_LEVEL_4K,
                 permission_bits);
@@ -291,7 +292,8 @@ Process *process_new(ProcessMode mode)
 {
     Process *p = (Process *)kzalloc(sizeof(Process));
     debugf("process.c (process_new): Process address: 0x%08x\n", p);
-
+    p->lock = MUTEX_UNLOCKED;
+    mutex_spinlock(&p->lock);
     p->pid = generate_unique_pid();
     p->hart = sbi_whoami();
     p->mode = mode;
@@ -299,10 +301,10 @@ Process *process_new(ProcessMode mode)
     p->quantum = 10;
     p->priority = 10;
     
-    process_map_set(p);
 
     // Initialize the Resource Control Block
     rcb_init(&p->rcb);
+    debugf("process.c (process_new): RCB address: 0x%08x\n", &p->rcb);
 
     // Set the trap frame and create all necessary structures.
     // p->frame->sepc = filled_in_by_ELF_loader
@@ -383,9 +385,9 @@ Process *process_new(ProcessMode mode)
     void process_asm_run(void *frame_addr);
     rcb_map(&p->rcb, trampoline_thread_start, kernel_mmu_translate(trampoline_thread_start), 0x1000, PB_READ | PB_EXECUTE);
     rcb_map(&p->rcb, trampoline_trap_start, kernel_mmu_translate(trampoline_trap_start), 0x1000, PB_READ | PB_EXECUTE);
-    rcb_map(&p->rcb, process_asm_run, kernel_mmu_translate(process_asm_run), 0x10000, PB_READ | PB_EXECUTE);
-    rcb_map(&p->rcb, os_trap_handler, kernel_mmu_translate(os_trap_handler), 0x1000, PB_READ | PB_EXECUTE);
-    rcb_map(&p->rcb, p->frame, kernel_mmu_translate(p->frame), 0x1000, PB_READ | PB_WRITE | PB_EXECUTE);
+    rcb_map(&p->rcb, (uintptr_t)process_asm_run, kernel_mmu_translate((uintptr_t)process_asm_run), 0x10000, PB_READ | PB_EXECUTE);
+    rcb_map(&p->rcb, (uintptr_t)os_trap_handler, kernel_mmu_translate((uintptr_t)os_trap_handler), 0x1000, PB_READ | PB_EXECUTE);
+    rcb_map(&p->rcb, (uintptr_t)p->frame, kernel_mmu_translate((uintptr_t)p->frame), 0x1000, PB_READ | PB_WRITE | PB_EXECUTE);
 
     uint64_t permission_bits = PB_READ | PB_EXECUTE | PB_WRITE;
     if (mode == PM_USER) {
@@ -442,13 +444,16 @@ Process *process_new(ProcessMode mode)
     #ifdef DEBUG_PROCESS
     mmu_print_entries(p->rcb.ptable, MMU_LEVEL_4K);
     #endif
-    SFENCE_ASID(p->pid);
 
+    mutex_unlock(&p->lock);
+    debugf("process.c (process_new): Process created\n");
+    process_map_set(p);
     return p;
 }
 
 int process_free(Process *p)
 {
+    mutex_spinlock(&p->lock);
     struct ListElem *e;
 
     if (!p) {
@@ -513,16 +518,19 @@ bool process_run(Process *p, unsigned int hart)
             process_run(sched_get_idle_process(), hart);
         }
 
+        if (!process_map_contains(p->pid)) {
+            fatalf("process.c (process_run): Process %d not found on process map\n", p->pid);
+        }
+
         set_current_process(p);
         // process_debug(p);
-        uint64_t satp, sscratch;
-        CSR_READ(satp, "satp");
-        CSR_READ(sscratch, "sscratch");
+        // uint64_t satp, sscratch;
+        // CSR_READ(satp, "satp");
+        // CSR_READ(sscratch, "sscratch");
         // debugf("Old SATP: 0x%08x\n", satp);
         // trap_frame_debug((TrapFrame*)sscratch);
         // debugf("New SATP: 0x%08x\n", p->frame->satp);
         // trap_frame_debug(p->frame);
-        pid_harts_map_set(hart, p->pid);
         // debugf("Jumping to 0x%08lx\n", p->frame->sepc);
         process_asm_run(p->frame);
         
@@ -543,25 +551,42 @@ static Map *processes;
 void process_map_init()
 {
     processes = map_new();
+    map_clear(processes);
 }
 
 // Store a process on a map as its PID as the key.
 void process_map_set(Process *p)
 {
+    mutex_spinlock(&p->lock);
+    infof("process.c (process_map_set): Setting PID %d\n", p->pid);
     map_set_int(processes, p->pid, (MapValue)p);
+    mutex_unlock(&p->lock);
 }
 
-void process_map_remove(Process *p)
-{
-    map_remove_int(processes, p->pid);
-}
+// void process_map_remove(Process *p)
+// {
+//     map_remove_int(processes, p->pid);
+// }
 
 // Get process stored on the process map using the PID as the key.
 Process *process_map_get(uint16_t pid) 
 {
+    if (!process_map_contains(pid)) {
+        return NULL;
+    }
     MapValue val;
     map_get_int(processes, pid, &val);
     return (Process *)val;
+}
+
+bool process_map_contains(uint16_t pid) 
+{
+    return map_contains_int(processes, pid);
+}
+
+void process_map_remove(uint16_t pid)
+{
+    map_remove_int(processes, pid);
 }
 
 // Keep track of the PIDs running on each hart.
@@ -573,8 +598,8 @@ void pid_harts_map_init()
 {
     // pid_on_harts = map_new_with_slots(0x100);
     pid_on_harts = map_new();
+    map_clear(pid_on_harts);
 }
-
 // Associate the PID running to hart
 void pid_harts_map_set(uint32_t hart, uint16_t pid)
 {
