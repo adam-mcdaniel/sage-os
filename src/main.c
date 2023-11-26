@@ -244,6 +244,7 @@ void main(unsigned int hart)
 #ifdef RUN_INTERNAL_CONSOLE
     VirtioDevice *block_device = virtio_get_block_device(0);
     // minix3_init(block_device, "/");
+
     vfs_init();
 
     // File *file = vfs_open("/dev/sda/root.txt", 0, O_RDONLY, VFS_TYPE_FILE);
@@ -281,12 +282,12 @@ void main(unsigned int hart)
     sched_add(p);
     process_debug(p);
 
-    // debugf("SIE: 0x%lx\n", kernel_trap_frame->sie);
-    // CSR_READ(kernel_trap_frame->sie, "sie");
-    // kernel_trap_frame->sie = SIE_STIE | SIE_SSIE | SIE_SEIE;
-    // CSR_WRITE("sie", kernel_trap_frame->sie);
+    debugf("SIE: 0x%lx\n", kernel_trap_frame->sie);
+    CSR_READ(kernel_trap_frame->sie, "sie");
+    kernel_trap_frame->sie = SIE_STIE | SIE_SSIE | SIE_SEIE;
+    CSR_WRITE("sie", kernel_trap_frame->sie);
 
-    process_run(p, 0);
+    // process_run(p, 0);
 
     console();
 #else
