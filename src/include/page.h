@@ -10,6 +10,9 @@
  */
 #pragma once
 
+#define ALIGN_UP_TO_PAGE(x) \
+    (((x) + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1))
+
 /**
  * @brief Initialize the page allocator. Clears the bookkeeping bytes, but does not initialize the
  * pages themselves.

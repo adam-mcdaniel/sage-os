@@ -16,14 +16,23 @@
 #include <vector.h>
 #include <map.h>
 #include <mmu.h>
+#include <kmalloc.h>
 
 
-#define USER_STACK_TOP   0x000000000000e000UL
-#define USER_STACK_BOTTOM 0x000000000000d000UL
-#define USER_HEAP_TOP    0x000000000000c000UL
-#define USER_HEAP_BOTTOM 0x000000000000b000UL
-#define USER_STACK_SIZE  (USER_STACK_TOP - USER_STACK_BOTTOM)
-#define USER_HEAP_SIZE   (USER_HEAP_TOP - USER_HEAP_BOTTOM)
+// #define USER_STACK_TOP   0x00000000000e0000UL
+// #define USER_STACK_BOTTOM 0x00000000000d0000UL
+// Define much larger stack and heap
+#define USER_STACK_TOP   0x00000000000e0000UL
+#define USER_STACK_BOTTOM 0x00000000000a0000UL
+#define USER_HEAP_TOP    0x1c0fffe000UL
+#define USER_HEAP_BOTTOM 0x1c0ffee000UL
+// #define USER_HEAP_TOP    0x00000000000a0000UL
+// #define USER_HEAP_BOTTOM 0x0000000000080000UL
+
+#define ABS(x) ((x) < 0 ? -(x) : (x))
+
+#define USER_STACK_SIZE  (ABS(USER_STACK_TOP - USER_STACK_BOTTOM))
+#define USER_HEAP_SIZE   (ABS(USER_HEAP_TOP - USER_HEAP_BOTTOM))
 
 
 #define MAX_NUM_HARTS    (8) // We are gonna be scheduling 8 harts at most.

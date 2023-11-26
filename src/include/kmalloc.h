@@ -11,6 +11,10 @@
 #pragma once
 #include <stddef.h>
 
+#define KERNEL_HEAP_START_VADDR 0x1c0ffee000UL
+#define KERNEL_HEAP_PAGES       4096
+#define KERNEL_HEAP_END_VADDR   (KERNEL_HEAP_START_VADDR + (KERNEL_HEAP_PAGES * 4096))
+
 /// @brief Allocate <bytes> number of bytes and return
 /// a memory address to the start of these bytes.
 /// Your memory address may have more bytes than requested,

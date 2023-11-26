@@ -6,6 +6,13 @@
 #include <debug.h>
 #include <process.h>
 
+// #define SYSCALL_DEBUG
+#ifdef SYSCALL_DEBUG
+#define debugf(...) debugf(__VA_ARGS__)
+#else
+#define debugf(...)
+#endif
+
 #define XREG(x)             (scratch[XREG_##x])
 #define SYSCALL_RETURN_TYPE void
 #define SYSCALL_PARAM_LIST  int hart, uint64_t epc, int64_t *scratch
@@ -23,21 +30,25 @@ SYSCALL(exit)
     // Kill the current process on this HART and schedule the next
     // one.
     debugf("HELLO\n");
-    
+    infof("syscall.c (exit): Exiting process %d on hart %d\n", pid_harts_map_get(hart), hart);
     // Get the current process running on hart
     Process *p = process_map_get(pid_harts_map_get(hart));
+
+    p->state = PS_DEAD;
     
     // Kill process
     // ...
 
     // Free process
-    if (process_free(p)) 
-        fatalf("syscall.c (exit): process_free failed\n");
+    // if (process_free(p)) 
+    //     fatalf("syscall.c (exit): process_free failed\n");
 }
 
 SYSCALL(putchar)
 {
     SYSCALL_ENTER();
+
+    debugf("syscall.c (putchar) with args: %lx %lx %lx %lx %lx %lx\n", XREG(A0), XREG(A1), XREG(A2), XREG(A3), XREG(A4), XREG(A5));
     sbi_putchar(XREG(A0));
 }
 
@@ -109,6 +120,7 @@ void syscall_handle(int hart, uint64_t epc, int64_t *scratch)
     }
     else {
         // debugf("syscall_handle: Calling syscall %ld\n", XREG(A7));
+        // debugf("With args: %lx %lx %lx %lx %lx %lx\n", XREG(A0), XREG(A1), XREG(A2), XREG(A3), XREG(A4), XREG(A5));
         SYSCALL_EXEC(XREG(A7));
     }
 }
