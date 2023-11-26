@@ -192,7 +192,6 @@ TrapFrame *trap_frame_new(bool is_user, PageTable *page_table) {
     frame->trap_satp = SATP_KERNEL;
     frame->stvec = kernel_trap_frame->stvec;
     frame->trap_stack = kernel_trap_frame->trap_stack;
-    frame->trap_satp = kernel_trap_frame->trap_satp;
 
     uint64_t permission_bits = PB_READ | PB_EXECUTE | PB_WRITE;
     debugf("process.c (trap_frame_new): Mapping trap stack 0x%08lx:0x%08lx to 0x%08lx\n", frame->trap_stack, frame->trap_stack + 0x10000, kernel_mmu_translate(frame->trap_stack));
