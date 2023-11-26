@@ -134,6 +134,7 @@ bool process_run(Process *p, uint32_t hart);
 
 void process_map_init();
 void process_map_set(Process *p);
+void process_map_remove(uint16_t pid);
 Process *process_map_get(uint16_t pid);
 
 void pid_harts_map_init();

@@ -34,21 +34,11 @@ SYSCALL(exit)
     
     debugf("syscall.c (exit) Exiting PID %d\n", pid);
 
-    // // Set to dead so it will be freed and removed the next time the
-    // // scheduler is invoked
+    // Set to dead so it will be freed and removed the next time the
+    // scheduler is invoked
     p->state = PS_DEAD;
 
-
-    // // Remove process from the schedule tree
-    // sched_remove_process(p);
-    // process_map_remove(pid);
-
-    // // Free process
-    // if (process_free(p)) {
-    //     fatalf("syscall.c (exit): process_free failed\n");
-    // }
-
-    // // Invoke scheduler
+    // Invoke scheduler
     sched_handle_timer_interrupt(hart);
 }
 
