@@ -17,8 +17,9 @@ Scheduler - uses completely fair scheduler approach
 #include <kmalloc.h>
 #include <lock.h>
 #include <compiler.h>
+#include <config.h>
 
-// #define DEBUG_SCHED
+#define DEBUG_SCHED
 #ifdef DEBUG_SCHED
 #define debugf(...) debugf(__VA_ARGS__)
 #else
@@ -35,7 +36,6 @@ void idle_process_main() {
         asm volatile("wfi");
     }
 }
-
 
 Process *sched_get_idle_process() {
     return idle_process;
@@ -247,6 +247,7 @@ void sched_handle_timer_interrupt(int hart) {
     //put Process currently on the hart back in the scheduler to recalc priority
     uint16_t pid = pid_harts_map_get(hart);
     Process *current_proc = process_map_get(pid);
+
     if (current_proc == sched_get_idle_process()) {
         debugf("sched_handle_timer_interrupt: Idle Process interrupted\n");
     } else {
@@ -254,27 +255,35 @@ void sched_handle_timer_interrupt(int hart) {
     }
 
     CSR_READ(current_proc->frame->sepc, "sepc");
+    // Print the program counter of the Process that was interrupted
+    debugf("pc: %lx\n", current_proc->frame->sepc);
 
     // Remove the Process from the tree
     rb_delete(sched_tree, current_proc->runtime * current_proc->priority);
-    // Update the Process's runtime
+    
+    // Update runtime and priority
     sbi_add_timer(sbi_whoami(), CONTEXT_SWITCH_TIMER * current_proc->quantum);
-
     current_proc->runtime += CONTEXT_SWITCH_TIMER * current_proc->quantum;
     current_proc->priority = 1;
+
     debugf("sched_handle_timer_interrupt: Process %d quantum is now %d\n", current_proc->pid, current_proc->quantum);
     debugf("sched_handle_timer_interrupt: Process %d runtime is now %d\n", current_proc->pid, current_proc->runtime);
-    // Add the Process back to the tree
-    debugf("sched_handle_timer_interrupt: Putting Process %d back in scheduler\n", current_proc->pid);
-    rb_insert_ptr(sched_tree, current_proc->runtime * current_proc->priority, current_proc);
     
-    // remove_process(current_proc);
-    debugf("sched_handle_timer_interrupt: Putting Process %d back in scheduler\n", current_proc->pid);
-    // sched_add(current_proc);
-    // Print the program counter of the Process that was interrupted
-    debugf("pc: %lx\n", current_proc->frame->sepc);
-    // Print map size
-    // debugf("sched_handle_timer_interrupt: Map size is %d\n", process_map_size());
+    bool process_free_failed = false;
+    switch (current_proc->state) {
+    case PS_DEAD:
+        process_free_failed = process_free(current_proc);
+        process_map_remove(pid);
+        break;
+    case PS_RUNNING:
+        debugf("sched_handle_timer_interrupt: Putting Process %d back in scheduler\n", current_proc->pid);
+        rb_insert_ptr(sched_tree, current_proc->runtime * current_proc->priority, current_proc);
+    case PS_WAITING:
+    case PS_SLEEPING:
+        break;
+    default:
+        fatalf("sched_handle_timer_interrupt: Invalid process state\n");
+    }
 
     //get an idle Process
     Process *next_process = sched_get_next(); // Implement this function to get the currently running Process

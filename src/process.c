@@ -187,8 +187,8 @@ TrapFrame *trap_frame_new(bool is_user, PageTable *page_table, uint64_t pid) {
     } else {
         frame->sstatus |= SSTATUS_SPP_SUPERVISOR;
     }
-    frame->satp = SATP(kernel_mmu_translate(page_table), pid % 0xffff);
-    frame->sscratch = frame;
+    frame->satp = SATP(kernel_mmu_translate((uintptr_t)page_table), pid % 0xffff);
+    frame->sscratch = (uintptr_t)frame;
     frame->trap_satp = SATP_KERNEL;
     frame->stvec = kernel_trap_frame->stvec;
     frame->trap_stack = kernel_trap_frame->trap_stack;
@@ -215,17 +215,17 @@ TrapFrame *trap_frame_new(bool is_user, PageTable *page_table, uint64_t pid) {
     //             permission_bits);
     debugf("process.c (trap_frame_new): Mapping page table 0x%08lx:0x%08lx to 0x%08lx\n", page_table, page_table + 0x1000, kernel_mmu_translate(page_table));
     mmu_map_range(page_table,
-                page_table,
-                page_table + 0x1000,
-                kernel_mmu_translate(page_table),
+                (uintptr_t)page_table,
+                (uintptr_t)(page_table + 0x1000),
+                kernel_mmu_translate((uintptr_t)page_table),
                 MMU_LEVEL_4K,
                 permission_bits);
 
     debugf("process.c (trap_frame_new): Mapping trap frame 0x%08lx:0x%08lx to 0x%08lx\n", frame, frame + 0x1000, kernel_mmu_translate(frame));
     mmu_map_range(page_table,
-                frame,
-                frame + 0x1000,
-                kernel_mmu_translate(frame),
+                (uintptr_t)frame,
+                (uintptr_t)(frame + 0x1000),
+                kernel_mmu_translate((uintptr_t)frame),
                 // (uint64_t)frame,
                 MMU_LEVEL_4K,
                 permission_bits);
@@ -383,9 +383,9 @@ Process *process_new(ProcessMode mode)
     void process_asm_run(void *frame_addr);
     rcb_map(&p->rcb, trampoline_thread_start, kernel_mmu_translate(trampoline_thread_start), 0x1000, PB_READ | PB_EXECUTE);
     rcb_map(&p->rcb, trampoline_trap_start, kernel_mmu_translate(trampoline_trap_start), 0x1000, PB_READ | PB_EXECUTE);
-    rcb_map(&p->rcb, process_asm_run, kernel_mmu_translate(process_asm_run), 0x10000, PB_READ | PB_EXECUTE);
-    rcb_map(&p->rcb, os_trap_handler, kernel_mmu_translate(os_trap_handler), 0x1000, PB_READ | PB_EXECUTE);
-    rcb_map(&p->rcb, p->frame, kernel_mmu_translate(p->frame), 0x1000, PB_READ | PB_WRITE | PB_EXECUTE);
+    rcb_map(&p->rcb, (uintptr_t)process_asm_run, kernel_mmu_translate((uintptr_t)process_asm_run), 0x10000, PB_READ | PB_EXECUTE);
+    rcb_map(&p->rcb, (uintptr_t)os_trap_handler, kernel_mmu_translate((uintptr_t)os_trap_handler), 0x1000, PB_READ | PB_EXECUTE);
+    rcb_map(&p->rcb, (uintptr_t)p->frame, kernel_mmu_translate((uintptr_t)p->frame), 0x1000, PB_READ | PB_WRITE | PB_EXECUTE);
 
     uint64_t permission_bits = PB_READ | PB_EXECUTE | PB_WRITE;
     if (mode == PM_USER) {
@@ -525,6 +525,11 @@ Process *process_map_get(uint16_t pid)
     MapValue val;
     map_get_int(processes, pid, &val);
     return (Process *)val;
+}
+
+void process_map_remove(uint16_t pid)
+{
+    map_remove_int(processes, pid);
 }
 
 // Keep track of the PIDs running on each hart.
