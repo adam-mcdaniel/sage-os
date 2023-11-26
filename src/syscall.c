@@ -5,6 +5,8 @@
 #include <util.h>
 #include <debug.h>
 #include <process.h>
+#include "config.h"
+#include "sched.h"
 
 #define XREG(x)             (scratch[XREG_##x])
 #define SYSCALL_RETURN_TYPE void
@@ -21,18 +23,33 @@ SYSCALL(exit)
 {
     SYSCALL_ENTER();
     // Kill the current process on this HART and schedule the next
-    // one.
-    debugf("HELLO\n");
+    // one.    
     
-    // Get the current process running on hart
-    Process *p = process_map_get(pid_harts_map_get(hart));
+    uint16_t pid = pid_harts_map_get(hart);
+    Process *p = process_map_get(pid);
     
-    // Kill process
-    // ...
+    if (!p) {
+        debugf("syscall.c (exit): Null process on hart %d", hart);
+    }
+    
+    debugf("syscall.c (exit) Exiting PID %d\n", pid);
 
-    // Free process
-    if (process_free(p)) 
-        fatalf("syscall.c (exit): process_free failed\n");
+    // // Set to dead so it will be freed and removed the next time the
+    // // scheduler is invoked
+    p->state = PS_DEAD;
+
+
+    // // Remove process from the schedule tree
+    // sched_remove_process(p);
+    // process_map_remove(pid);
+
+    // // Free process
+    // if (process_free(p)) {
+    //     fatalf("syscall.c (exit): process_free failed\n");
+    // }
+
+    // // Invoke scheduler
+    sched_handle_timer_interrupt(hart);
 }
 
 SYSCALL(putchar)
@@ -56,9 +73,20 @@ SYSCALL(yield)
 SYSCALL(sleep)
 {
     SYSCALL_ENTER();
+    
+    uint16_t pid = pid_harts_map_get(0);
+    Process *p = process_map_get(pid);
+    
+    if (!p) {
+        fatalf("syscall.c (sleep): Null process on hart %d", hart);
+    }
+
     // Sleep the process. VIRT_TIMER_FREQ is 10MHz, divided by 1000, we get 10KHz
-    //     p->sleep_until = sbi_get_time() + XREG(A0) * VIRT_TIMER_FREQ / 1000;
-    //     p->state = PS_SLEEPING;
+    debugf("syscall.c (sleep) Sleeping PID %d\n", pid);
+    p->sleep_until = sbi_get_time() + XREG(A0) * VIRT_TIMER_FREQ / 1000;
+    p->state = PS_SLEEPING;
+    
+    sched_handle_timer_interrupt(hart);
 }
 
 SYSCALL(events)
