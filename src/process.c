@@ -392,33 +392,56 @@ Process *process_new(ProcessMode mode)
         permission_bits |= PB_USER;
     }
 
-    p->heap_size = USER_HEAP_SIZE * 2;
-    p->stack_size = USER_STACK_SIZE * 2;
-    p->stack = page_znalloc(p->stack_size / PAGE_SIZE);
-    p->heap = page_znalloc(p->heap_size / PAGE_SIZE);
+    p->heap_size = USER_HEAP_SIZE;
+    p->stack_size = USER_STACK_SIZE;
+    do {
+        debugf("Allocating %d pages for the stack\n", p->stack_size / PAGE_SIZE);
+        p->stack = page_znalloc(p->stack_size / PAGE_SIZE);
+        if (!p->stack) {
+            p->stack_size /= 2;
+        }
+    } while (!p->stack);
+    debugf("Allocating %d pages for the heap\n", p->heap_size / PAGE_SIZE);
+    
+    do {
+        debugf("Allocating %d pages for the heap\n", p->heap_size / PAGE_SIZE);
+        p->heap = page_znalloc(p->heap_size / PAGE_SIZE);
+        if (!p->heap) {
+            p->heap_size /= 2;
+        }
+    } while (!p->heap);
+    debugf("Stack: %p\n", p->stack);
+    debugf("Heap: %p\n", p->heap);
     trap_frame_set_stack_pointer(p->frame, USER_STACK_TOP);
     trap_frame_set_heap_pointer(p->frame, USER_HEAP_BOTTOM);
 
+    debugf("Wiping the heap\n");
     memset(p->heap, 0, p->heap_size);
     for (uint64_t i = 0; i < p->heap_size / PAGE_SIZE; i++) {
         list_add_ptr(p->rcb.heap_pages, p->heap + i * PAGE_SIZE);
+        debugf("Mapping heap page\n");
         rcb_map(&p->rcb, 
                 USER_HEAP_BOTTOM + i * PAGE_SIZE, 
                 kernel_mmu_translate((uint64_t)p->heap + i * PAGE_SIZE), 
                 PAGE_SIZE,
                 permission_bits);
+        debugf("Heap page mapped\n");
     }
+    debugf("Wiping the stack\n");
     memset(p->stack, 0, p->stack_size);
     for (uint64_t i = 0; i < p->stack_size / PAGE_SIZE; i++) {
         list_add_ptr(p->rcb.stack_pages, p->stack + i * PAGE_SIZE);
+        debugf("Mapping stack page\n");
         rcb_map(&p->rcb, 
                 USER_STACK_BOTTOM + i * PAGE_SIZE, 
                 kernel_mmu_translate((uint64_t)p->stack + i * PAGE_SIZE), 
                 PAGE_SIZE,
                 permission_bits);
+        debugf("Stack page mapped\n");
     }
-    
+    #ifdef DEBUG_PROCESS
     mmu_print_entries(p->rcb.ptable, MMU_LEVEL_4K);
+    #endif
     SFENCE_ASID(p->pid);
 
     return p;
@@ -428,8 +451,13 @@ int process_free(Process *p)
 {
     struct ListElem *e;
 
-    if (!p || !ON_HART_NONE(p)) {
-        // Process is invalid or running somewhere, or this is stale.
+    if (!p) {
+        warnf("process.c (process_free): Process is NULL\n");
+        return -1;
+    }
+
+    if (ON_HART_NONE(p)) {
+        warnf("process.c (process_free): Process is not running on any hart\n");
         return -1;
     }
 
@@ -463,12 +491,11 @@ int process_free(Process *p)
     }
 
     if (p->rcb.environemnt) {
-        map_free_get_keys(map_get_keys(p->rcb.environemnt));
+        map_free(p->rcb.environemnt);
     }
 
     if (p->rcb.ptable) {
-        mmu_free(p->rcb.ptable);
-        SFENCE_ASID(p->pid);
+        page_free(p->rcb.ptable);
     }
 
     kfree(p);
@@ -481,17 +508,22 @@ bool process_run(Process *p, unsigned int hart)
     unsigned int me = sbi_whoami();
 
     if (me == hart) {
+        if (p->state == PS_DEAD) {
+            warnf("process.c (process_run): Process is dead, running idle instead\n");
+            process_run(sched_get_idle_process(), hart);
+        }
+
         set_current_process(p);
-        process_debug(p);
+        // process_debug(p);
         uint64_t satp, sscratch;
         CSR_READ(satp, "satp");
         CSR_READ(sscratch, "sscratch");
-        debugf("Old SATP: 0x%08x\n", satp);
+        // debugf("Old SATP: 0x%08x\n", satp);
         // trap_frame_debug((TrapFrame*)sscratch);
-        debugf("New SATP: 0x%08x\n", p->frame->satp);
+        // debugf("New SATP: 0x%08x\n", p->frame->satp);
         // trap_frame_debug(p->frame);
         pid_harts_map_set(hart, p->pid);
-        debugf("Jumping to 0x%08lx\n", p->frame->sepc);
+        // debugf("Jumping to 0x%08lx\n", p->frame->sepc);
         process_asm_run(p->frame);
         
         fatalf("process.c (process_run): process_asm_run returned\n");
@@ -517,6 +549,11 @@ void process_map_init()
 void process_map_set(Process *p)
 {
     map_set_int(processes, p->pid, (MapValue)p);
+}
+
+void process_map_remove(Process *p)
+{
+    map_remove_int(processes, p->pid);
 }
 
 // Get process stored on the process map using the PID as the key.

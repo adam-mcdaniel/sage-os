@@ -8,6 +8,7 @@
 #include <compiler.h>
 #include <trap.h>
 #include <sbi.h>
+#include <process.h>
 #include <sched.h>
 
 // #define TRAP_DEBUG
@@ -36,6 +37,8 @@ void os_trap_handler(void)
     CSR_READ(epc, "sepc");
     CSR_READ(tval, "stval");
     CSR_READ(sie, "sie");
+
+    TrapFrame *frame = (TrapFrame*)scratch;
 
     // CSR_WRITE("sscratch", kernel_trap_frame);
 
@@ -81,6 +84,7 @@ void os_trap_handler(void)
                 debugf("os_trap_handler: Supervisor timer interrupt!\n");
                 // CSR_CLEAR("sip");
                 sbi_ack_timer();
+                frame->sepc = epc;
                 // We typically invoke our scheduler if we get a timer
                 sched_handle_timer_interrupt(hart);
                 break;
@@ -102,12 +106,20 @@ void os_trap_handler(void)
             infof("ERROR!!!\n");
             trap_frame_debug(scratch);
         }
+        Process *p;
         switch (cause) {
             case CAUSE_ECALL_U_MODE:  // ECALL U-Mode
                 // Forward to src/syscall.c
                 // infof("Handling syscall\n");
                 // trap_frame_debug(scratch);
                 syscall_handle(hart, epc, scratch);
+                // Get the process
+                p = sched_get_current();
+                if (p->state == PS_DEAD) {
+                    infof("Process %d is dead. Scheduling next process\n", p->pid);
+                    sched_handle_timer_interrupt(hart);
+                }
+
                 // We have to move beyond the ECALL instruction, which is exactly 4 bytes.
                 break;
             case CAUSE_ECALL_S_MODE:  // ECALL U-Mode
