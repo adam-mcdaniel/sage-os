@@ -24,7 +24,7 @@ void syscall_handle(int hart, uint64_t epc, int64_t *scratch);
 // Called from asm/spawn.S: _spawn_kthread
 void os_trap_handler(void)
 {
-    // infof("Entering OS trap handler\n");
+    // debugf("Entering OS trap handler\n");
     // SFENCE_ALL();
 
     unsigned long cause;
@@ -68,7 +68,7 @@ void os_trap_handler(void)
     //                 "csrs sie, t1\n");
 
 
-    // infof("Is async: %d\n", SCAUSE_IS_ASYNC(cause));
+    // debugf("Is async: %d\n", SCAUSE_IS_ASYNC(cause));
 
     if (SCAUSE_IS_ASYNC(cause)) {
         debugf("os_trap_handler: Is async!\n");
@@ -94,7 +94,7 @@ void os_trap_handler(void)
                 plic_handle_irq(hart);
                 break;
             default:
-                infof("ERROR!!!\n");
+                debugf("ERROR!!!\n");
                 trap_frame_debug(scratch);
                 fatalf("os_trap_handler: Unhandled Asynchronous interrupt %ld\n", cause);
                 WFI_LOOP();
@@ -103,34 +103,48 @@ void os_trap_handler(void)
     } else {
         debugf("Is sync!\n");
         if (cause != CAUSE_ECALL_S_MODE && cause != CAUSE_ECALL_U_MODE) {
-            infof("ERROR!!!\n");
+            debugf("ERROR!!!\n");
             trap_frame_debug(scratch);
+        } else {
+            frame->sepc = epc;
         }
         Process *p;
         switch (cause) {
             case CAUSE_ECALL_U_MODE:  // ECALL U-Mode
                 // Forward to src/syscall.c
-                // infof("Handling syscall\n");
+                // debugf("Handling syscall\n");
                 // trap_frame_debug(scratch);
                 syscall_handle(hart, epc, scratch);
                 // Get the process
                 p = sched_get_current();
-                if (p->state == PS_DEAD) {
-                    infof("Process %d is dead. Scheduling next process\n", p->pid);
+
+                switch (p->state) {
+                case PS_RUNNING:
+                    return;
+                case PS_SLEEPING:
+                    debugf("Process %d is sleeping. Scheduling next process\n", p->pid);
                     sched_handle_timer_interrupt(hart);
+                case PS_WAITING:
+                    debugf("Process %d is waiting. Scheduling next process\n", p->pid);
+                    sched_handle_timer_interrupt(hart);
+                case PS_DEAD:
+                    debugf("Process %d is dead. Scheduling next process\n", p->pid);
+                    sched_handle_timer_interrupt(hart);
+                default:
+                    fatalf("Unknown process state %d\n", p->state);
                 }
 
                 // We have to move beyond the ECALL instruction, which is exactly 4 bytes.
                 break;
             case CAUSE_ECALL_S_MODE:  // ECALL U-Mode
                 // Forward to src/syscall.c
-                // infof("Handling supervisor syscall\n");
+                // debugf("Handling supervisor syscall\n");
                 syscall_handle(hart, epc, scratch);
                 // We have to move beyond the ECALL instruction, which is exactly 4 bytes.
                 break;
             case CAUSE_ILLEGAL_INSTRUCTION:
                 fatalf("Illegal instruction \"%x\" at %p\n", *((uint64_t*)epc), epc);
-                CSR_WRITE("sepc", epc + 4);
+                // CSR_WRITE("sepc", epc + 4);
                 break;
             case CAUSE_INSTRUCTION_ACCESS_FAULT:
                 fatalf("Couldn't access instruction=%p at instruction %p\n", tval, epc);

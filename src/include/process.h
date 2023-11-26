@@ -17,7 +17,7 @@
 #include <map.h>
 #include <mmu.h>
 #include <kmalloc.h>
-
+#include <lock.h>
 
 // #define USER_STACK_TOP   0x00000000000e0000UL
 // #define USER_STACK_BOTTOM 0x00000000000d0000UL
@@ -93,6 +93,8 @@ void rcb_map(RCB *rcb, uint64_t vaddr, uint64_t paddr, uint64_t size, uint64_t b
 void rcb_debug(RCB *rcb);
 
 typedef struct Process {
+    Mutex lock;
+
     uint16_t pid;
     uint32_t hart;
     ProcessMode mode;
@@ -143,7 +145,9 @@ bool process_run(Process *p, uint32_t hart);
 
 void process_map_init();
 void process_map_set(Process *p);
+void process_map_remove(uint16_t pid);
 Process *process_map_get(uint16_t pid);
+bool process_map_contains(uint16_t pid);
 
 void pid_harts_map_init();
 void pid_harts_map_set(uint32_t hart, uint16_t pid);

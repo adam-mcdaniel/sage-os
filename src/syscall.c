@@ -5,6 +5,8 @@
 #include <util.h>
 #include <debug.h>
 #include <process.h>
+#include "config.h"
+#include "sched.h"
 
 // #define SYSCALL_DEBUG
 #ifdef SYSCALL_DEBUG
@@ -36,8 +38,11 @@ SYSCALL(exit)
 
     p->state = PS_DEAD;
     
-    // Kill process
-    // ...
+    if (!p) {
+        debugf("syscall.c (exit): Null process on hart %d", hart);
+    }
+    
+    debugf("syscall.c (exit) Exiting PID %d\n", p->pid);
 
     // Free process
     // if (process_free(p)) 
@@ -67,9 +72,35 @@ SYSCALL(yield)
 SYSCALL(sleep)
 {
     SYSCALL_ENTER();
-    // Sleep the process. VIRT_TIMER_FREQ is 10MHz, divided by 1000, we get 10KHz
-    //     p->sleep_until = sbi_get_time() + XREG(A0) * VIRT_TIMER_FREQ / 1000;
-    //     p->state = PS_SLEEPING;
+    
+    uint16_t pid = pid_harts_map_get(hart);
+    Process *p = sched_get_current();
+    if (!process_map_contains(pid)) {
+        // fatalf("syscall.c (sleep): Process %d not found on hart %d\n", pid, hart);
+        process_debug(p);
+        fatalf("syscall.c (sleep): Process %d not found on hart %d\n", pid, hart);
+    } else {
+        debugf("syscall.c (sleep): Process %d found on hart %d\n", pid, hart);
+    }
+
+    if (p->pid != pid) {
+        process_debug(p);
+        fatalf("syscall.c (sleep): Process %d not found on hart %d\n", pid, hart);
+    } else {
+        debugf("syscall.c (sleep): Process %d found on hart %d\n", pid, hart);
+    }
+    
+    if (!p) {
+        fatalf("syscall.c (sleep): Null process on hart %d", p->hart);
+    }
+    // // Sleep the process. VIRT_TIMER_FREQ is 10MHz, divided by 1000, we get 10KHz
+
+    /*
+    // Commented out until we implement an IO buffer for the process
+    // infof("syscall.c (sleep) Sleeping PID %d at %d until %d\n", p->pid, sbi_get_time(), sbi_get_time() + XREG(A0) * VIRT_TIMER_FREQ / 1000);
+    p->sleep_until = sbi_get_time() + XREG(A0) * VIRT_TIMER_FREQ / 1000;
+    p->state = PS_SLEEPING;
+    */
 }
 
 SYSCALL(events)
