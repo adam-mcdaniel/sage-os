@@ -36,6 +36,7 @@ void os_trap_handler(void)
     CSR_READ(epc, "sepc");
     CSR_READ(tval, "stval");
     CSR_READ(sie, "sie");
+
     // CSR_WRITE("sscratch", kernel_trap_frame);
 
     // __asm__ volatile ("savegp");
@@ -105,6 +106,9 @@ void os_trap_handler(void)
                 break;
             case CAUSE_INSTRUCTION_PAGE_FAULT:
                 fatalf("Instruction page fault at instruction %p accessing address %p\n", epc, tval);
+                break;
+            case CAUSE_STORE_AMO_PAGE_FAULT:
+                fatalf("Instruction store page fault at instruction %p accessing address %p\n", epc, tval);
                 break;
             case CAUSE_LOAD_PAGE_FAULT:
                 fatalf("Load page fault at %p = %p", epc, tval);

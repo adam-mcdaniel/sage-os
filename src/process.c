@@ -82,7 +82,7 @@ void rcb_debug(RCB *rcb) {
 
 
 void trap_frame_debug(TrapFrame *tf) {
-    debugf("TrapFrame:\n");
+    debugf("TrapFrame (%p):\n", tf);
     // int64_t xregs[32];
     // double fregs[32];
     // uint64_t sepc;
@@ -264,6 +264,14 @@ void rcb_map(RCB *rcb, uint64_t vaddr, uint64_t paddr, uint64_t size, uint64_t b
         debugf("rcb_map: Mapping 0x%08lx to 0x%08lx\n", (vaddr + i) & alignment, (paddr + i) & alignment);
         mmu_map(rcb->ptable, (vaddr + i) & alignment, (paddr + i) & alignment, MMU_LEVEL_4K, bits);
     }
+}
+
+void trap_frame_set_stack_pointer(TrapFrame *frame, uint64_t stack_pointer) {
+    frame->xregs[2] = stack_pointer;
+}
+
+void trap_frame_set_heap_pointer(TrapFrame *frame, uint64_t heap_pointer) {
+    frame->xregs[3] = heap_pointer;
 }
 
 Process *process_new(ProcessMode mode)

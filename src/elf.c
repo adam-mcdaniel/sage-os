@@ -711,7 +711,6 @@ int elf_create_process(Process *p, const uint8_t *elf) {
     //         PB_READ | PB_EXECUTE | PB_USER);
     // mmu_map(p->rcb.ptable, os_trap_handler, trans_os_trap_handler, MMU_LEVEL_4K,
     //         PB_READ | PB_EXECUTE | PB_USER);
-    // uintptr_t trans_frame = kernel_mmu_translate((uintptr_t)&p->frame);
     // mmu_map(p->rcb.ptable, trans_frame, trans_frame, MMU_LEVEL_4K, PB_READ | PB_WRITE | PB_EXECUTE | PB_USER);
     // mmu_map(p->rcb.ptable, p->frame.stvec, p->frame.stvec, MMU_LEVEL_4K, PB_READ | PB_WRITE | PB_EXECUTE | PB_USER);
 
@@ -781,7 +780,7 @@ int elf_create_process(Process *p, const uint8_t *elf) {
                 PAGE_SIZE,
                 permission_bits);
     }
-    
+
     // Create the environment
     if (!p->rcb.environemnt) {
         p->rcb.environemnt = map_new();
@@ -825,7 +824,7 @@ int elf_create_process(Process *p, const uint8_t *elf) {
         rcb_map(&p->rcb, 
                 text_header.p_vaddr & ~0xfff, 
                 kernel_mmu_translate((uint64_t)text), 
-                (text_size / 0x1000 + 1) * 0x4000,
+                (text_size / 0x1000 + 1) * 0x2000,
                 permission_bits);
     }
     if (rodata) {
@@ -839,7 +838,7 @@ int elf_create_process(Process *p, const uint8_t *elf) {
         rcb_map(&p->rcb, 
                 rodata_header.p_vaddr, 
                 kernel_mmu_translate((uint64_t)rodata), 
-                (rodata_size / 0x1000 + 1) * 0x4000,
+                (rodata_size / 0x1000 + 1) * 0x2000,
                 permission_bits);
     }
     if (bss) {
@@ -853,7 +852,7 @@ int elf_create_process(Process *p, const uint8_t *elf) {
         rcb_map(&p->rcb, 
                 bss_header.p_vaddr, 
                 kernel_mmu_translate((uint64_t)bss), 
-                (bss_size / 0x1000 + 1) * 0x4000,
+                (bss_size / 0x1000 + 1) * 0x2000,
                 permission_bits);
     }
     if (data) {
@@ -867,7 +866,7 @@ int elf_create_process(Process *p, const uint8_t *elf) {
         rcb_map(&p->rcb, 
                 data_header.p_vaddr, 
                 kernel_mmu_translate((uint64_t)data), 
-                (data_size / 0x1000 + 1) * 0x4000,
+                (data_size / 0x1000 + 1) * 0x2000,
                 permission_bits);
     }
 
@@ -890,6 +889,11 @@ int elf_create_process(Process *p, const uint8_t *elf) {
         debugf("Copying data segment\n");
         memcpy(bss, elf + bss_header.p_offset, bss_header.p_filesz);
     }
+
+
+    trap_frame_set_stack_pointer(p->frame, (uint64_t)p->stack + p->stack_size * 2);
+    trap_frame_set_heap_pointer(p->frame, (uint64_t)p->heap + p->heap_size * 2);
+    
     // int64_t xregs[32];
     // double fregs[32];
     // uint64_t sepc;
