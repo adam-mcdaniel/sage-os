@@ -58,6 +58,9 @@ void trap_frame_debug(TrapFrame *frame);
 TrapFrame *trap_frame_new(bool is_user, PageTable *page_table);
 void trap_frame_free(TrapFrame *frame);
 
+void trap_frame_set_stack_pointer(TrapFrame *frame, uint64_t stack_pointer);
+void trap_frame_set_heap_pointer(TrapFrame *frame, uint64_t heap_pointer);
+
 // Resource Control Block
 typedef struct RCB {
     List *image_pages;
