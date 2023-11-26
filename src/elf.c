@@ -1015,16 +1015,6 @@ int elf_create_process(Process *p, const uint8_t *elf) {
         memcpy(data, elf + data_header.p_offset, data_size);
     }
     
-    // Get `__global_pointer$`
-    Elf64_Sym *global_pointer_sym = elf_get_symbol(header, section_headers, elf, "__global_pointer$");
-    if (global_pointer_sym) {
-        // Set the global pointer
-        debugf("Found __global_pointer$=%p symbol\n", global_pointer_sym->st_value);
-        uint8_t *global_pointer = mmu_translate(p->rcb.ptable, global_pointer_sym->st_value);
-        debugf("Setting global pointer to %p\n", global_pointer);
-        // *(uint64_t*)global_pointer = (uint64_t)p->rcb.ptable;
-    }
-
     // trap_frame_set_stack_pointer(p->frame, USER_STACK_TOP);
     // trap_frame_set_heap_pointer(p->frame, USER_HEAP_BOTTOM);
     // Section headers
