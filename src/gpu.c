@@ -209,8 +209,8 @@ void gpu_send_command(VirtioDevice *gpu_device,
     virtio_send_descriptor_chain(gpu_device, which_queue, chain, num_descriptors, true);
     
     // Wait until device_idx catches up 
+    debugf("GPU WAITING\n");
     while (gpu_device->device_idx != gpu_device->device->idx) {
-        debugf("GPU WAITING\n");
     }
     debugf("gpu_send_command: device_idx caught up\n");
 }
