@@ -123,7 +123,7 @@ static void init_systems(void)
     CSR_READ(kernel_trap_frame->stvec, "stvec");
     CSR_READ(kernel_trap_frame->trap_satp, "satp");
     // kernel_trap_frame->satp = kernel_mmu_table
-    kernel_trap_frame->trap_stack = (uint64_t)kmalloc(0x10000);
+    kernel_trap_frame->trap_stack = (uint64_t)kmalloc(0x100000);
     CSR_WRITE("sscratch", kernel_trap_frame);
     trap_frame_debug(kernel_trap_frame);
 
