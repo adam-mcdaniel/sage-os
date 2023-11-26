@@ -23,8 +23,8 @@ void syscall_handle(int hart, uint64_t epc, int64_t *scratch);
 // Called from asm/spawn.S: _spawn_kthread
 void os_trap_handler(void)
 {
-    infof("Entering OS trap handler\n");
-    SFENCE_ALL();
+    // infof("Entering OS trap handler\n");
+    // SFENCE_ALL();
 
     unsigned long cause;
     long *scratch;
@@ -65,7 +65,7 @@ void os_trap_handler(void)
     //                 "csrs sie, t1\n");
 
 
-    infof("Is async: %d\n", SCAUSE_IS_ASYNC(cause));
+    // infof("Is async: %d\n", SCAUSE_IS_ASYNC(cause));
 
     if (SCAUSE_IS_ASYNC(cause)) {
         debugf("os_trap_handler: Is async!\n");
@@ -115,13 +115,14 @@ void os_trap_handler(void)
                 break;
             case CAUSE_ECALL_U_MODE:  // ECALL U-Mode
                 // Forward to src/syscall.c
-                infof("Handling syscall\n");
+                // infof("Handling syscall\n");
+                // trap_frame_debug(scratch);
                 syscall_handle(hart, epc, scratch);
                 // We have to move beyond the ECALL instruction, which is exactly 4 bytes.
                 break;
             case CAUSE_ECALL_S_MODE:  // ECALL U-Mode
                 // Forward to src/syscall.c
-                infof("Handling supervisor syscall\n");
+                // infof("Handling supervisor syscall\n");
                 syscall_handle(hart, epc, scratch);
                 // We have to move beyond the ECALL instruction, which is exactly 4 bytes.
                 break;

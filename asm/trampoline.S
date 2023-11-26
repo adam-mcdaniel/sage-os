@@ -24,10 +24,9 @@
 
 .section .trampoline
 process_asm_run:
-
     # a0 - Trap frame
     csrw    sscratch, a0
-    csrr        t6, sscratch
+    csrr    t6, sscratch
 
 	# Spawn table fields
 	# 0    - gpregs
@@ -81,7 +80,6 @@ process_asm_run:
 		.set i, i + 1
 	.endr
 
-    #ebreak
 	sret
 
 process_asm_run_end:

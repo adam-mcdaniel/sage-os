@@ -661,8 +661,8 @@ int elf_create_process(Process *p, const uint8_t *elf) {
     uint64_t data_size = elf_is_valid_data(data_header)? data_header.p_memsz : 0;
     debugf("DATA size: %x\n", data_size);
 
-    p->heap_size = DEFAULT_HEAP_SIZE;
-    p->stack_size = DEFAULT_STACK_SIZE;
+    p->heap_size = USER_HEAP_SIZE * 2;
+    p->stack_size = USER_STACK_SIZE * 2;
     uint64_t total_size = text_size + rodata_size + bss_size + data_size + p->heap_size + p->stack_size;
     debugf("Total size: %x\n", total_size);
     // Allocate the memory for the segments
@@ -759,10 +759,10 @@ int elf_create_process(Process *p, const uint8_t *elf) {
     }
     
     memset(p->heap, 0, p->heap_size);
-    for (uint64_t i = 0; i < p->heap_size * 2 / PAGE_SIZE; i++) {
+    for (uint64_t i = 0; i < p->heap_size / PAGE_SIZE; i++) {
         list_add_ptr(p->rcb.heap_pages, p->heap + i * PAGE_SIZE);
         rcb_map(&p->rcb, 
-                p->heap + i * PAGE_SIZE, 
+                USER_HEAP_BOTTOM + i * PAGE_SIZE, 
                 kernel_mmu_translate((uint64_t)p->heap + i * PAGE_SIZE), 
                 PAGE_SIZE,
                 permission_bits);
@@ -772,10 +772,10 @@ int elf_create_process(Process *p, const uint8_t *elf) {
         p->rcb.stack_pages = list_new();
     }
     memset(p->stack, 0, p->stack_size);
-    for (uint64_t i = 0; i < p->stack_size * 2 / PAGE_SIZE; i++) {
+    for (uint64_t i = 0; i < p->stack_size / PAGE_SIZE; i++) {
         list_add_ptr(p->rcb.stack_pages, p->stack + i * PAGE_SIZE);
         rcb_map(&p->rcb, 
-                p->stack + i * PAGE_SIZE, 
+                USER_STACK_BOTTOM + i * PAGE_SIZE, 
                 kernel_mmu_translate((uint64_t)p->stack + i * PAGE_SIZE), 
                 PAGE_SIZE,
                 permission_bits);
@@ -806,23 +806,17 @@ int elf_create_process(Process *p, const uint8_t *elf) {
     //             (uint64_t)segments,
     //             MMU_LEVEL_4K,
     //             permission_bits);
-    rcb_map(&p->rcb, 
-                segments,
-                kernel_mmu_translate((uint64_t)segments), 
-                total_size,
-                permission_bits);
+    // rcb_map(&p->rcb, 
+    //             segments,
+    //             kernel_mmu_translate((uint64_t)segments), 
+    //             total_size,
+    //             permission_bits);
 
     // // Map the segments into the page table
     if (text) {
         debugf("Mapping text segment\n");
-        // mmu_map_range(p->rcb.ptable, 
-        //             text_header.p_vaddr, 
-        //             text_header.p_vaddr + text_size, 
-        //             (uint64_t)text, 
-        //             MMU_LEVEL_4K,
-        //             permission_bits);
         rcb_map(&p->rcb, 
-                text_header.p_vaddr & ~0xfff, 
+                text_header.p_vaddr, 
                 kernel_mmu_translate((uint64_t)text), 
                 (text_size / 0x1000 + 1) * 0x2000,
                 permission_bits);
@@ -858,7 +852,7 @@ int elf_create_process(Process *p, const uint8_t *elf) {
     if (data) {
         debugf("Mapping data segment\n");
         // mmu_map_range(p->rcb.ptable, 
-        //             data_header.p_vaddr, 
+        //             data_head & ~0xfffer.p_vaddr, 
         //             data_header.p_vaddr + data_size, 
         //             (uint64_t)data, 
         //             MMU_LEVEL_4K,
@@ -890,9 +884,8 @@ int elf_create_process(Process *p, const uint8_t *elf) {
         memcpy(bss, elf + bss_header.p_offset, bss_header.p_filesz);
     }
 
-
-    trap_frame_set_stack_pointer(p->frame, (uint64_t)p->stack + p->stack_size * 2);
-    trap_frame_set_heap_pointer(p->frame, (uint64_t)p->heap + p->heap_size * 2);
+    trap_frame_set_stack_pointer(p->frame, USER_STACK_TOP);
+    trap_frame_set_heap_pointer(p->frame, USER_HEAP_BOTTOM);
     
     // int64_t xregs[32];
     // double fregs[32];

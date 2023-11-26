@@ -104,9 +104,11 @@ void syscall_handle(int hart, uint64_t epc, int64_t *scratch)
 
     if (XREG(A7) >= NUM_SYSCALLS || SYSCALLS[XREG(A7)] == NULL) {
         // Invalid syscall
+        warnf("Invalid syscall %ld\n", XREG(A7));
         XREG(A0) = -EINVAL;
     }
     else {
+        // debugf("syscall_handle: Calling syscall %ld\n", XREG(A7));
         SYSCALL_EXEC(XREG(A7));
     }
 }

@@ -17,8 +17,14 @@
 #include <map.h>
 #include <mmu.h>
 
-#define DEFAULT_HEAP_SIZE (0x10000) // 16 KB
-#define DEFAULT_STACK_SIZE (0x2000) // 8 KB
+
+#define USER_STACK_TOP   0x000000000000e000UL
+#define USER_STACK_BOTTOM 0x000000000000d000UL
+#define USER_HEAP_TOP    0x000000000000c000UL
+#define USER_HEAP_BOTTOM 0x000000000000b000UL
+#define USER_STACK_SIZE  (USER_STACK_TOP - USER_STACK_BOTTOM)
+#define USER_HEAP_SIZE   (USER_HEAP_TOP - USER_HEAP_BOTTOM)
+
 
 #define MAX_NUM_HARTS    (8) // We are gonna be scheduling 8 harts at most.
 #define HART_NONE        (-1U)
