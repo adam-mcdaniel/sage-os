@@ -16,8 +16,9 @@ Scheduler - uses completely fair scheduler approach
 #include <debug.h>
 #include <kmalloc.h>
 #include <lock.h>
+#include <compiler.h>
 
-#define DEBUG_SCHED
+// #define DEBUG_SCHED
 #ifdef DEBUG_SCHED
 #define debugf(...) debugf(__VA_ARGS__)
 #else
@@ -30,10 +31,8 @@ static Mutex sched_lock = MUTEX_UNLOCKED;
 static Process *idle_process, *current_process;
 
 void idle_process_main() {
-    infof("idle_process_main: Idle Process started\n");
     while (1) {
-        infof("idle_process_main: Idle Process started\n");
-        WFI_LOOP();
+        asm volatile("wfi");
     }
 }
 
@@ -47,12 +46,14 @@ void sched_init() {
     mutex_spinlock(&sched_lock);
     sched_tree = rb_new();
     //create idle Process
-    Process *p = process_new(PM_SUPERVISOR);
-    p->state = PS_RUNNING;
-    p->hart = sbi_whoami();
-    debugf("sched_init: Idle Process created with pid %d\n", p->pid);
-    p->runtime = 2;
-    p->priority = 2;
+    idle_process = process_new(PM_SUPERVISOR);
+    
+    idle_process->state = PS_RUNNING;
+    idle_process->hart = sbi_whoami();
+    debugf("sched_init: Idle Process created with pid %d\n", idle_process->pid);
+    idle_process->runtime = 2;
+    idle_process->priority = 2;
+    // idle_process->frame->xregs
     // kfree(p->rcb.ptable);
     // p->rcb.ptable = kernel_mmu_table;
     // p->frame = *kernel_trap_frame;
@@ -119,7 +120,7 @@ void sched_init() {
     // mmu_map(p->rcb.ptable, (uintptr_t)&p->frame, trans_frame, MMU_LEVEL_4K, PB_READ | PB_WRITE | PB_EXECUTE | PB_USER);
 
     // mmu_translate(p->rcb.ptable, p->frame.stvec);
-    CSR_READ(p->frame->sie, "sie");
+    // CSR_READ(p->frame->sie, "sie");
     
     // uint64_t  gpregs[32]; 
     // double    fpregs[32]; 
@@ -132,15 +133,22 @@ void sched_init() {
     // uint64_t  trap_satp;
     // uint64_t  trap_stack;
 
-    mmu_map(p->rcb.ptable, idle_process_main, idle_process_main, MMU_LEVEL_4K, PB_READ | PB_WRITE | PB_EXECUTE | PB_USER);
+    // memcpy(idle_process->frame->xregs, kernel_trap_frame->xregs, sizeof(kernel_trap_frame->xregs));
+    rcb_map(&idle_process->rcb, idle_process_main, idle_process_main, 0x1000, PB_READ | PB_EXECUTE);
+    // rcb_map(&idle_process->rcb, TE)
+
+    // rcb_map(&idle_process->rcb, sym_start(text), , sym_start(text), MMU_LEVEL_1G,
+    //               PB_READ | PB_WRITE | PB_EXECUTE);
+    // mmu_map(p->rcb.ptable, idle_process_main, idle_process_main, MMU_LEVEL_4K, PB_READ | PB_WRITE | PB_EXECUTE | PB_USER);
+
     // p->frame.sepc = (uint64_t) idle_process_main;
     // CSR_READ(p->frame.sstatus, "sstatus");
     
     // process_map_set(p);
-    set_current_process(p);
+    set_current_process(idle_process);
     //add idle Process to scheduler tree
     mutex_unlock(&sched_lock);
-    sched_add(p);
+    sched_add(idle_process);
     mutex_spinlock(&sched_lock);
 
     // process_debug(p);
@@ -271,6 +279,7 @@ void sched_handle_timer_interrupt(int hart) {
     //get an idle Process
     Process *next_process = sched_get_next(); // Implement this function to get the currently running Process
     if (next_process == sched_get_idle_process()) {
+        next_process->frame->sepc = (uint64_t) idle_process_main;
         debugf("sched_handle_timer_interrupt: Next Process to run is idle\n");
     } else {
         debugf("sched_handle_timer_interrupt: Next Process to run is %d\n", next_process->pid);

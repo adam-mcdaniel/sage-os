@@ -16,7 +16,7 @@
 #include <trap.h>
 #include <sched.h>
 
-#define DEBUG_PROCESS
+// #define DEBUG_PROCESS
 #ifdef DEBUG_PROCESS
 #define debugf(...) debugf(__VA_ARGS__)
 #else
@@ -178,7 +178,7 @@ void process_debug(Process *p) {
     }
 }
 
-TrapFrame *trap_frame_new(bool is_user, PageTable *page_table) {
+TrapFrame *trap_frame_new(bool is_user, PageTable *page_table, uint64_t pid) {
     TrapFrame *frame = (TrapFrame *)kzalloc(sizeof(TrapFrame));
     memset(frame, 0, sizeof(TrapFrame));
     frame->sstatus = SSTATUS_FS_INITIAL | SSTATUS_SPIE;
@@ -187,11 +187,17 @@ TrapFrame *trap_frame_new(bool is_user, PageTable *page_table) {
     } else {
         frame->sstatus |= SSTATUS_SPP_SUPERVISOR;
     }
-    frame->satp = SATP(kernel_mmu_translate(page_table), 10);
+    frame->satp = SATP(kernel_mmu_translate(page_table), pid % 0xffff);
     frame->sscratch = frame;
     frame->trap_satp = SATP_KERNEL;
     frame->stvec = kernel_trap_frame->stvec;
     frame->trap_stack = kernel_trap_frame->trap_stack;
+    frame->sie = SIE_SEIE | SIE_SSIE | SIE_STIE;
+    // CSR_READ(frame->sie, "sie");
+    if (is_user) {
+        trap_frame_set_stack_pointer(frame, USER_STACK_TOP);
+        trap_frame_set_heap_pointer(frame, USER_HEAP_BOTTOM);
+    }
 
     uint64_t permission_bits = PB_READ | PB_EXECUTE | PB_WRITE;
     debugf("process.c (trap_frame_new): Mapping trap stack 0x%08lx:0x%08lx to 0x%08lx\n", frame->trap_stack, frame->trap_stack + 0x10000, kernel_mmu_translate(frame->trap_stack));
@@ -306,7 +312,7 @@ Process *process_new(ProcessMode mode)
     // p->frame->stvec = trampoline_trap_start;
     // p->frame->trap_satp = SATP_KERNEL;
 
-    p->frame = trap_frame_new(mode == PM_USER, p->rcb.ptable);
+    p->frame = trap_frame_new(mode == PM_USER, p->rcb.ptable, p->pid);
 
 
     // p->frame->sie = SIE_SEIE | SIE_SSIE | SIE_STIE;
@@ -381,41 +387,39 @@ Process *process_new(ProcessMode mode)
     rcb_map(&p->rcb, os_trap_handler, kernel_mmu_translate(os_trap_handler), 0x1000, PB_READ | PB_EXECUTE);
     rcb_map(&p->rcb, p->frame, kernel_mmu_translate(p->frame), 0x1000, PB_READ | PB_WRITE | PB_EXECUTE);
 
-    // unsigned long trans_trampoline_start = mmu_translate(kernel_mmu_table, trampoline_thread_start);
-    // unsigned long trans_trampoline_trap  = mmu_translate(kernel_mmu_table, trampoline_trap_start);
-    // unsigned long trans_process_asm_run  = mmu_translate(kernel_mmu_table, process_asm_run);
-    // unsigned long trans_os_trap_handler  = mmu_translate(kernel_mmu_table, os_trap_handler);
-    // mmu_map_range(p->rcb.ptable, sym_start(text), sym_end(heap), sym_start(text), MMU_LEVEL_4K,
-    //               PB_READ | PB_WRITE | PB_EXECUTE | PB_USER | PB_VALID);
-    // PLIC
-    // debugf("Mapping PLIC\n");
-    // mmu_map_range(p->rcb.ptable, 0x0C000000, 0x0C2FFFFF, 0x0C000000, MMU_LEVEL_2M, PB_READ | PB_WRITE);
-    // // PCIe ECAM
-    // debugf("Mapping PCIe ECAM\n");
-    // mmu_map_range(p->rcb.ptable, 0x30000000, 0x3FFFFFFF, 0x30000000, MMU_LEVEL_2M, PB_READ | PB_WRITE);
-    // // PCIe MMIO
-    // debugf("Mapping PCIe MMIO\n");
-    // mmu_map_range(p->rcb.ptable, 0x40000000, 0x5FFFFFFF, 0x40000000, MMU_LEVEL_2M, PB_READ | PB_WRITE);
-    // mmu_map(p->rcb.ptable, trampoline_thread_start, trans_trampoline_start, MMU_LEVEL_4K,
-    //         PB_READ | PB_EXECUTE | PB_USER | PB_VALID);
-    // mmu_map(p->rcb.ptable, trampoline_trap_start, trans_trampoline_trap, MMU_LEVEL_4K,
-    //         PB_READ | PB_EXECUTE | PB_USER | PB_VALID);
-    // // Map the trap stack
-    // mmu_map_range(p->rcb.ptable,
-    //             process_asm_run,
-    //             process_asm_run + 0x10000,
-    //             kernel_mmu_translate(process_asm_run),
-    //             MMU_LEVEL_4K,
-    //             PB_READ | PB_EXECUTE | PB_USER | PB_VALID);
-    // mmu_map(p->rcb.ptable, os_trap_handler, trans_os_trap_handler, MMU_LEVEL_4K,
-    //         PB_READ | PB_EXECUTE | PB_USER | PB_VALID);
-    // Map trap frame to user's page table
-    // uintptr_t trans_frame = kernel_mmu_translate((uintptr_t)&p->frame);
-    // mmu_map(p->rcb.ptable, p->frame->stvec, kernel_mmu_translate(p->frame->stvec), MMU_LEVEL_4K, PB_READ | PB_WRITE | PB_EXECUTE | PB_USER);
-    // mmu_map(p->rcb.ptable, &p->frame, trans_frame, MMU_LEVEL_4K, PB_READ | PB_WRITE | PB_EXECUTE | PB_USER | PB_VALID);
-    // debug_page_table(p->rcb.ptable, MMU_LEVEL_4K);
-    // SFENCE_ASID(p->pid);
+    uint64_t permission_bits = PB_READ | PB_EXECUTE | PB_WRITE;
+    if (mode == PM_USER) {
+        permission_bits |= PB_USER;
+    }
+
+    p->heap_size = USER_HEAP_SIZE * 2;
+    p->stack_size = USER_STACK_SIZE * 2;
+    p->stack = page_znalloc(p->stack_size / PAGE_SIZE);
+    p->heap = page_znalloc(p->heap_size / PAGE_SIZE);
+    trap_frame_set_stack_pointer(p->frame, USER_STACK_TOP);
+    trap_frame_set_heap_pointer(p->frame, USER_HEAP_BOTTOM);
+
+    memset(p->heap, 0, p->heap_size);
+    for (uint64_t i = 0; i < p->heap_size / PAGE_SIZE; i++) {
+        list_add_ptr(p->rcb.heap_pages, p->heap + i * PAGE_SIZE);
+        rcb_map(&p->rcb, 
+                USER_HEAP_BOTTOM + i * PAGE_SIZE, 
+                kernel_mmu_translate((uint64_t)p->heap + i * PAGE_SIZE), 
+                PAGE_SIZE,
+                permission_bits);
+    }
+    memset(p->stack, 0, p->stack_size);
+    for (uint64_t i = 0; i < p->stack_size / PAGE_SIZE; i++) {
+        list_add_ptr(p->rcb.stack_pages, p->stack + i * PAGE_SIZE);
+        rcb_map(&p->rcb, 
+                USER_STACK_BOTTOM + i * PAGE_SIZE, 
+                kernel_mmu_translate((uint64_t)p->stack + i * PAGE_SIZE), 
+                PAGE_SIZE,
+                permission_bits);
+    }
+    
     mmu_print_entries(p->rcb.ptable, MMU_LEVEL_4K);
+    SFENCE_ASID(p->pid);
 
     return p;
 }
@@ -483,12 +487,10 @@ bool process_run(Process *p, unsigned int hart)
         CSR_READ(satp, "satp");
         CSR_READ(sscratch, "sscratch");
         debugf("Old SATP: 0x%08x\n", satp);
-        trap_frame_debug((TrapFrame*)sscratch);
+        // trap_frame_debug((TrapFrame*)sscratch);
         debugf("New SATP: 0x%08x\n", p->frame->satp);
-        trap_frame_debug(p->frame);
+        // trap_frame_debug(p->frame);
         pid_harts_map_set(hart, p->pid);
-        debugf("process.c (process_run): Running process %d on hart %d\n", p->pid, hart);
-        // trap_frame_debug(&p->frame);
         debugf("Jumping to 0x%08lx\n", p->frame->sepc);
         process_asm_run(p->frame);
         

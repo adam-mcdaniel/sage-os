@@ -61,7 +61,7 @@ typedef struct TrapFrame {
 } TrapFrame;
 
 void trap_frame_debug(TrapFrame *frame);
-TrapFrame *trap_frame_new(bool is_user, PageTable *page_table);
+TrapFrame *trap_frame_new(bool is_user, PageTable *page_table, uint64_t pid);
 void trap_frame_free(TrapFrame *frame);
 
 void trap_frame_set_stack_pointer(TrapFrame *frame, uint64_t stack_pointer);

@@ -90,13 +90,32 @@ void os_trap_handler(void)
                 plic_handle_irq(hart);
                 break;
             default:
+                infof("ERROR!!!\n");
+                trap_frame_debug(scratch);
                 fatalf("os_trap_handler: Unhandled Asynchronous interrupt %ld\n", cause);
                 WFI_LOOP();
                 break;
         }
     } else {
         debugf("Is sync!\n");
+        if (cause != CAUSE_ECALL_S_MODE && cause != CAUSE_ECALL_U_MODE) {
+            infof("ERROR!!!\n");
+            trap_frame_debug(scratch);
+        }
         switch (cause) {
+            case CAUSE_ECALL_U_MODE:  // ECALL U-Mode
+                // Forward to src/syscall.c
+                // infof("Handling syscall\n");
+                // trap_frame_debug(scratch);
+                syscall_handle(hart, epc, scratch);
+                // We have to move beyond the ECALL instruction, which is exactly 4 bytes.
+                break;
+            case CAUSE_ECALL_S_MODE:  // ECALL U-Mode
+                // Forward to src/syscall.c
+                // infof("Handling supervisor syscall\n");
+                syscall_handle(hart, epc, scratch);
+                // We have to move beyond the ECALL instruction, which is exactly 4 bytes.
+                break;
             case CAUSE_ILLEGAL_INSTRUCTION:
                 fatalf("Illegal instruction \"%x\" at %p\n", *((uint64_t*)epc), epc);
                 CSR_WRITE("sepc", epc + 4);
@@ -112,19 +131,6 @@ void os_trap_handler(void)
                 break;
             case CAUSE_LOAD_PAGE_FAULT:
                 fatalf("Load page fault at %p = %p", epc, tval);
-                break;
-            case CAUSE_ECALL_U_MODE:  // ECALL U-Mode
-                // Forward to src/syscall.c
-                // infof("Handling syscall\n");
-                // trap_frame_debug(scratch);
-                syscall_handle(hart, epc, scratch);
-                // We have to move beyond the ECALL instruction, which is exactly 4 bytes.
-                break;
-            case CAUSE_ECALL_S_MODE:  // ECALL U-Mode
-                // Forward to src/syscall.c
-                // infof("Handling supervisor syscall\n");
-                syscall_handle(hart, epc, scratch);
-                // We have to move beyond the ECALL instruction, which is exactly 4 bytes.
                 break;
             default:
                 fatalf(

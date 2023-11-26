@@ -8,6 +8,7 @@ Scheduler header
 #include <process.h>
 
 Process *sched_get_idle_process();
+void idle_process_main();
 
 //initialize scheduler tree
 void sched_init();
