@@ -150,6 +150,7 @@ void input_device_isr(VirtioDevice* viodev) {
             // IRQ_OFF();
             // memcpy(&input_dev->event_buffer[input_dev->buffer_tail], event_ptr, sizeof(VirtioInputEvent));
             // IRQ_ON();
+            input_dev->event_buffer[input_dev->buffer_tail] = *event_ptr;
             input_dev->buffer_head = (input_dev->buffer_head + 1) % INPUT_EVENT_BUFFER_SIZE;
             ++input_dev->buffer_count;
             debugf("input_device_isr: Input event received: type = 0x%x, code = 0x%x, value = 0x%x\n", event_ptr->type, event_ptr->code, event_ptr->value);
