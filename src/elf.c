@@ -853,10 +853,6 @@ int elf_create_process(Process *p, const uint8_t *elf) {
     debugf("DATA vaddr: %p\n", p->data_vaddr);
     debugf("DATA size: %lu\n", p->data_size);
 
-    // Set the fields of the RCB
-    if (!p->rcb.image_pages) {
-        p->rcb.image_pages = list_new();
-    }
     // Store all the pages in the `segments` array
     for (uint64_t i = 0; i < total_size / PAGE_SIZE; i++) {
         list_add_ptr(p->rcb.image_pages, segments + i * PAGE_SIZE);
@@ -891,14 +887,14 @@ int elf_create_process(Process *p, const uint8_t *elf) {
     }
 
     // Create the environment
-    if (!p->rcb.environemnt) {
-        p->rcb.environemnt = map_new();
-    }
+    // if (!p->rcb.environemnt) {
+    //     p->rcb.environemnt = map_new();
+    // }
 
-    // Create the file descriptors
-    if (!p->rcb.file_descriptors) {
-        p->rcb.file_descriptors = list_new();
-    }
+    // // Create the file descriptors
+    // if (!p->rcb.file_descriptors) {
+    //     p->rcb.file_descriptors = list_new();
+    // }
 
     // Set sepc of the process's trap frame
 
@@ -976,31 +972,7 @@ int elf_create_process(Process *p, const uint8_t *elf) {
     Elf64_Shdr *section_headers = kmalloc(header.e_shentsize * header.e_shnum);
     memcpy(section_headers, elf + header.e_shoff, header.e_shentsize * header.e_shnum);
     elf_print_symbols(header, section_headers, (uint8_t*)elf);
-    if (bss) {
-        debugf("Clearing bss segment\n");
 
-        // Get _bss_start and _bss_end
-        // Elf64_Sym *bss_start_sym = elf_get_symbol(header, section_headers, elf, "_bss_start");
-        // Elf64_Sym *bss_end_sym = elf_get_symbol(header, section_headers, elf, "_bss_end");
-
-        // if (bss_start_sym && bss_end_sym) {
-        //     // Clear the bss segment
-        //     debugf("Found _bss_start=%p and _bss_end=%p symbols\n", bss_start_sym->st_value, bss_end_sym->st_value);
-        //     uint8_t *bss_start = mmu_translate(p->rcb.ptable, bss_start_sym->st_value);
-        //     uint8_t *bss_end = mmu_translate(p->rcb.ptable, bss_end_sym->st_value);
-        //     debugf("Clearing bss segment from %p to %p\n", bss_start, bss_end);
-        //     memcpy(bss, elf + bss_header.p_offset, bss_header.p_filesz);
-        //     memset(bss_start, 0, bss_end - bss_start);
-        //     // memset(bss, 0, bss_end_sym->st_value - bss_start_sym->st_value);
-        // } else {
-        // }
-        // Clear the bss segment
-        memset(bss, 0, bss_size);
-
-        // memset(bss, 0, bss_size);
-        // debugf("Copying data segment\n");
-        // memcpy(bss, elf + bss_header.p_offset, bss_header.p_filesz);
-    }
     // Copy the data into the process's memory
     if (text) {
         debugf("Copying text segment from %p to %p\n", elf + text_header.p_offset, text);
@@ -1014,9 +986,28 @@ int elf_create_process(Process *p, const uint8_t *elf) {
         debugf("Copying data segment\n");
         memcpy(data, elf + data_header.p_offset, data_size);
     }
+    if (bss) {
+        debugf("Copying data segment\n");
+        memcpy(bss, elf + bss_header.p_offset, data_size);
+    }
     
-    // trap_frame_set_stack_pointer(p->frame, USER_STACK_TOP);
-    // trap_frame_set_heap_pointer(p->frame, USER_HEAP_BOTTOM);
+    // Get _bss_start and _bss_end
+    Elf64_Sym *bss_start_sym = elf_get_symbol(header, section_headers, elf, "_bss_start");
+    Elf64_Sym *bss_end_sym = elf_get_symbol(header, section_headers, elf, "_bss_end");
+
+    if (bss_start_sym && bss_end_sym) {
+        // Clear the bss segment
+        debugf("Found _bss_start=%p and _bss_end=%p symbols\n", bss_start_sym->st_value, bss_end_sym->st_value);
+        uint8_t *bss_start = mmu_translate(p->rcb.ptable, bss_start_sym->st_value);
+        uint8_t *bss_end = mmu_translate(p->rcb.ptable, bss_end_sym->st_value);
+        debugf("Clearing bss segment from %p to %p\n", bss_start, bss_end);
+        memset(bss_start, 0, bss_end - bss_start);
+    }
+
+
+    
+    trap_frame_set_stack_pointer(p->frame, USER_STACK_TOP);
+    trap_frame_set_heap_pointer(p->frame, USER_HEAP_BOTTOM);
     // Section headers
     // int64_t xregs[32];
     // double fregs[32];
@@ -1028,5 +1019,6 @@ int elf_create_process(Process *p, const uint8_t *elf) {
     // uint64_t stvec;
     // uint64_t trap_satp;
     // uint64_t trap_stack;
+    process_debug(p);
     return 0;
 }
