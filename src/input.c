@@ -34,7 +34,6 @@ void input_device_init(VirtioDevice *device) {
     switch (prod_id) {
     case EV_KEY:
         virtio_set_device_name(device, "Keyboard");
-        device->ready = true;
         device->is_keyboard = 1;
         device->is_tablet = 0;
         keyboard_dev.viodev = device;
@@ -43,7 +42,6 @@ void input_device_init(VirtioDevice *device) {
         break;
     case EV_ABS:
         virtio_set_device_name(device, "Tablet");
-        device->ready = true;
         device->is_keyboard = 1;
         device->is_tablet = 0;
         tablet_dev.viodev = device;
@@ -54,6 +52,11 @@ void input_device_init(VirtioDevice *device) {
         fatalf("input_device_init: Unsupported device\n", prod_id);
         break;
     }
+
+    input_dev->buffer_head = 0;
+    input_dev->buffer_tail = 0;
+    input_dev->buffer_count = 0;
+    device->ready = true;
 
     IRQ_ON();
     input_device_receive_buffer_init(input_dev);
@@ -121,7 +124,7 @@ void input_device_isr(VirtioDevice* viodev) {
     uint16_t start_device_idx = viodev->device_idx;
     uint16_t num_received = 0;
     // Have to receive multiple descriptors
-    mutex_spinlock(input_dev);
+    mutex_spinlock(&input_dev->lock);
     while (viodev->device_idx != viodev->device->idx) {
         // uint32_t id = viodev->device->ring[viodev->device_idx % queue_size].id;
         VirtioDescriptor received_desc;
@@ -136,12 +139,12 @@ void input_device_isr(VirtioDevice* viodev) {
         }
 
         // Copy event to local buffer
-        if (input_dev->buffer_size < INPUT_EVENT_BUFFER_SIZE) {
+        if (input_dev->buffer_count < INPUT_EVENT_BUFFER_SIZE) {
             // IRQ_OFF();
-            // memcpy(&input_dev->event_buffer[input_dev->tail], event_ptr, sizeof(VirtioInputEvent));
+            // memcpy(&input_dev->event_buffer[input_dev->buffer_tail], event_ptr, sizeof(VirtioInputEvent));
             // IRQ_ON();
-            input_dev->tail = (input_dev->tail + 1) % INPUT_EVENT_BUFFER_SIZE;
-            input_dev->buffer_size++;
+            input_dev->buffer_head = (input_dev->buffer_head + 1) % INPUT_EVENT_BUFFER_SIZE;
+            ++input_dev->buffer_count;
             debugf("input_device_isr: Input event received: type = 0x%x, code = 0x%x, value = 0x%x\n", event_ptr->type, event_ptr->code, event_ptr->value);
         } else {
             debugf("input_device_isr: Input event buffer full, event dropped\n");
@@ -149,7 +152,7 @@ void input_device_isr(VirtioDevice* viodev) {
         virtio_send_one_descriptor(viodev, 0, received_desc, true);
         ++num_received;
     }
-    mutex_unlock(input_dev);
+    mutex_unlock(&input_dev->lock);
 
     // Sanity check
     debugf("input_device_isr: After receiving descriptors\n");
@@ -157,5 +160,39 @@ void input_device_isr(VirtioDevice* viodev) {
     debugf("  Starting device_idx = %d\n", start_device_idx);
     debugf("  Ending device_idx = %d\n", viodev->device_idx);
     debugf("  Ending device->idx = %d\n", viodev->device->idx);
-    debugf("  input_dev->buffer_size = %d\n", input_dev->buffer_size);
+    debugf("  input_dev->buffer_count = %d\n", input_dev->buffer_count);
+}
+
+InputDevice *input_device_get_keyboard() {
+    if (!keyboard_dev.viodev || !keyboard_dev.viodev->ready) {
+        warnf("input_device_get_keyboard: Invalid virtio device\n");
+        return NULL;
+    }
+
+    return &keyboard_dev;
+}
+
+InputDevice *input_device_get_tablet() {
+    if (!tablet_dev.viodev || !tablet_dev.viodev->ready) {
+        warnf("input_device_get_tablet: Invalid virtio device\n");
+        return NULL;
+    }
+
+    return &tablet_dev;
+}
+
+// Pop the input event from the event buffer ot input_dev to event.
+// Return true if succeeded, false if failed.
+bool input_device_buffer_pop(InputDevice *input_dev, VirtioInputEvent *event) {
+    // Event buffer is empty
+    if (input_dev->buffer_count == 0) {
+        return false;
+    }
+
+    *event = input_dev->event_buffer[input_dev->buffer_tail];
+    
+    input_dev->buffer_tail = (input_dev->buffer_tail + 1) % INPUT_EVENT_BUFFER_SIZE;
+    --input_dev->buffer_count;
+    
+    return true;
 }
