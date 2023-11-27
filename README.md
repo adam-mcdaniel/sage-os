@@ -14,6 +14,18 @@ Every week, you will need to write entries in this journal. Include brief inform
 * any complications that you've fixed and how you did it.
 
 Sort your entries in descending order (newest entries at the top).
+
+# 26-Nov-2023
+- `amcdan23`: Fixed bug with the trap frame being overwritten -- we were using a fresh trap stack for every process, when we should've just pointed to the kernel trap frame's trap stack. User processes can now be scheduled and descheduled with an `exit` system call! Fixed where `start.S` code was causing a `Null` pointer dereference in the `bss` zeroing code -- the OS zeroes the BSS instead. Fixed where RODATA was copied incorrectly, so we could not use strings in user applications -- now we can compile and run programs arbitrarily! We can compile our programs, store them on the mounted disk, and then execute them with our ELF loader!
+
+# 25-Nov-2023
+
+- `amcdan23`: Started trying to fix the trampoline code for the user space processes, and mapping the ELF sections into the RCB for a process correctly. Trying to fix where the process gets stuck repeatedly trapping without being able to load the trampoline code (instruction load fault). Got a process to actually execute and trap, but the trap frame returned by the trampoline code is all overwritten when we get it back.
+
+# 22-Nov-2023
+
+- `amcdan23`: Removed `elf_load_block_device` and `elf_load_file` -- they did not read from the block device at all, were just copied code that tried to parse an elf file on a zeroed buffer? Went back and added an Idle process to the scheduler that is scheduled and run like an actual process, with its own RCB and all. Prevented dead processes from being inserted back into the scheduler. Added functions for setting up the idle process.
+
 # 20-Nov-2023
 - `ttahmid`: Created user-space branch. Modified elf.h and elf.c with elf_load_process, elf_load_file, and elf_load_block_device functions.
 
