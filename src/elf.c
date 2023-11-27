@@ -772,7 +772,7 @@ int elf_create_process(Process *p, const uint8_t *elf) {
     uint64_t total_size = text_size + rodata_size + bss_size + data_size;
     debugf("Total size: %x\n", total_size);
     // Allocate the memory for the segments
-    uint8_t *segments = (uint8_t*)page_nalloc(ALIGN_UP_TO_PAGE(total_size) / PAGE_SIZE_4K);
+    uint8_t *segments = (uint8_t*)page_znalloc(ALIGN_UP_TO_PAGE(total_size) / PAGE_SIZE_4K);
     memset(segments, 0, total_size);
     p->image = segments;
     p->image_size = total_size;
@@ -858,33 +858,35 @@ int elf_create_process(Process *p, const uint8_t *elf) {
         list_add_ptr(p->rcb.image_pages, segments + i * PAGE_SIZE);
     }
 
-    // Allocate stack and heap
-    if (!p->rcb.heap_pages) {
-        p->rcb.heap_pages = list_new();
-        memset(p->heap, 0, p->heap_size);
-        for (uint64_t i = 0; i < p->heap_size / PAGE_SIZE; i++) {
-            list_add_ptr(p->rcb.heap_pages, p->heap + i * PAGE_SIZE);
-            rcb_map(&p->rcb, 
-                    USER_HEAP_BOTTOM + i * PAGE_SIZE, 
-                    kernel_mmu_translate((uint64_t)p->heap + i * PAGE_SIZE), 
-                    PAGE_SIZE,
-                    permission_bits);
-        }
-    }
+    // // Allocate stack and heap
+    // if (!p->rcb.heap_pages) {
+    //     p->rcb.heap_pages = list_new();
+    //     warnf("Allocating heap\n");
+    //     memset(p->heap, 0, p->heap_size);
+    //     for (uint64_t i = 0; i < p->heap_size / PAGE_SIZE; i++) {
+    //         list_add_ptr(p->rcb.heap_pages, p->heap + i * PAGE_SIZE);
+    //         rcb_map(&p->rcb, 
+    //                 USER_HEAP_BOTTOM + i * PAGE_SIZE, 
+    //                 kernel_mmu_translate((uint64_t)p->heap + i * PAGE_SIZE), 
+    //                 PAGE_SIZE,
+    //                 permission_bits);
+    //     }
+    // }
     
 
-    if (!p->rcb.stack_pages) {
-        p->rcb.stack_pages = list_new();
-        memset(p->stack, 0, p->stack_size);
-        for (uint64_t i = 0; i < p->stack_size / PAGE_SIZE; i++) {
-            list_add_ptr(p->rcb.stack_pages, p->stack + i * PAGE_SIZE);
-            rcb_map(&p->rcb, 
-                    USER_STACK_BOTTOM + i * PAGE_SIZE, 
-                    kernel_mmu_translate((uint64_t)p->stack + i * PAGE_SIZE), 
-                    PAGE_SIZE,
-                    permission_bits);
-        }
-    }
+    // if (!p->rcb.stack_pages) {
+    //     p->rcb.stack_pages = list_new();
+    //     warnf("Allocating stack\n");
+    //     memset(p->stack, 0, p->stack_size);
+    //     for (uint64_t i = 0; i < p->stack_size / PAGE_SIZE; i++) {
+    //         list_add_ptr(p->rcb.stack_pages, p->stack + i * PAGE_SIZE);
+    //         rcb_map(&p->rcb, 
+    //                 USER_STACK_BOTTOM + i * PAGE_SIZE, 
+    //                 kernel_mmu_translate((uint64_t)p->stack + i * PAGE_SIZE), 
+    //                 PAGE_SIZE,
+    //                 permission_bits);
+    //     }
+    // }
 
     // Create the environment
     // if (!p->rcb.environemnt) {
@@ -922,8 +924,8 @@ int elf_create_process(Process *p, const uint8_t *elf) {
         debugf("Mapping text segment\n");
         rcb_map(&p->rcb, 
                 text_header.p_vaddr, 
-                kernel_mmu_translate((uint64_t)text), 
-                (text_size / 0x1000 + 1) * 0x1000,
+                kernel_mmu_translate((uint64_t)text),
+                text_size,
                 permission_bits);
     }
     if (rodata) {
@@ -937,7 +939,7 @@ int elf_create_process(Process *p, const uint8_t *elf) {
         rcb_map(&p->rcb, 
                 rodata_header.p_vaddr, 
                 kernel_mmu_translate((uint64_t)rodata), 
-                (rodata_size / 0x1000 + 1) * 0x1000,
+                rodata_size,
                 permission_bits);
     }
     if (bss) {
@@ -951,7 +953,7 @@ int elf_create_process(Process *p, const uint8_t *elf) {
         rcb_map(&p->rcb, 
                 bss_header.p_vaddr, 
                 kernel_mmu_translate((uint64_t)bss), 
-                (bss_size / 0x1000 + 1) * 0x1000,
+                bss_size,
                 permission_bits);
     }
     if (data) {
@@ -965,7 +967,7 @@ int elf_create_process(Process *p, const uint8_t *elf) {
         rcb_map(&p->rcb, 
                 data_header.p_vaddr, 
                 kernel_mmu_translate((uint64_t)data), 
-                (data_size / 0x1000 + 1) * 0x1000,
+                data_size,
                 permission_bits);
     }
 
@@ -1006,8 +1008,8 @@ int elf_create_process(Process *p, const uint8_t *elf) {
 
 
     
-    trap_frame_set_stack_pointer(p->frame, USER_STACK_TOP);
-    trap_frame_set_heap_pointer(p->frame, USER_HEAP_BOTTOM);
+    trap_frame_set_stack_pointer(p->frame, USER_STACK_START);
+    trap_frame_set_heap_pointer(p->frame, USER_STACK_START);
     // Section headers
     // int64_t xregs[32];
     // double fregs[32];
@@ -1020,5 +1022,6 @@ int elf_create_process(Process *p, const uint8_t *elf) {
     // uint64_t trap_satp;
     // uint64_t trap_stack;
     process_debug(p);
+    debugf("Loaded elf process\n");
     return 0;
 }

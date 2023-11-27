@@ -1,0 +1,285 @@
+make -C sbi
+make[1]: se entra en el directorio '/home/amcdan23/cosc562_fa23_4/sbi'
+make[1]: No se hace nada para 'all'.
+make[1]: se sale del directorio '/home/amcdan23/cosc562_fa23_4/sbi'
+echo "Running WITHOUT GUI. Use target rungui to run WITH GUI."
+Running WITHOUT GUI. Use target rungui to run WITH GUI.
+/home/cosc562/qemu/bin/qemu-system-riscv64 -nographic -bios ./sbi/sbi.elf -d guest_errors,unimp -gdb unix:debug.pipe,server,nowait -cpu rv64  -machine virt  -smp 4 -m 128M -kernel cosc562.elf -serial mon:stdio  -device pcie-root-port,id=bridge1,multifunction=off,chassis=0,slot=1,bus=pcie.0,addr=01.0 -device pcie-root-port,id=bridge2,multifunction=off,chassis=1,slot=2,bus=pcie.0,addr=02.0 -device pcie-root-port,id=bridge3,multifunction=off,chassis=2,slot=3,bus=pcie.0,addr=03.0 -device pcie-root-port,id=bridge4,multifunction=off,chassis=3,slot=4,bus=pcie.0,addr=04.0 -device virtio-keyboard-pci,bus=pcie.0,id=keyboard -device virtio-tablet-pci,bus=pcie.0,id=tablet -device virtio-rng-pci-non-transitional,bus=bridge1,id=rng -device virtio-gpu-pci,bus=bridge2,id=gpu -device virtio-blk-pci-non-transitional,drive=hdd1,bus=bridge3,id=blk1 -drive if=none,format=raw,file=minix3_test1.dsk,id=hdd1
+[INFO]: [[ MEMORY MAPPINGS ]]
+[INFO]:   [TEXT]  : 0x80010000 -> 0x8001bc62
+[INFO]:   [BSS]   : 0x8001d000 -> 0x8001d108
+[INFO]:   [RODATA]: 0x8001e000 -> 0x8001fff1
+[INFO]:   [DATA]  : 0x80021000 -> 0x80021030
+[INFO]:   [STACK] : 0x80022000 -> 0x8002a000
+[INFO]:   [HEAP]  : 0x8002a000 -> 0x88010000
+[INFO]: [[ HART MAPPINGS ]]
+[INFO]:   [HART#0]: RUNNING (this HART).
+[INFO]:   [HART#1]: STOPPED.
+[INFO]:   [HART#2]: STOPPED.
+[INFO]:   [HART#3]: STOPPED.
+[DEBUG]: plic_init() done
+[DEBUG]: page_init: bookkeeping area initialized
+[DEBUG]: page_init: bookkeeping area starts at 0x8002a000
+[DEBUG]: page_init: bookkeeping area ends at 0x8002c000
+[INFO]: Page Init: 0x8002a000 -> 0x8002c000
+[INFO]:   Heap: 0x8002c000 -> 0x88010000[INFO]:   Heap size: 0x7fe6000 bytes, 32742 pages
+[INFO]:   Bookkeeping size: 0x2000 bytes, 2 pages
+[INFO]:   Taken pages: 2
+[INFO]:   Free pages: 32740
+[DEBUG]: page_init() done
+[DEBUG]: Found 1 free pages at 000000008002C000
+[DEBUG]: Kernel page table at 000000008002C000
+[DEBUG]: Mapping kernel segments
+[DEBUG]: Mapping PLIC
+[DEBUG]: Found 1 free pages at 000000008002D000
+[DEBUG]: Mapping PCIe ECAM
+[DEBUG]: Mapping PCIe MMIO
+[DEBUG]: Found 1 free pages at 000000008002E000
+[DEBUG]: About to set SATP to 8ffff0000008002c
+[DEBUG]: MMU enabled
+[DEBUG]: Found 4096 free pages at 000000008002F000
+[DEBUG]: Found 1 free pages at 000000008102F000
+[DEBUG]: Found 1 free pages at 0000000081030000
+[DEBUG]: Found 1 free pages at 0000000081031000
+[DEBUG]: Found 1 free pages at 0000000081032000
+[DEBUG]: Found 1 free pages at 0000000081033000
+[DEBUG]: Found 1 free pages at 0000000081034000
+[DEBUG]: Found 1 free pages at 0000000081035000
+[DEBUG]: Found 1 free pages at 0000000081036000
+[DEBUG]: Found 1 free pages at 0000000081037000
+[DEBUG]: Found 1 free pages at 0000000081038000
+[DEBUG]: heap_init() done
+[DEBUG]: kmalloc(1024) = 0000001C0FFF4020
+[DEBUG]: kmalloc(1024) = Hello, world!
+[DEBUG]: STVEC: 0x000000008001C140, 0x000000008001C140
+[DEBUG]: RNG init done for device at 0000000030100000
+[DEBUG]: Input device init done for device at 0000000030028000
+[DEBUG]: Input device initialized
+[DEBUG]: Reading input config
+[DEBUG]: [INPUT HANDLER]ignore first interrupts!
+[DEBUG]: set_input_device_config: select = 0x1
+[DEBUG]: [INPUT HANDLER]ignore first interrupts!
+[DEBUG]: set_input_device_config: subsel = 0x0
+[DEBUG]: QEMU Virtio Keyboard
+[DEBUG]: QEMU Virtio Keyboard[DEBUG]: [INPUT HANDLER]ignore first interrupts!
+[DEBUG]: set_input_device_config: select = 0x1
+[DEBUG]: [INPUT HANDLER]ignore first interrupts!
+[DEBUG]: set_input_device_config: subsel = 0x0
+[DEBUG]: QEMU Virtio Keyboard
+[DEBUG]: [INPUT HANDLER]ignore first interrupts!
+[DEBUG]: Found tablet input device.
+[DEBUG]: Input device init done for device at 0000000030030000
+[DEBUG]: Input device initialized
+[DEBUG]: Reading input config
+[DEBUG]: [INPUT HANDLER]ignore first interrupts!
+[DEBUG]: set_input_device_config: select = 0x1
+[DEBUG]: [INPUT HANDLER]ignore first interrupts!
+[DEBUG]: set_input_device_config: subsel = 0x0
+[DEBUG]: QEMU Virtio Tablet
+[DEBUG]: QEMU Virtio Tablet[DEBUG]: [INPUT HANDLER]ignore first interrupts!
+[DEBUG]: set_input_device_config: select = 0x1
+[DEBUG]: [INPUT HANDLER]ignore first interrupts!
+[DEBUG]: set_input_device_config: subsel = 0x0
+[DEBUG]: QEMU Virtio Tablet
+[DEBUG]: [INPUT HANDLER]ignore first interrupts!
+[DEBUG]: Found tablet input device.
+[DEBUG]: GPU device has 0 events that needs to be read
+[DEBUG]: GPU device has 1 scanouts
+[DEBUG]: RNG State Before:[DEBUG]:  0 [DEBUG]:  0 [DEBUG]:  0 [DEBUG]:  0 [DEBUG]:  0 [DEBUG]:  0 [DEBUG]:  0 [DEBUG]:  0 [DEBUG]:  0 [DEBUG]:  0 [DEBUG]:  0 [DEBUG]:  0 [DEBUG]:  0 [DEBUG]:  0 [DEBUG]:  0 [DEBUG]:  0 [DEBUG]: 
+[DEBUG]: RNG init done; about to fill
+[DEBUG]: RNG State After:[DEBUG]:  188 [DEBUG]:  68 [DEBUG]:  115 [DEBUG]:  199 [DEBUG]:  37 [DEBUG]:  238 [DEBUG]:  80 [DEBUG]:  209 [DEBUG]:  143 [DEBUG]:  130 [DEBUG]:  102 [DEBUG]:  208 [DEBUG]:  103 [DEBUG]:  79 [DEBUG]:  153 [DEBUG]:  109 [DEBUG]:  91 [DEBUG]:  30 [DEBUG]:  100 [DEBUG]:  69 [DEBUG]:  161 [DEBUG]:  53 [DEBUG]:  224 [DEBUG]:  244 [DEBUG]:  77 [DEBUG]:  189 [DEBUG]:  201 [DEBUG]:  45 [DEBUG]:  58 [DEBUG]:  36 [DEBUG]:  168 [DEBUG]:  62 [DEBUG]: Internal desc_idx: 2
+[DEBUG]: Internal driver_idx: 0
+[DEBUG]: Internal device_idx: 1
+[DEBUG]: Driver ring index: 1
+[DEBUG]: Device ring index: 1
+[DEBUG]: used element id: 0
+[DEBUG]: used element len: 408
+[DEBUG]: used element id: 0
+[DEBUG]: used element len: 0
+[DEBUG]: gpu_get_display_info: Received display info
+[DEBUG]: gpu_get_display_info: Display 0 enabled
+[DEBUG]: gpu_init: Allocated frame buffer of (4 * 1024000) bytes at 0000001C1023B368
+[DEBUG]: gpu_send_command: device_idx caught up
+[DEBUG]: gpu_init: Create 2D resource OK
+[DEBUG]: gpu_send_command: device_idx caught up
+[DEBUG]: gpu_init: Attach backing OK
+[DEBUG]: gpu_send_command: device_idx caught up
+[DEBUG]: gpu_init: Set scanout OK
+[DEBUG]: gpu_send_command: device_idx caught up
+[DEBUG]: gpu_init: Transfer OK
+[DEBUG]: gpu_send_command: device_idx caught up
+[DEBUG]: gpu_init: Flush OK
+[DEBUG]: GPU init successful
+[INFO]: Congratulations! You made it to the OS! Going back to sleep.
+[INFO]: The logf function in the OS uses sbi_putchar(), so this means ECALLs from S-mode are working!
+[INFO]: If you don't remember, type CTRL-a, followed by x to exit. Make sure your CAPS LOCK is off.
+[DEBUG]: Filesystem block size: 1024
+[DEBUG]: Superblock:
+[DEBUG]:    num_inodes: 10928
+[DEBUG]:    imap_blocks: 2
+[DEBUG]:    zmap_blocks: 4
+[DEBUG]:    first_data_zone: 691
+[DEBUG]:    log_zone_size: 0
+[DEBUG]:    max_size: 0x7fffffff (2147483647)
+[DEBUG]:    num_zones: 0x8000 (32768)
+[DEBUG]:    magic: 0x4d5a
+[DEBUG]:    block_size: 1024
+[DEBUG]:    disk_version: 0
+[DEBUG]: Max inode: 16384
+[DEBUG]: Getting inode bitmap...
+[DEBUG]: Getting zone bitmap...
+[DEBUG]: Inode 12 (c):
+[DEBUG]:    mode: 81a4
+[DEBUG]:    num_links: 1
+[DEBUG]:    uid: 1000
+[DEBUG]:    gid: 1000
+[DEBUG]:    size: 5044
+[DEBUG]:    atime: 1689601089
+[DEBUG]:    mtime: 1689363540
+[DEBUG]:    ctime: 1689363540
+[DEBUG]:    zones[]:
+[DEBUG]:    zones[0] = 2b7 (*1024 = adc00)
+[DEBUG]:    zones[1] = 2b8 (*1024 = ae000)
+[DEBUG]:    zones[2] = 2b9 (*1024 = ae400)
+[DEBUG]:    zones[3] = 2ba (*1024 = ae800)
+[DEBUG]:    zones[4] = 2bb (*1024 = aec00)
+[DEBUG]: File 12 size: 5044
+
+The Death of Mrs D
+
+by William S. Burroughs
+
+[From the book 'The Third Mind', by William S. Burroughs and Brion
+Gysin, Viking, 1978.]
+
+[Transcriber's note:  In this e-text, italicized grammatical
+emphases are surrounded by asterisks, italicized names are
+surrounded by single quotes, italicized foreign words and quotes
+are not indicated.]
+
+==================================================================
+
+From Pitman's 'Commonsense Arithmetic'
+
+ 1. In the beginning was the word.
+ 2. The word was and is flesh.
+ 3. The word was and is sound and image.
+ 4. Sound travels at the rate of 1114 feet per second.
+ 5. Image travels at the speed of light: 186,000 miles per second.
+ 6. Mr B, at point B', and Mrs D, at point D', are 1114 feet
+    apart.
+ 7. Mrs D is equipped with a penetrating, long-range voice that
+    carries from point D' to point B'.
+ 8. Mrs D screams: "...flesh flesh flesh flesh you stinking
+    heel..." (She hopes her contempt does not show unpro-
+    tected margin.
+ 9. Mr B is equipped with a telescopic-sighted camera and a tape
+    recorder.
+10. The camera and tape recorder are synchronized so that when
+    Mr B sights the beginning word on the lips of Mrs D, he
+    takes her picture and begins to record.
+11. One second later, he hears and records her words.
+12. When he hears her words, he has already taken her picture.
+13. Mr B has taken a picture of Mrs D one second *before* she
+    manifests herself to him in word.
+14. Mr B has split Mrs D's word from her image.
+15. Mrs D might well bellow out some further pleasantries.
+16. Mr B, feeling he has heard enough already, provides himself
+    with a rifle.
+17. Mr B mounts the rifle and the telescopic-sighted camera on a
+    tripod.
+18. The rifle has a muzzle velocity of 2228 feet per second.
+19. When Mr B sights the beginning word on the lips of Mrs D,
+    he squeezes the trigger and takes her last picture.
+20. Half a second later, the bullet hits her square in the mouth
+    and explodes her back brain.
+21. One second later, he hears and records her last words:...
+    flesh flesh fl...
+22. Mrs D has ceased to exist half a second *before* he hears and
+    records her last words.
+23. Expose negative.
+24. Wipe tape.
+25. Not knowing what is and is not knowing, Mr B knew *not*
+    Mrs D.
+26. Mr B is now at a point in space, 186,000 miles from Earth
+    at point B". (See proposition #5.)
+27. Mrs D is back on Earth at point D".
+28. Mr B has the same basic equipment but has substituted an
+    E&G Bradly laser gun emitting intense beams of coherent
+    light at 186,000 miles per second, capable of piercing the
+    hardest substance, even diamond...laser guns on the table,
+    how dumb can you be?
+29. Mrs D has amplified her voice to accommodate the altered
+    distance relationship.
+30. At one second *after* 4:00 p.m., Mr B sights the ugly word
+    on Mrs D's ugly mouth.
+31. Now, since Mr B is one light-second away from Mrs D, and
+    it takes one second for her image to reach point B", Mr B
+    has, needless to say, provided himself with a more powerful
+    telescope to take a picture of Mrs D...not at one second
+    after 4:00 p.m., of course, but at exactly 4:00 p.m., present
+    Earth Time.
+32. One second later, Bradly's laser slices through Mrs D's big
+    mouth and on my way rejoicing.
+33. Mr B has taken the last picture of Mrs D (for Dead).
+34. Mrs D is always dead when Mr B takes her death picture, a
+    second later.
+35. Mrs D existed only in her last image and her last words,
+    which arrive, of course, from Pitman's 'Commonsense Arith-
+    metic' some hours later...so shut off the recorder...expose
+    the negative.
+36. Mrs D's word and image never existed.
+
+                   Silent Grocer Shops  Cobblestone Streets
+                      Wind Cold on the Lake
+
+1. From Pitman's 'Commonsense Arithmetic', 1917:
+   "Walks at the rate of 18 miles per day. Will he be there in
+   time?"
+2. From Claude PＭieu, 'San Francisco 9, Beach':
+   "Please adjust your brakes; a great risk in 'dancing.'"
+3. From 'Transatlantic Review, 14':
+   "The beginning is also the end."
+4. From 'Naked Lunch, Traveler's Companion #74':
+   "I can feel the heat closing in."
+5. From 'D. Lamont':
+   "Throw the gasoline on them and light it quick."
+6. From 'Work in Progress':
+   "terrible bright sun...raw pealed face...this thing dying
+   there in my arms..."
+7. I would like to sound a word of warning to the 'Dancing Acad-
+   emy', "In Hazard":
+   Should the world's gravity be reduced by The Other Half, who
+   is known as 'Gravity Gert', the force of the sun's rays would
+   increase by one half...from Pitman's 'Commonsense Arithme-
+   tic'...constituting The Heat Death.
+8. From 'Work in Progress':
+   "The formulae are fierce, can't hold the bastards back. The
+   tide is coming in at Hiroshima, you dumb Earth hicks, sauve
+   qui peut!"
+9. From 'The Moving Times:
+   "Only one caller this week; plain Mr Jones. Going to reach
+   Frisco but we'll all be dead."
+
+------------------------------------------------------------------
+[DEBUG]: Inode 18 (12):
+[DEBUG]:    mode: 81a4
+[DEBUG]:    num_links: 1
+[DEBUG]:    uid: 1000
+[DEBUG]:    gid: 1000
+[DEBUG]:    size: 20422
+[DEBUG]:    atime: 1689601089
+[DEBUG]:    mtime: 1689363604
+[DEBUG]:    ctime: 1689363604
+[DEBUG]:    zones[]:
+[DEBUG]:    zones[0] = 2c1 (*1024 = b0400)
+[DEBUG]:    zones[1] = 2c2 (*1024 = b0800)
+[DEBUG]:    zones[2] = 2c3 (*1024 = b0c00)
+[DEBUG]:    zones[3] = 2c4 (*1024 = b1000)
+[DEBUG]:    zones[4] = 2c5 (*1024 = b1400)
+[DEBUG]:    zones[5] = 2c6 (*1024 = b1800)
+[DEBUG]:    zones[6] = 2c7 (*1024 = b1c00)
+[DEBUG]:    zones[7] = 2c8 (*1024 = b2000)
+[DEBUG]: File 18 size: 20422
+QEMU: Terminated
+

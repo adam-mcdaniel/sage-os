@@ -45,19 +45,19 @@ void rcb_debug(RCB *rcb) {
     // List *file_descriptors;
     // Map *environemnt;
     // PageTable *ptable;
-    debugf("  image_pages:\n");
     struct ListElem *e;
-    list_for_each(rcb->image_pages, e) {
-        debugf("    %p\n", list_elem_value_ptr(e));
-    }
-    debugf("  stack_pages:\n");
-    list_for_each(rcb->stack_pages, e) {
-        debugf("    %p\n", list_elem_value_ptr(e));
-    }
-    debugf("  heap_pages:\n");
-    list_for_each(rcb->heap_pages, e) {
-        debugf("    %p\n", list_elem_value_ptr(e));
-    }
+    // debugf("  image_pages:\n");
+    // list_for_each(rcb->image_pages, e) {
+    //     debugf("    %p\n", list_elem_value_ptr(e));
+    // }
+    // debugf("  stack_pages:\n");
+    // list_for_each(rcb->stack_pages, e) {
+    //     debugf("    %p\n", list_elem_value_ptr(e));
+    // }
+    // debugf("  heap_pages:\n");
+    // list_for_each(rcb->heap_pages, e) {
+    //     debugf("    %p\n", list_elem_value_ptr(e));
+    // }
     debugf("  file_descriptors:\n");
     list_for_each(rcb->file_descriptors, e) {
         debugf("    %p\n", list_elem_value_ptr(e));
@@ -313,8 +313,7 @@ Process *process_new(ProcessMode mode)
     p->mode = mode;
     p->state = PS_WAITING;
     p->quantum = 10;
-    p->priority = 10;
-    
+    p->priority = 10; 
 
     // Initialize the Resource Control Block
     rcb_init(&p->rcb);
@@ -413,6 +412,7 @@ Process *process_new(ProcessMode mode)
     do {
         debugf("Allocating %d pages for the stack\n", p->stack_size / PAGE_SIZE);
         p->stack = page_znalloc(p->stack_size / PAGE_SIZE);
+        debugf("Stack address: %p\n", p->stack);
         if (!p->stack) {
             p->stack_size /= 2;
             debugf("Stack allocation failed, trying with %d pages\n", p->stack_size / PAGE_SIZE);
@@ -422,11 +422,11 @@ Process *process_new(ProcessMode mode)
             fatalf("process.c (process_new): Stack size too small\n");
         }
     } while (!p->stack);
-    debugf("Allocating %d pages for the heap\n", p->heap_size / PAGE_SIZE);
     
     do {
         debugf("Allocating %d pages for the heap\n", p->heap_size / PAGE_SIZE);
         p->heap = page_znalloc(p->heap_size / PAGE_SIZE);
+        debugf("Heap address: %p\n", p->heap);
         if (!p->heap) {
             p->heap_size /= 2;
             debugf("Heap allocation failed, trying with %d pages\n", p->heap_size / PAGE_SIZE);
@@ -436,10 +436,21 @@ Process *process_new(ProcessMode mode)
             fatalf("process.c (process_new): Heap size too small\n");
         }
     } while (!p->heap);
+
+    if (p->stack == NULL) {
+        fatalf("process.c (process_new): Stack allocation failed\n");
+    }
+    if (p->heap == NULL) {
+        fatalf("process.c (process_new): Heap allocation failed\n");
+    }
+
     debugf("Stack: %p\n", p->stack);
     debugf("Heap: %p\n", p->heap);
-    trap_frame_set_stack_pointer(p->frame, USER_STACK_TOP);
-    trap_frame_set_heap_pointer(p->frame, USER_HEAP_BOTTOM);
+    trap_frame_set_stack_pointer(p->frame, USER_STACK_START);
+    trap_frame_set_heap_pointer(p->frame, USER_STACK_START);
+
+    p->stack_vaddr = USER_STACK_START;
+    p->heap_vaddr = USER_HEAP_START;
 
     debugf("Wiping the heap\n");
     memset(p->heap, 0, p->heap_size);
@@ -451,7 +462,7 @@ Process *process_new(ProcessMode mode)
         }
         rcb_map(&p->rcb, 
                 USER_HEAP_BOTTOM + i * PAGE_SIZE, 
-                kernel_mmu_translate((uint64_t)p->heap + i * PAGE_SIZE), 
+                (uint64_t)p->heap + i * PAGE_SIZE, 
                 PAGE_SIZE,
                 permission_bits);
         debugf("Heap page mapped\n");
@@ -464,21 +475,25 @@ Process *process_new(ProcessMode mode)
         if (USER_STACK_BOTTOM + i * PAGE_SIZE > USER_STACK_TOP) {
             fatalf("process.c (process_new): Stack overflow\n");
         }
-
-        rcb_map(&p->rcb, 
-                USER_STACK_BOTTOM + i * PAGE_SIZE, 
-                kernel_mmu_translate((uint64_t)p->stack + i * PAGE_SIZE), 
+        
+        rcb_map(&p->rcb,
+                USER_STACK_BOTTOM + i * PAGE_SIZE,
+                (uint64_t)p->stack + i * PAGE_SIZE, 
                 PAGE_SIZE,
                 permission_bits);
         debugf("Stack page mapped\n");
     }
+    debugf("Stack: %p\n", p->stack);
+    debugf("Heap: %p\n", p->heap);
     #ifdef DEBUG_PROCESS
     mmu_print_entries(p->rcb.ptable, MMU_LEVEL_4K);
     #endif
 
     mutex_unlock(&p->lock);
-    debugf("process.c (process_new): Process created\n");
     process_map_set(p);
+    debugf("process.c (process_new): Process created\n");
+
+    process_debug(p);
     return p;
 }
 
