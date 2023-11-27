@@ -17,7 +17,7 @@
 #include <lock.h>
 #include <sched.h>
 
-// #define DEBUG_PROCESS
+#define DEBUG_PROCESS
 #ifdef DEBUG_PROCESS
 #define debugf(...) debugf(__VA_ARGS__)
 #else
@@ -91,7 +91,7 @@ void trap_frame_debug(TrapFrame *tf) {
     // uint64_t trap_stack;
     debugf("  xregs:\n");
     for (int i = 0; i < 32; i++) {
-        debugf("    x%d: %d\n", i, tf->xregs[i]);
+        debugf("    x%d: %d (0x%08x)\n", i, tf->xregs[i], tf->xregs[i]);
     }
     // debugf("  fregs:\n");
     // for (int i = 0; i < 32; i++) {
@@ -163,6 +163,20 @@ void process_debug(Process *p) {
         debugf("  data_size: 0x%X (%d pages)\n", p->data_size, ALIGN_UP_POT(p->data_size, PAGE_SIZE_4K) / PAGE_SIZE_4K);
     } else {
         debugf("  data: NULL\n");
+    }
+
+    if (p->stack) {
+        debugf("  stack: %p (physical address = %p)\n", p->stack_vaddr, mmu_translate(p->rcb.ptable, (uintptr_t)p->stack_vaddr));
+        debugf("  stack_size: 0x%X (%d pages)\n", p->stack_size, ALIGN_UP_POT(p->stack_size, PAGE_SIZE_4K) / PAGE_SIZE_4K);
+    } else {
+        debugf("  stack: NULL\n");
+    }
+
+    if (p->heap) {
+        debugf("  heap: %p (physical address = %p)\n", p->heap_vaddr, mmu_translate(p->rcb.ptable, (uintptr_t)p->heap_vaddr));
+        debugf("  heap_size: 0x%X (%d pages)\n", p->heap_size, ALIGN_UP_POT(p->heap_size, PAGE_SIZE_4K) / PAGE_SIZE_4K);
+    } else {
+        debugf("  heap: NULL\n");
     }
 
     // // Resources
@@ -401,6 +415,11 @@ Process *process_new(ProcessMode mode)
         p->stack = page_znalloc(p->stack_size / PAGE_SIZE);
         if (!p->stack) {
             p->stack_size /= 2;
+            debugf("Stack allocation failed, trying with %d pages\n", p->stack_size / PAGE_SIZE);
+        }
+
+        if (p->stack_size < PAGE_SIZE * 16) {
+            fatalf("process.c (process_new): Stack size too small\n");
         }
     } while (!p->stack);
     debugf("Allocating %d pages for the heap\n", p->heap_size / PAGE_SIZE);
@@ -410,6 +429,11 @@ Process *process_new(ProcessMode mode)
         p->heap = page_znalloc(p->heap_size / PAGE_SIZE);
         if (!p->heap) {
             p->heap_size /= 2;
+            debugf("Heap allocation failed, trying with %d pages\n", p->heap_size / PAGE_SIZE);
+        }
+
+        if (p->heap_size < PAGE_SIZE * 16) {
+            fatalf("process.c (process_new): Heap size too small\n");
         }
     } while (!p->heap);
     debugf("Stack: %p\n", p->stack);
@@ -422,6 +446,9 @@ Process *process_new(ProcessMode mode)
     for (uint64_t i = 0; i < p->heap_size / PAGE_SIZE; i++) {
         list_add_ptr(p->rcb.heap_pages, p->heap + i * PAGE_SIZE);
         debugf("Mapping heap page\n");
+        if (USER_HEAP_BOTTOM + i * PAGE_SIZE > USER_HEAP_TOP) {
+            fatalf("process.c (process_new): Heap overflow\n");
+        }
         rcb_map(&p->rcb, 
                 USER_HEAP_BOTTOM + i * PAGE_SIZE, 
                 kernel_mmu_translate((uint64_t)p->heap + i * PAGE_SIZE), 
@@ -434,6 +461,10 @@ Process *process_new(ProcessMode mode)
     for (uint64_t i = 0; i < p->stack_size / PAGE_SIZE; i++) {
         list_add_ptr(p->rcb.stack_pages, p->stack + i * PAGE_SIZE);
         debugf("Mapping stack page\n");
+        if (USER_STACK_BOTTOM + i * PAGE_SIZE > USER_STACK_TOP) {
+            fatalf("process.c (process_new): Stack overflow\n");
+        }
+
         rcb_map(&p->rcb, 
                 USER_STACK_BOTTOM + i * PAGE_SIZE, 
                 kernel_mmu_translate((uint64_t)p->stack + i * PAGE_SIZE), 
