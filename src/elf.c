@@ -21,7 +21,7 @@
 #include <process.h>
 #include <sched.h>
 
-#define ELF_DEBUG
+// #define ELF_DEBUG
 #ifdef ELF_DEBUG
 #define debugf(...) debugf(__VA_ARGS__)
 #else
