@@ -16,6 +16,13 @@
 #include <compiler.h>
 #include <csr.h>
 
+// #define INPUT_DEBUG
+#ifdef INPUT_DEBUG
+#define debugf(...) debugf(__VA_ARGS__)
+#else
+#define debugf(...)
+#endif
+
 #define MAX_DESCRIPTORS 10
 
 static Vector *device_active_jobs;
