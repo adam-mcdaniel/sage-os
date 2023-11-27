@@ -17,7 +17,7 @@ Sort your entries in descending order (newest entries at the top).
 
 # 26-Nov-2023
 
-- `amcdan23`: Fixed bug with the trap frame being overwritten -- we were using a fresh trap stack for every process, when we should've just pointed to the kernel trap frame's trap stack. The stack was being smashed when we trapped. User processes can now be scheduled and descheduled with an `exit` system call! Fixed where `start.S` code was causing a `Null` pointer dereference in the `bss` zeroing code -- the OS zeroes the BSS instead. Fixed where RODATA was copied incorrectly, so we could not use strings in user applications -- now we can compile and run programs arbitrarily! We can compile our programs, store them on the mounted disk, and then execute them with our ELF loader!
+- `amcdan23`: Fixed bug with the trap frame being overwritten -- we were using a fresh trap stack for every process, when we should've just pointed to the kernel trap frame's trap stack. The stack was being smashed when we trapped. User processes can now be scheduled, executed, and then descheduled with an `exit` system call! Fixed where `start.S` code was causing a `Null` pointer dereference in the `bss` zeroing code -- the OS zeroes the BSS instead. Fixed where RODATA was copied incorrectly, so we could not use strings in user applications -- now we can compile and run programs arbitrarily! We can compile our programs, store them on the mounted disk, and then execute them with our ELF loader!
 
 # 25-Nov-2023
 
