@@ -17,3 +17,5 @@ typedef struct Trapframe {
     uint64_t  trap_satp;
     uint64_t  trap_stack;
 } Trapframe;
+
+extern struct TrapFrame *kernel_trap_frame;

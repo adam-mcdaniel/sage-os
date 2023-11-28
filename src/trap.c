@@ -8,10 +8,10 @@
 #include <compiler.h>
 #include <trap.h>
 #include <sbi.h>
+#include <process.h>
 #include <sched.h>
 
 // #define TRAP_DEBUG
-
 #ifdef TRAP_DEBUG
 #define debugf(...) debugf(__VA_ARGS__)
 #else
@@ -24,7 +24,9 @@ void syscall_handle(int hart, uint64_t epc, int64_t *scratch);
 // Called from asm/spawn.S: _spawn_kthread
 void os_trap_handler(void)
 {
-    debugf("Entering OS trap handler\n");
+    // debugf("Entering OS trap handler\n");
+    // SFENCE_ALL();
+
     unsigned long cause;
     long *scratch;
     unsigned long epc;
@@ -35,6 +37,10 @@ void os_trap_handler(void)
     CSR_READ(epc, "sepc");
     CSR_READ(tval, "stval");
     CSR_READ(sie, "sie");
+
+    TrapFrame *frame = (TrapFrame*)scratch;
+
+    // CSR_WRITE("sscratch", kernel_trap_frame);
 
     // __asm__ volatile ("savegp");
     // __asm__ volatile ("savefp");
@@ -62,7 +68,7 @@ void os_trap_handler(void)
     //                 "csrs sie, t1\n");
 
 
-    debugf("Is async: %d\n", SCAUSE_IS_ASYNC(cause));
+    // debugf("Is async: %d\n", SCAUSE_IS_ASYNC(cause));
 
     if (SCAUSE_IS_ASYNC(cause)) {
         debugf("os_trap_handler: Is async!\n");
@@ -78,6 +84,7 @@ void os_trap_handler(void)
                 debugf("os_trap_handler: Supervisor timer interrupt!\n");
                 // CSR_CLEAR("sip");
                 sbi_ack_timer();
+                frame->sepc = epc;
                 // We typically invoke our scheduler if we get a timer
                 sched_handle_timer_interrupt(hart);
                 break;
@@ -87,16 +94,57 @@ void os_trap_handler(void)
                 plic_handle_irq(hart);
                 break;
             default:
+                debugf("ERROR!!!\n");
+                trap_frame_debug(scratch);
                 fatalf("os_trap_handler: Unhandled Asynchronous interrupt %ld\n", cause);
                 WFI_LOOP();
                 break;
         }
     } else {
         debugf("Is sync!\n");
+        if (cause != CAUSE_ECALL_S_MODE && cause != CAUSE_ECALL_U_MODE) {
+            debugf("ERROR!!!\n");
+            trap_frame_debug(scratch);
+        } else {
+            frame->sepc = epc;
+        }
+        Process *p;
         switch (cause) {
+            case CAUSE_ECALL_U_MODE:  // ECALL U-Mode
+                // Forward to src/syscall.c
+                // debugf("Handling syscall\n");
+                // trap_frame_debug(scratch);
+                syscall_handle(hart, epc, scratch);
+                // Get the process
+                p = sched_get_current();
+
+                switch (p->state) {
+                case PS_RUNNING:
+                    return;
+                case PS_SLEEPING:
+                    debugf("Process %d is sleeping. Scheduling next process\n", p->pid);
+                    sched_handle_timer_interrupt(hart);
+                case PS_WAITING:
+                    debugf("Process %d is waiting. Scheduling next process\n", p->pid);
+                    sched_handle_timer_interrupt(hart);
+                case PS_DEAD:
+                    debugf("Process %d is dead. Scheduling next process\n", p->pid);
+                    sched_handle_timer_interrupt(hart);
+                default:
+                    fatalf("Unknown process state %d\n", p->state);
+                }
+
+                // We have to move beyond the ECALL instruction, which is exactly 4 bytes.
+                break;
+            case CAUSE_ECALL_S_MODE:  // ECALL U-Mode
+                // Forward to src/syscall.c
+                // debugf("Handling supervisor syscall\n");
+                syscall_handle(hart, epc, scratch);
+                // We have to move beyond the ECALL instruction, which is exactly 4 bytes.
+                break;
             case CAUSE_ILLEGAL_INSTRUCTION:
                 fatalf("Illegal instruction \"%x\" at %p\n", *((uint64_t*)epc), epc);
-                CSR_WRITE("sepc", epc + 4);
+                // CSR_WRITE("sepc", epc + 4);
                 break;
             case CAUSE_INSTRUCTION_ACCESS_FAULT:
                 fatalf("Couldn't access instruction=%p at instruction %p\n", tval, epc);
@@ -104,20 +152,11 @@ void os_trap_handler(void)
             case CAUSE_INSTRUCTION_PAGE_FAULT:
                 fatalf("Instruction page fault at instruction %p accessing address %p\n", epc, tval);
                 break;
+            case CAUSE_STORE_AMO_PAGE_FAULT:
+                fatalf("Instruction store page fault at instruction %p accessing address %p\n", epc, tval);
+                break;
             case CAUSE_LOAD_PAGE_FAULT:
                 fatalf("Load page fault at %p = %p", epc, tval);
-                break;
-            case CAUSE_ECALL_U_MODE:  // ECALL U-Mode
-                // Forward to src/syscall.c
-                debugf("Handling syscall\n");
-                syscall_handle(hart, epc, scratch);
-                // We have to move beyond the ECALL instruction, which is exactly 4 bytes.
-                break;
-            case CAUSE_ECALL_S_MODE:  // ECALL U-Mode
-                // Forward to src/syscall.c
-                debugf("Handling syscall\n");
-                syscall_handle(hart, epc, scratch);
-                // We have to move beyond the ECALL instruction, which is exactly 4 bytes.
                 break;
             default:
                 fatalf(

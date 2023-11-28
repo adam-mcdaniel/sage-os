@@ -23,6 +23,66 @@
 .endm
 
 .section .trampoline
+process_asm_run:
+    # a0 - Trap frame
+    csrw    sscratch, a0
+    csrr    t6, sscratch
+
+	# Spawn table fields
+	# 0    - gpregs
+    # 256  - fpregs
+    # 512  - sepc
+    # 520  - sstatus
+    # 528  - sie
+    # 536  - satp
+    # 544  - sscratch
+    # 552  - stvec
+    # 560  - trap_satp
+    # 568  - trap_stack
+
+	ld		t0, 512(t6)   # sepc
+	csrw	sepc, t0
+
+	ld		t4, 520(t6)   # sstatus
+	csrw	sstatus, t4
+
+	ld		t0, 528(t6)  # sie
+	csrw	sie, t0
+
+	ld		t0, 552(t6)  # stvec
+	csrw	stvec, t0
+
+	ld		t1, 536(t6)  # satp
+
+	ld		t6, 544(t6)  # sscratch
+	csrw	sscratch, t6
+
+    # We need a proper sscratch before we
+    # turn on the MMU
+	csrw	satp, t1
+
+    # We usually don't care about the FP regs,
+    # but just in case.
+    srli    t4, t4, 13
+    andi    t4, t4, 3
+    beqz    t4, 1f
+
+    .set i, 0
+    .rept 32
+        loadfp %i
+        .set i, i + 1
+    .endr
+
+1:
+	.set i, 1
+	.rept 31
+		loadgp  %i
+		.set i, i + 1
+	.endr
+
+	sret
+
+process_asm_run_end:
 _spawn_kthread:
     csrr        t6, sscratch
 
@@ -79,6 +139,7 @@ _spawn_kthread:
 	.endr
 
 	sret
+
 .align 4
 _spawn_kthread_end:
 .size _spawn_kthread, . - _spawn_kthread
@@ -150,19 +211,13 @@ _trap_end:
 .type _trap, function
 
 .section .text
-.global process_asm_run
-process_asm_run:
-    # a0 - Trap frame
-    csrw    sscratch, a0
-    tail    _spawn_kthread
-
-.size process_asm_run, . - process_asm_run
-.type process_asm_run, function
-.weak process_asm_run
-
 # The following exports the symbols of the trampoline code (thread and trap)
 # You will use these in src/process.c and map these into the process' MMU table.
 .section .rodata
+.global process_asm_run
+.type process_asm_run, function
+.weak process_asm_run
+
 .global trampoline_thread_start
 trampoline_thread_start: .dword _spawn_kthread
 .size trampoline_thread_start, . - trampoline_thread_start

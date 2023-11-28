@@ -7,6 +7,9 @@ Scheduler header
 
 #include <process.h>
 
+Process *sched_get_idle_process();
+void idle_process_main();
+
 //initialize scheduler tree
 void sched_init();
 
@@ -14,7 +17,7 @@ void sched_init();
 void sched_add(Process *p);
 
 //removes node from scheduler tree - used if process gets manually killed
-void sched_remove_process(Process *p);
+void sched_remove(Process *p);
 
 //get process with the lowest vruntime
 Process *sched_get_next();

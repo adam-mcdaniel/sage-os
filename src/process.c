@@ -12,14 +12,21 @@
 #include <stdint.h>
 #include <map.h>
 #include <util.h>
+#include <symbols.h>
+#include <trap.h>
+#include <lock.h>
+#include <sched.h>
 
+// #define DEBUG_PROCESS
+#ifdef DEBUG_PROCESS
+#define debugf(...) debugf(__VA_ARGS__)
+#else
+#define debugf(...)
+#endif
 
-extern const unsigned long trampoline_thread_start;
-extern const unsigned long trampoline_trap_start;
-
-#define STACK_PAGES 2
-#define STACK_SIZE  (STACK_PAGES * PAGE_SIZE)
-#define STACK_TOP   0xfffffffc0ffee000UL
+// extern const unsigned long trampoline_thread_start;
+// extern const unsigned long trampoline_trap_start;
+// extern const unsigned long process_asm_run;
 
 static uint16_t pid = 1; // Start from 1, 0 is reserved
 
@@ -71,7 +78,7 @@ void rcb_debug(RCB *rcb) {
 
 
 void trap_frame_debug(TrapFrame *tf) {
-    debugf("TrapFrame:\n");
+    debugf("TrapFrame (v = %p, p = %p):\n", tf, kernel_mmu_translate(tf));
     // int64_t xregs[32];
     // double fregs[32];
     // uint64_t sepc;
@@ -84,12 +91,12 @@ void trap_frame_debug(TrapFrame *tf) {
     // uint64_t trap_stack;
     debugf("  xregs:\n");
     for (int i = 0; i < 32; i++) {
-        debugf("    x%d: %d\n", i, tf->xregs[i]);
+        debugf("    x%d: %d (0x%p)\n", i, tf->xregs[i], tf->xregs[i]);
     }
-    debugf("  fregs:\n");
-    for (int i = 0; i < 32; i++) {
-        debugf("    f%d: %d\n", i, tf->fregs[i]);
-    }
+    // debugf("  fregs:\n");
+    // for (int i = 0; i < 32; i++) {
+    //     debugf("    f%d: %d\n", i, tf->fregs[i]);
+    // }
     debugf("  sepc: 0x%p\n", tf->sepc);
     debugf("  sstatus: 0x%p\n", tf->sstatus);
     debugf("  sie: 0x%p\n", tf->sie);
@@ -111,7 +118,7 @@ void process_debug(Process *p) {
     debugf("  hart: %d\n", p->hart);
     debugf("  mode: %d\n", p->mode);
     debugf("  state: %d\n", p->state);
-    trap_frame_debug(&p->frame);
+    trap_frame_debug(p->frame);
     
     // // Process stats
     // uint64_t sleep_until;
@@ -158,79 +165,338 @@ void process_debug(Process *p) {
         debugf("  data: NULL\n");
     }
 
+    if (p->stack) {
+        debugf("  stack: %p (physical address = %p)\n", p->stack_vaddr, mmu_translate(p->rcb.ptable, (uintptr_t)p->stack_vaddr));
+        debugf("  stack_size: 0x%X (%d pages)\n", p->stack_size, ALIGN_UP_POT(p->stack_size, PAGE_SIZE_4K) / PAGE_SIZE_4K);
+    } else {
+        debugf("  stack: NULL\n");
+    }
+
+    if (p->heap) {
+        debugf("  heap: %p (physical address = %p)\n", p->heap_vaddr, mmu_translate(p->rcb.ptable, (uintptr_t)p->heap_vaddr));
+        debugf("  heap_size: 0x%X (%d pages)\n", p->heap_size, ALIGN_UP_POT(p->heap_size, PAGE_SIZE_4K) / PAGE_SIZE_4K);
+    } else {
+        debugf("  heap: NULL\n");
+    }
+
     // // Resources
     // RCB rcb;
     rcb_debug(&p->rcb);
     // uint64_t break_size;
+
+    // if (p->frame->sscratch != kernel_mmu_translate((unsigned long)p->frame)) {
+    //     warnf("`sscratch` (0x%08lx) is not pointing to the trap frame (0x%08lx)!\n", p->frame->sscratch, (unsigned long)p->frame);
+    // }
+
+    if (p->frame->trap_satp != SATP_KERNEL) {
+        warnf("  trap_satp: 0x%p (physical address = %p)\n", p->frame->trap_satp, mmu_translate(p->rcb.ptable, (uintptr_t)p->frame->trap_satp));
+    }
+}
+
+TrapFrame *trap_frame_new(bool is_user, PageTable *page_table, uint64_t pid) {
+    TrapFrame *frame = (TrapFrame *)kzalloc(sizeof(TrapFrame));
+    memset(frame, 0, sizeof(TrapFrame));
+    frame->sstatus = SSTATUS_FS_INITIAL | SSTATUS_SPIE;
+    if (is_user) {
+        frame->sstatus |= SSTATUS_SPP_USER;
+    } else {
+        frame->sstatus |= SSTATUS_SPP_SUPERVISOR;
+    }
+    frame->satp = SATP(kernel_mmu_translate((uintptr_t)page_table), pid % 0xffff);
+    frame->sscratch = (uintptr_t)frame;
+    frame->trap_satp = SATP_KERNEL;
+    frame->stvec = kernel_trap_frame->stvec;
+    frame->trap_stack = kernel_trap_frame->trap_stack;
+    frame->sie = SIE_SEIE | SIE_SSIE | SIE_STIE;
+    // CSR_READ(frame->sie, "sie");
+    if (is_user) {
+        trap_frame_set_stack_pointer(frame, USER_STACK_TOP);
+        trap_frame_set_heap_pointer(frame, USER_HEAP_BOTTOM);
+    }
+
+    uint64_t permission_bits = PB_READ | PB_EXECUTE | PB_WRITE;
+    debugf("process.c (trap_frame_new): Mapping trap stack 0x%08lx:0x%08lx to 0x%08lx\n", frame->trap_stack, frame->trap_stack + 0x10000, kernel_mmu_translate(frame->trap_stack));
+    mmu_map_range(page_table, 
+                frame->trap_stack, 
+                frame->trap_stack + 0x10000, 
+                kernel_mmu_translate(frame->trap_stack), 
+                MMU_LEVEL_4K,
+                permission_bits);
+    // mmu_map_range(page_table,
+    //             frame->sscratch,
+    //             frame->sscratch + 0x1000,
+    //             kernel_mmu_translate((unsigned long)frame),
+    //             MMU_LEVEL_4K,
+    //             permission_bits);
+    debugf("process.c (trap_frame_new): Mapping page table 0x%08lx:0x%08lx to 0x%08lx\n", page_table, page_table + 0x1000, kernel_mmu_translate(page_table));
+    mmu_map_range(page_table,
+                (uintptr_t)page_table,
+                (uintptr_t)(page_table + 0x1000),
+                kernel_mmu_translate((uintptr_t)page_table),
+                MMU_LEVEL_4K,
+                permission_bits);
+
+    debugf("process.c (trap_frame_new): Mapping trap frame 0x%08lx:0x%08lx to 0x%08lx\n", frame, frame + 0x1000, kernel_mmu_translate(frame));
+    mmu_map_range(page_table,
+                (uintptr_t)frame,
+                (uintptr_t)(frame + 0x1000),
+                kernel_mmu_translate((uintptr_t)frame),
+                // (uint64_t)frame,
+                MMU_LEVEL_4K,
+                permission_bits);
+
+    debugf("process.c (trap_frame_new): Mapping trampoline trap 0x%08lx:0x%08lx to 0x%08lx\n", trampoline_trap_start, trampoline_trap_start + 0x1000, kernel_mmu_translate(trampoline_trap_start));
+    mmu_map_range(page_table,
+                trampoline_trap_start,
+                trampoline_trap_start + 0x1000,
+                kernel_mmu_translate(trampoline_trap_start),
+                MMU_LEVEL_4K,
+                permission_bits);
+
+    debugf("process.c (trap_frame_new): TrapFrame address: 0x%08x\n", frame);
+    return frame;
+}
+
+void trap_frame_free(TrapFrame *frame) {
+    kfree((void *)frame->trap_stack);
+    kfree(frame);
+}
+
+void rcb_init(RCB *rcb) {
+    rcb->image_pages = list_new();
+    rcb->stack_pages = list_new();
+    rcb->heap_pages = list_new();
+    rcb->file_descriptors = list_new();
+    rcb->environemnt = map_new();
+    rcb->ptable = mmu_table_create();
+}
+void rcb_free(RCB *rcb) {
+    list_free(rcb->image_pages);
+    list_free(rcb->stack_pages);
+    list_free(rcb->heap_pages);
+    list_free(rcb->file_descriptors);
+    map_free(rcb->environemnt);
+    page_free(rcb->ptable);
+}
+
+void rcb_map(RCB *rcb, uint64_t vaddr, uint64_t paddr, uint64_t size, uint64_t bits) {
+    debugf("rcb_map: vaddr = 0x%08lx, paddr = 0x%08lx, size = 0x%08lx, bits = 0x%08lx\n", vaddr, paddr, size, bits);
+    if (size % PAGE_SIZE_4K != 0) {
+        warnf("rcb_map: size is not a multiple of PAGE_SIZE_4K\n");
+        size = ALIGN_UP_POT(size, PAGE_SIZE_4K);
+        size += PAGE_SIZE_4K;
+    }
+
+    uint64_t alignment = ~(PAGE_SIZE_4K - 1);
+    for (uint64_t i = 0; i < size; i += PAGE_SIZE_4K) {
+        debugf("rcb_map: Mapping 0x%08lx to 0x%08lx\n", (vaddr + i) & alignment, (paddr + i) & alignment);
+        mmu_map(rcb->ptable, (vaddr + i) & alignment, (paddr + i) & alignment, MMU_LEVEL_4K, bits);
+    }
+}
+
+void trap_frame_set_stack_pointer(TrapFrame *frame, uint64_t stack_pointer) {
+    frame->xregs[2] = stack_pointer;
+}
+
+void trap_frame_set_heap_pointer(TrapFrame *frame, uint64_t heap_pointer) {
+    frame->xregs[3] = heap_pointer;
 }
 
 Process *process_new(ProcessMode mode)
 {
-    Process *p = (Process *)kzalloc(sizeof(*p));
+    Process *p = (Process *)kzalloc(sizeof(Process));
     debugf("process.c (process_new): Process address: 0x%08x\n", p);
-
+    p->lock = MUTEX_UNLOCKED;
+    mutex_spinlock(&p->lock);
     p->pid = generate_unique_pid();
-    p->hart = -1U;
+    p->hart = sbi_whoami();
     p->mode = mode;
     p->state = PS_WAITING;
+    p->quantum = 10;
+    p->priority = 10;
     
-    process_map_set(p);
 
     // Initialize the Resource Control Block
-    p->rcb.image_pages = list_new();
-    p->rcb.stack_pages = list_new();
-    p->rcb.heap_pages = list_new();
-    p->rcb.file_descriptors = list_new();
-    p->rcb.environemnt = map_new();
-    p->rcb.ptable = mmu_table_create();
+    rcb_init(&p->rcb);
+    debugf("process.c (process_new): RCB address: 0x%08x\n", &p->rcb);
 
     // Set the trap frame and create all necessary structures.
-    // p->frame.sepc = filled_in_by_ELF_loader
-    p->frame.sstatus = SSTATUS_SPP_BOOL(mode) | SSTATUS_FS_INITIAL | SSTATUS_SPIE;
-    p->frame.sie = SIE_SEIE | SIE_SSIE | SIE_STIE;
-    p->frame.satp = SATP(p->rcb.ptable, p->pid);
-    p->frame.sscratch = (unsigned long)&p->frame;
-    p->frame.stvec = trampoline_trap_start;
-    p->frame.trap_satp = SATP_KERNEL;
-    // p->frame.trap_stack = filled_in_by_SCHEDULER
+    // p->frame->sepc = filled_in_by_ELF_loader
+    // p->frame->sstatus = SSTATUS_SPP_BOOL(mode) | SSTATUS_FS_INITIAL | SSTATUS_SPIE;
+    // p->frame->satp = SATP(p->rcb.ptable, p->pid);
+    // p->frame->sscratch = (unsigned long)&p->frame;
+    // p->frame->stvec = trampoline_trap_start;
+    // p->frame->trap_satp = SATP_KERNEL;
+
+    p->frame = trap_frame_new(mode == PM_USER, p->rcb.ptable, p->pid);
+
+
+    // p->frame->sie = SIE_SEIE | SIE_SSIE | SIE_STIE;
+    // p->frame->sstatus = SSTATUS_SPP_BOOL(mode) | SSTATUS_FS_INITIAL | SSTATUS_SPIE;
+    // p->frame->stvec = trampoline_trap_start;
+    // p->frame->sscratch = kernel_mmu_translate(&p->frame);
+    // p->frame->satp = SATP(kernel_mmu_translate(p->rcb.ptable), p->pid % 0xffff);
+    // p->frame->trap_satp = SATP_KERNEL;
+
+
+    // p->frame->trap_stack = kzalloc(0x1000);
+    // uint64_t permission_bits = PB_READ | PB_EXECUTE | PB_WRITE | PB_USER;
+    // mmu_map_range(p->rcb.ptable, 
+    //             p->frame->trap_stack, 
+    //             p->frame->trap_stack + 0x10000, 
+    //             kernel_mmu_translate(p->frame->trap_stack), 
+    //             MMU_LEVEL_4K,
+    //             permission_bits);
+    // mmu_map_range(p->rcb.ptable, 
+    //             p->frame->sscratch, 
+    //             p->frame->sscratch + 0x10000, 
+    //             kernel_mmu_translate(p->frame->sscratch),
+    //             MMU_LEVEL_4K,
+    //             permission_bits);
+    // mmu_map_range(p->rcb.ptable,
+    //             p->rcb.ptable,
+    //             p->rcb.ptable + 0x10000,
+    //             kernel_mmu_translate(p->rcb.ptable),
+    //             MMU_LEVEL_4K,
+    //             permission_bits);
+    // mmu_map_range(p->rcb.ptable,
+    //             &p->frame,
+    //             &p->frame + 0x10000,
+    //             kernel_mmu_translate(&p->frame),
+    //             // (uint64_t)&p->frame,
+    //             MMU_LEVEL_4K,
+    //             permission_bits);
+
+    // Add the trap handler to the process's page table
+    // mmu_map_range(p->rcb.ptable,
+    //             p->frame->stvec & ~0xfff,
+    //             p->frame->stvec & ~0xfff + 0x1000,
+    //             p->frame->stvec & ~0xfff,
+    //             MMU_LEVEL_4K,
+    //             permission_bits);
+    // p->frame->trap_stack = filled_in_by_SCHEDULER
     
-    p->frame.trap_stack = (uint64_t)kmalloc(0x10000); 
+    // p->frame->trap_stack = (uint64_t)kzalloc(0x10000); 
 
     // We need to keep track of the stack itself in the kernel, so we can free it
     // later, but the user process will interact with the stack via the SP register.
-    p->frame.xregs[XREG_SP] = STACK_TOP + STACK_SIZE;
-    for (unsigned long i = 0; i < STACK_PAGES; i += 1) {
-        void *stack = page_zalloc();
-        list_add_ptr(p->rcb.stack_pages, stack);
-        mmu_map(p->rcb.ptable, STACK_TOP + PAGE_SIZE * i, (unsigned long)stack,
-                MMU_LEVEL_4K, mode == PM_USER ? PB_USER : 0 | PB_READ | PB_WRITE);
-    }
+    // for (unsigned long i = 0; i < STACK_PAGES; i += 1) {
+    //     void *stack = page_zalloc();
+    //     list_add_ptr(p->rcb.stack_pages, stack);
+    //     rcb_map(&p->rcb, STACK_TOP + PAGE_SIZE * i, (unsigned long)stack, PAGE_SIZE, PB_READ | PB_WRITE | PB_USER);
+    // }
+
+    // for (unsigned long i = 0; i < STACK_PAGES; i += 1) {
+    //     void *stack = page_zalloc();
+    //     list_add_ptr(p->rcb.stack_pages, stack);
+    //     rcb_map(&p->rcb, STACK_TOP + PAGE_SIZE * i, (unsigned long)stack, PAGE_SIZE, PB_READ | PB_WRITE | PB_USER);
+    // }
+    
 
     // We need to map certain kernel portions into the user's page table. Notice
     // that the PB_USER is NOT set, but it needs to be there because we need to execute
     // the trap/start instructions while using the user's page table until we change SATP.
-    unsigned long trans_trampoline_start = mmu_translate(kernel_mmu_table, trampoline_thread_start);
-    unsigned long trans_trampoline_trap  = mmu_translate(kernel_mmu_table, trampoline_trap_start);
-    mmu_map(p->rcb.ptable, trampoline_thread_start, trans_trampoline_start, MMU_LEVEL_4K,
-            PB_READ | PB_EXECUTE);
-    mmu_map(p->rcb.ptable, trampoline_trap_start, trans_trampoline_trap, MMU_LEVEL_4K,
-            PB_READ | PB_EXECUTE);
+    void process_asm_run(void *frame_addr);
+    rcb_map(&p->rcb, trampoline_thread_start, kernel_mmu_translate(trampoline_thread_start), 0x1000, PB_READ | PB_EXECUTE);
+    rcb_map(&p->rcb, trampoline_trap_start, kernel_mmu_translate(trampoline_trap_start), 0x1000, PB_READ | PB_EXECUTE);
+    rcb_map(&p->rcb, (uintptr_t)process_asm_run, kernel_mmu_translate((uintptr_t)process_asm_run), 0x10000, PB_READ | PB_EXECUTE);
+    rcb_map(&p->rcb, (uintptr_t)os_trap_handler, kernel_mmu_translate((uintptr_t)os_trap_handler), 0x1000, PB_READ | PB_EXECUTE);
+    rcb_map(&p->rcb, (uintptr_t)p->frame, kernel_mmu_translate((uintptr_t)p->frame), 0x1000, PB_READ | PB_WRITE | PB_EXECUTE);
 
-    // Map trap frame to user's page table
-    uintptr_t trans_frame = kernel_mmu_translate((uintptr_t)&p->frame);
-    mmu_map(p->rcb.ptable, (uintptr_t)&p->frame, trans_frame, MMU_LEVEL_4K, PB_READ | PB_WRITE | PB_EXECUTE);
+    uint64_t permission_bits = PB_READ | PB_EXECUTE | PB_WRITE;
+    if (mode == PM_USER) {
+        permission_bits |= PB_USER;
+    }
 
-    SFENCE_ASID(p->pid);
+    p->heap_size = USER_HEAP_SIZE;
+    p->stack_size = USER_STACK_SIZE;
+    do {
+        debugf("Allocating %d pages for the stack\n", p->stack_size / PAGE_SIZE);
+        p->stack = page_znalloc(p->stack_size / PAGE_SIZE);
+        if (!p->stack) {
+            p->stack_size /= 2;
+            debugf("Stack allocation failed, trying with %d pages\n", p->stack_size / PAGE_SIZE);
+        }
 
+        if (p->stack_size < PAGE_SIZE * 16) {
+            fatalf("process.c (process_new): Stack size too small\n");
+        }
+    } while (!p->stack);
+    debugf("Allocating %d pages for the heap\n", p->heap_size / PAGE_SIZE);
+    
+    do {
+        debugf("Allocating %d pages for the heap\n", p->heap_size / PAGE_SIZE);
+        p->heap = page_znalloc(p->heap_size / PAGE_SIZE);
+        if (!p->heap) {
+            p->heap_size /= 2;
+            debugf("Heap allocation failed, trying with %d pages\n", p->heap_size / PAGE_SIZE);
+        }
+
+        if (p->heap_size < PAGE_SIZE * 16) {
+            fatalf("process.c (process_new): Heap size too small\n");
+        }
+    } while (!p->heap);
+    debugf("Stack: %p\n", p->stack);
+    debugf("Heap: %p\n", p->heap);
+    p->stack_vaddr = USER_STACK_TOP;
+    p->heap_vaddr = USER_HEAP_BOTTOM;
+
+    trap_frame_set_stack_pointer(p->frame, USER_STACK_TOP);
+    trap_frame_set_heap_pointer(p->frame, USER_HEAP_BOTTOM);
+
+    debugf("Wiping the heap\n");
+    memset(p->heap, 0, p->heap_size);
+    for (uint64_t i = 0; i < p->heap_size / PAGE_SIZE; i++) {
+        list_add_ptr(p->rcb.heap_pages, p->heap + i * PAGE_SIZE);
+        debugf("Mapping heap page\n");
+        if (p->heap_vaddr + i * PAGE_SIZE > USER_HEAP_TOP) {
+            fatalf("process.c (process_new): Heap overflow\n");
+        }
+        rcb_map(&p->rcb, 
+                p->heap_vaddr + i * PAGE_SIZE, 
+                kernel_mmu_translate((uint64_t)p->heap + i * PAGE_SIZE), 
+                PAGE_SIZE,
+                permission_bits);
+        debugf("Heap page mapped\n");
+    }
+    debugf("Wiping the stack\n");
+    memset(p->stack, 0, p->stack_size);
+    for (uint64_t i = 0; i < p->stack_size / PAGE_SIZE; i++) {
+        list_add_ptr(p->rcb.stack_pages, p->stack + i * PAGE_SIZE);
+        debugf("Mapping stack page\n");
+        if (USER_STACK_BOTTOM + i * PAGE_SIZE > USER_STACK_TOP) {
+            fatalf("process.c (process_new): Stack overflow\n");
+        }
+
+        rcb_map(&p->rcb, 
+                p->stack_vaddr - i * PAGE_SIZE, 
+                kernel_mmu_translate((uint64_t)p->stack + i * PAGE_SIZE), 
+                PAGE_SIZE,
+                permission_bits);
+        debugf("Stack page mapped\n");
+    }
+    #ifdef DEBUG_PROCESS
+    mmu_print_entries(p->rcb.ptable, MMU_LEVEL_4K);
+    #endif
+
+    mutex_unlock(&p->lock);
+    debugf("process.c (process_new): Process created\n");
+    process_map_set(p);
     return p;
 }
 
 int process_free(Process *p)
 {
+    mutex_spinlock(&p->lock);
     struct ListElem *e;
 
-    if (!p || !ON_HART_NONE(p)) {
-        // Process is invalid or running somewhere, or this is stale.
+    if (!p) {
+        warnf("process.c (process_free): Process is NULL\n");
+        return -1;
+    }
+
+    if (ON_HART_NONE(p)) {
+        warnf("process.c (process_free): Process is not running on any hart\n");
         return -1;
     }
 
@@ -264,12 +530,11 @@ int process_free(Process *p)
     }
 
     if (p->rcb.environemnt) {
-        map_free_get_keys(map_get_keys(p->rcb.environemnt));
+        map_free(p->rcb.environemnt);
     }
 
     if (p->rcb.ptable) {
-        mmu_free(p->rcb.ptable);
-        SFENCE_ASID(p->pid);
+        page_free(p->rcb.ptable);
     }
 
     kfree(p);
@@ -282,14 +547,34 @@ bool process_run(Process *p, unsigned int hart)
     unsigned int me = sbi_whoami();
 
     if (me == hart) {
-        pid_harts_map_set(hart, p->pid);
-        process_asm_run(&p->frame);
+        if (p->state == PS_DEAD) {
+            warnf("process.c (process_run): Process is dead, running idle instead\n");
+            process_run(sched_get_idle_process(), hart);
+        }
+
+        if (!process_map_contains(p->pid)) {
+            fatalf("process.c (process_run): Process %d not found on process map\n", p->pid);
+        }
+
+        set_current_process(p);
+        // process_debug(p);
+        // uint64_t satp, sscratch;
+        // CSR_READ(satp, "satp");
+        // CSR_READ(sscratch, "sscratch");
+        // debugf("Old SATP: 0x%08x\n", satp);
+        // trap_frame_debug((TrapFrame*)sscratch);
+        // debugf("New SATP: 0x%08x\n", p->frame->satp);
+        // trap_frame_debug(p->frame);
+        // debugf("Jumping to 0x%08lx\n", p->frame->sepc);
+        process_asm_run(p->frame);
+        
+        fatalf("process.c (process_run): process_asm_run returned\n");
         // process_asm_run should not return, but if it does
         // something went wrong.
         return false;
     }
 
-    return sbi_hart_start(hart, trampoline_thread_start, (unsigned long)&p->frame, p->frame.satp);
+    return sbi_hart_start(hart, trampoline_thread_start, (unsigned long)p->frame, p->frame->satp);
 }
 
 // Map of all the processes, key is PID.
@@ -300,20 +585,42 @@ static Map *processes;
 void process_map_init()
 {
     processes = map_new();
+    map_clear(processes);
 }
 
 // Store a process on a map as its PID as the key.
 void process_map_set(Process *p)
 {
+    mutex_spinlock(&p->lock);
+    infof("process.c (process_map_set): Setting PID %d\n", p->pid);
     map_set_int(processes, p->pid, (MapValue)p);
+    mutex_unlock(&p->lock);
 }
+
+// void process_map_remove(Process *p)
+// {
+//     map_remove_int(processes, p->pid);
+// }
 
 // Get process stored on the process map using the PID as the key.
 Process *process_map_get(uint16_t pid) 
 {
+    if (!process_map_contains(pid)) {
+        return NULL;
+    }
     MapValue val;
     map_get_int(processes, pid, &val);
     return (Process *)val;
+}
+
+bool process_map_contains(uint16_t pid) 
+{
+    return map_contains_int(processes, pid);
+}
+
+void process_map_remove(uint16_t pid)
+{
+    map_remove_int(processes, pid);
 }
 
 // Keep track of the PIDs running on each hart.
@@ -323,9 +630,10 @@ static Map *pid_on_harts;
 // first process.
 void pid_harts_map_init()
 {
+    // pid_on_harts = map_new_with_slots(0x100);
     pid_on_harts = map_new();
+    map_clear(pid_on_harts);
 }
-
 // Associate the PID running to hart
 void pid_harts_map_set(uint32_t hart, uint16_t pid)
 {

@@ -25,6 +25,7 @@
 // the kernel.
 // Defined in src/include/mmu.h
 PageTable *kernel_mmu_table;
+TrapFrame *kernel_trap_frame;
 
 static void init_systems(void)
 {
@@ -113,16 +114,18 @@ static void init_systems(void)
     CSR_WRITE("stvec", trampoline_trap_start);
     debugf("STVEC: 0x%p, 0x%p\n", stvec, trampoline_trap_start);
 
-    Trapframe *sscratch = kzalloc(sizeof(Trapframe) * 4);
+    kernel_trap_frame = kzalloc(sizeof(Trapframe) * 4);
     
-    CSR_READ(sscratch->sepc, "sepc");
-    CSR_READ(sscratch->sstatus, "sstatus");
-    CSR_READ(sscratch->sie, "sie");
-    CSR_READ(sscratch->satp, "satp");
-    CSR_READ(sscratch->stvec, "stvec");
-    CSR_READ(sscratch->trap_satp, "satp");
-    sscratch->trap_stack = (uint64_t)kmalloc(0x10000);
-    CSR_WRITE("sscratch", sscratch);
+    CSR_READ(kernel_trap_frame->sepc, "sepc");
+    CSR_READ(kernel_trap_frame->sstatus, "sstatus");
+    
+    CSR_READ(kernel_trap_frame->satp, "satp");
+    CSR_READ(kernel_trap_frame->stvec, "stvec");
+    CSR_READ(kernel_trap_frame->trap_satp, "satp");
+    // kernel_trap_frame->satp = kernel_mmu_table
+    kernel_trap_frame->trap_stack = (uint64_t)kmalloc(0x50000);
+    CSR_WRITE("sscratch", kernel_trap_frame);
+    trap_frame_debug(kernel_trap_frame);
 
     virtio_init();
     uint8_t buffer[16] = {0};
@@ -187,8 +190,6 @@ static void init_systems(void)
     debugf("GPU init %s\n", gpu_test() ? "successful" : "failed");
 
     // Process init
-    process_map_init();
-    pid_harts_map_init();
     sched_init();
 #endif
 }
@@ -238,29 +239,13 @@ void main(unsigned int hart)
     // how the console works.
 
     // This is defined above main()
-#ifdef RUN_INTERNAL_CONSOLE
-    VirtioDevice *block_device = virtio_get_block_device(0);
-    // minix3_init(block_device, "/");
     vfs_init();
 
-    File *file = vfs_open("/dev/sda/root.txt", 0, O_RDONLY, VFS_TYPE_FILE);
-    uint8_t *buffer = kzalloc(2048);
-    vfs_read(file, buffer, 1024);
-    logf(LOG_INFO, "Read from file /dev/sda/root.txt: %1024s\n", buffer);
-    // vfs_print_mounted_devices();
-
-
-    File *file2 = vfs_open("/home/cosc562/subdir1/subdir2/subdir3/subdir4/subdir5/book1.txt", 0, O_RDONLY, VFS_TYPE_FILE);
-    vfs_read(file2, buffer, 1024);
-    logf(LOG_INFO, "Read 1024 bytes from file /home/cosc562/subdir1/subdir2/subdir3/subdir4/subdir5/book1.txt: %1024s\n", buffer);
-    vfs_read(file2, buffer, 1024);
-    logf(LOG_INFO, "Read another 1024 bytes from file /home/cosc562/subdir1/subdir2/subdir3/subdir4/subdir5/book1.txt: %1024s\n", buffer);
-
-    vfs_close(file);
-    vfs_close(file2);
-
     // Read in /home/cosc562/console.elf
-    File *elf_file = vfs_open("/home/cosc562/console.elf", 0, O_RDONLY, VFS_TYPE_FILE);
+    // File *elf_file = vfs_open("/home/cosc562/console.elf", 0, O_RDONLY, VFS_TYPE_FILE);
+    // File *elf_file = vfs_open("/home/cosc562/calculator.elf", 0, O_RDONLY, VFS_TYPE_FILE);
+    // File *elf_file = vfs_open("/home/cosc562/hex_editor.elf", 0, O_RDONLY, VFS_TYPE_FILE);
+    File *elf_file = vfs_open("/home/cosc562/bonzai.elf", 0, O_RDONLY, VFS_TYPE_FILE);
     Stat stat;
     vfs_stat(elf_file, &stat);
     logf(LOG_INFO, "Console file size: %lu\n", stat.size);
@@ -268,25 +253,22 @@ void main(unsigned int hart)
     vfs_read(elf_file, elfcon, elf_file->size);
     vfs_close(elf_file);
 
-
     Process *p = process_new(PM_USER);
     elf_create_process(p, elfcon);
-    process_debug(p);
+
+    p->state = PS_RUNNING;
+    p->hart = sbi_whoami();
+    p->frame->sstatus = SSTATUS_SPP_BIT | SSTATUS_SPIE_BIT;
     sched_add(p);
+    process_debug(p);
+
+    CSR_READ(kernel_trap_frame->sie, "sie");
+    kernel_trap_frame->sie = SIE_STIE | SIE_SSIE | SIE_SEIE;
+    CSR_WRITE("sie", kernel_trap_frame->sie);
+
     process_run(p, 0);
 
     console();
-#else
-    extern uint32_t *elfcon;
-    Process *con = process_new(PM_USER);
-    if (!elf_load(con, elfcon)) {
-        logf(LOG_INFO, "PANIC: Could not load init.\n");
-        WFI_LOOP();
-    }
-    sched_add(con);
-    con->state = PS_RUNNING;
-    sched_invoke(0);
-#endif
 }
 
 #ifdef RUN_INTERNAL_CONSOLE

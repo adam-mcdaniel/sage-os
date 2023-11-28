@@ -80,3 +80,5 @@ bool mmu_map(PageTable *tab,
 void mmu_free(PageTable *tab);
 
 void debug_page_table(PageTable *tab, uint8_t lvl);
+
+void mmu_print_entries(PageTable *tab, uint8_t lvl);

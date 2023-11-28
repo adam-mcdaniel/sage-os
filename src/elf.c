@@ -1,14 +1,27 @@
-#include <elf.h>
-#include <page.h>
-#include <util.h>
+#include <compiler.h>
+#include <config.h>
+#include <csr.h>
+#include <gpu.h>
 #include <kmalloc.h>
-#include <stdbool.h>
-#include <process.h>
-#include <mmu.h>
 #include <list.h>
-#include <map.h>
+#include <lock.h>
+#include <sbi.h>  // sbi_xxx()
+#include <symbols.h>
+#include <util.h>  // strcmp
+#include <debug.h>
+#include <mmu.h>
+#include <page.h>
+#include <csr.h>
+#include <trap.h>
+#include <block.h>
+#include <rng.h>
+#include <vfs.h>
+#include <stat.h>
+#include <elf.h>
+#include <process.h>
+#include <sched.h>
 
-// #define ELF_DEBUG
+#define ELF_DEBUG
 #ifdef ELF_DEBUG
 #define debugf(...) debugf(__VA_ARGS__)
 #else
@@ -584,7 +597,131 @@ bool elf_is_valid_text(Elf64_Phdr text) {
     return text.p_type == PT_LOAD && text.p_flags & PF_X;
 }
 
+Elf64_Shdr elf_get_string_table_header(Elf64_Ehdr header, Elf64_Shdr *section_headers, uint8_t *elf) {
+    // Find the string table
+    Elf64_Shdr strtab_header = {0};
+    for (uint32_t i = 0; i < header.e_shnum; i++) {
+        if (section_headers[i].sh_type == SHT_STRTAB) {
+            strtab_header = section_headers[i];
+            break;
+        }
+    }
+
+    if (strtab_header.sh_size == 0) {
+        debugf("No string table\n");
+        return strtab_header;
+    }
+
+    return strtab_header;
+}
+
+char *elf_get_string_table(Elf64_Ehdr header, Elf64_Shdr *section_headers, uint8_t *elf) {
+    // Find the string table
+    Elf64_Shdr strtab_header = elf_get_string_table_header(header, section_headers, elf);
+    if (strtab_header.sh_size == 0) {
+        debugf("No string table\n");
+        return NULL;
+    }
+
+    // Get the string table
+    char *strtab = (char*)(elf + strtab_header.sh_offset);
+    return strtab;
+}
+
+Elf64_Shdr elf_get_symbol_table_header(Elf64_Ehdr header, Elf64_Shdr *section_headers, uint8_t *elf) {
+    // Find the symbol table
+    Elf64_Shdr symtab_header = {0};
+    for (uint32_t i = 0; i < header.e_shnum; i++) {
+        if (section_headers[i].sh_type == SHT_SYMTAB) {
+            symtab_header = section_headers[i];
+            break;
+        }
+    }
+
+    if (symtab_header.sh_size == 0) {
+        debugf("No symbols\n");
+        return symtab_header;
+    }
+
+    return symtab_header;
+}
+
+Elf64_Sym *elf_get_symbol_table(Elf64_Ehdr header, Elf64_Shdr *section_headers, uint8_t *elf) {
+    // Find the symbol table
+    Elf64_Shdr symtab_header = elf_get_symbol_table_header(header, section_headers, elf);
+    if (symtab_header.sh_size == 0) {
+        debugf("No symbols\n");
+        return NULL;
+    }
+
+    // Get the symbol table
+    Elf64_Sym *symtab = (Elf64_Sym*)(elf + symtab_header.sh_offset);
+    return symtab;
+}
+
+Elf64_Sym *elf_get_symbol(Elf64_Ehdr header, Elf64_Shdr *section_headers, uint8_t *elf, char *name) {
+    // Get the symbol table
+    Elf64_Shdr symtab_header = elf_get_symbol_table_header(header, section_headers, elf);
+    Elf64_Sym *symtab = elf_get_symbol_table(header, section_headers, elf);
+    if (symtab == NULL) {
+        debugf("No symbols\n");
+        return NULL;
+    }
+    uint32_t num_symbols = symtab_header.sh_size / symtab_header.sh_entsize;
+
+    // Get the string table
+    char *strtab = elf_get_string_table(header, section_headers, elf);
+    if (symtab_header.sh_size == 0) {
+        debugf("No symbols\n");
+        return NULL;
+    }
+
+    // Find the symbol
+    for (uint32_t i = 0; i < num_symbols; i++) {
+        if (strcmp(strtab + symtab[i].st_name, name) == 0) {
+            return &symtab[i];
+        }
+    }
+    return NULL;
+}
+
+void elf_print_symbols(Elf64_Ehdr header, Elf64_Shdr *section_headers, uint8_t *elf) {
+    // Get the symbol table
+    Elf64_Shdr symtab_header = elf_get_symbol_table_header(header, section_headers, elf);
+    Elf64_Sym *symtab = elf_get_symbol_table(header, section_headers, elf);
+    if (symtab == NULL) {
+        debugf("No symbols\n");
+        return;
+    }
+    uint32_t num_symbols = symtab_header.sh_size / symtab_header.sh_entsize;
+
+    // Get the string table
+    Elf64_Shdr strtab_header = elf_get_string_table_header(header, section_headers, elf);
+    char *strtab = (char*)(elf + strtab_header.sh_offset);
+
+    if (symtab_header.sh_size == 0) {
+        debugf("No symbols\n");
+        return;
+    }
+
+    // Print the symbols
+    debugf("Symbols:\n");
+    for (uint32_t i = 0; i < num_symbols; i++) {
+        debugf("   %s\n", strtab + symtab[i].st_name);
+    }
+}
+
 int elf_create_process(Process *p, const uint8_t *elf) {
+    if (!elf_is_valid_header(*(Elf64_Ehdr*)elf)) {
+        debugf("Invalid ELF header\n");
+        return 1;
+    }
+
+    if (p == NULL) {
+        debugf("Process is NULL\n");
+        return 1;
+    }
+
     // Check if the process has a page table
     if (p->rcb.ptable == NULL) {
         debugf("Process does not have a page table\n");
@@ -616,11 +753,7 @@ int elf_create_process(Process *p, const uint8_t *elf) {
         elf_debug_program_header(program_headers[i]);
     }
 
-
     // Go through the program headers and find the text, bss, rodata, srodata, and data segments
-    debugf("Text header:\n");
-
-
     uint64_t permission_bits = PB_READ | PB_EXECUTE | PB_WRITE | PB_USER;
 
     // Get sum of the sizes of all the segments
@@ -639,19 +772,23 @@ int elf_create_process(Process *p, const uint8_t *elf) {
 
     // Get the sizes of the segments
     debugf("Getting sizes of segments\n");
-    uint64_t text_size = elf_is_valid_text(text_header)? text_header.p_memsz : 0;
+    #define min(a, b) ((a) < (b)? (a) : (b))
+    #define max(a, b) ((a) > (b)? (a) : (b))
+    uint64_t text_size = max(ALIGN_UP_TO_PAGE(elf_is_valid_text(text_header)? text_header.p_memsz : 0), 0x10000);
     debugf("Text size: %x\n", text_size);
-    uint64_t rodata_size = elf_is_valid_rodata(rodata_header)? rodata_header.p_memsz : 0;
+    uint64_t rodata_size = max(ALIGN_UP_TO_PAGE(elf_is_valid_rodata(rodata_header)? rodata_header.p_memsz : 0), 0x10000);
     debugf("RODATA size: %x\n", rodata_size);
-    uint64_t bss_size = elf_is_valid_bss(bss_header)? bss_header.p_memsz : 0;
+    uint64_t bss_size = max(ALIGN_UP_TO_PAGE(elf_is_valid_bss(bss_header)? bss_header.p_memsz : 0), 0x10000);
     debugf("BSS size: %x\n", bss_size);
-    uint64_t data_size = elf_is_valid_data(data_header)? data_header.p_memsz : 0;
+    uint64_t data_size = max(ALIGN_UP_TO_PAGE(elf_is_valid_data(data_header) && data_header.p_vaddr != bss_header.p_vaddr? data_header.p_memsz : 0), 0x10000);
     debugf("DATA size: %x\n", data_size);
 
+    // p->heap_size = USER_HEAP_SIZE * 2;
+    // p->stack_size = USER_STACK_SIZE * 2;
     uint64_t total_size = text_size + rodata_size + bss_size + data_size;
     debugf("Total size: %x\n", total_size);
     // Allocate the memory for the segments
-    uint8_t *segments = (uint8_t*)page_nalloc(ALIGN_UP_POT(total_size, PAGE_SIZE_4K) / PAGE_SIZE_4K);
+    uint8_t *segments = (uint8_t*)page_nalloc(ALIGN_UP_TO_PAGE(total_size) / PAGE_SIZE_4K);
     memset(segments, 0, total_size);
     p->image = segments;
     p->image_size = total_size;
@@ -661,10 +798,15 @@ int elf_create_process(Process *p, const uint8_t *elf) {
     uint8_t *rodata = text + text_size;
     uint8_t *bss = rodata + rodata_size;
     uint8_t *data = bss + bss_size;
+    // p->heap = data + data_size;
+    // p->stack = p->heap + p->heap_size;
     if (!text_size) text = NULL;
     if (!rodata_size) rodata = NULL;
     if (!bss_size) bss = NULL;
-    if (!data_size || data_header.p_vaddr == bss_header.p_vaddr) data = NULL;
+    if (!data_size || data_header.p_vaddr == bss_header.p_vaddr) {
+        data = NULL;
+        data_size = 0;
+    }
 
     // Copy the segments into the allocated memory
     if (text) {
@@ -680,43 +822,23 @@ int elf_create_process(Process *p, const uint8_t *elf) {
         memcpy(data, elf + data_header.p_offset, data_header.p_filesz);
     }
 
-    // Map the segments into the page table
-    if (text) {
-        debugf("Mapping text segment\n");
-        mmu_map_range(p->rcb.ptable, 
-                    text_header.p_vaddr, 
-                    text_header.p_vaddr + text_size, 
-                    (uint64_t)text, 
-                    MMU_LEVEL_4K,
-                    permission_bits);
-    }
-    if (rodata) {
-        debugf("Mapping rodata segment\n");
-        mmu_map_range(p->rcb.ptable, 
-                    rodata_header.p_vaddr, 
-                    rodata_header.p_vaddr + rodata_size, 
-                    (uint64_t)rodata, 
-                    MMU_LEVEL_4K,
-                    permission_bits);
-    }
-    if (bss) {
-        debugf("Mapping bss segment\n");
-        mmu_map_range(p->rcb.ptable, 
-                    bss_header.p_vaddr, 
-                    bss_header.p_vaddr + bss_size, 
-                    (uint64_t)bss, 
-                    MMU_LEVEL_4K,
-                    permission_bits);
-    }
-    if (data) {
-        debugf("Mapping data segment\n");
-        mmu_map_range(p->rcb.ptable, 
-                    data_header.p_vaddr, 
-                    data_header.p_vaddr + data_size, 
-                    (uint64_t)data, 
-                    MMU_LEVEL_4K,
-                    permission_bits);
-    }
+    // void process_asm_run(void);
+    // unsigned long trans_trampoline_start = mmu_translate(kernel_mmu_table, trampoline_thread_start);
+    // unsigned long trans_trampoline_trap  = mmu_translate(kernel_mmu_table, trampoline_trap_start);
+    // unsigned long trans_process_asm_run  = mmu_translate(kernel_mmu_table, process_asm_run);
+    // unsigned long trans_os_trap_handler  = mmu_translate(kernel_mmu_table, os_trap_handler);
+    // mmu_map(p->rcb.ptable, trampoline_thread_start, trans_trampoline_start, MMU_LEVEL_4K,
+    //         PB_READ | PB_EXECUTE | PB_USER);
+    // mmu_map(p->rcb.ptable, trampoline_trap_start, trans_trampoline_trap, MMU_LEVEL_4K,
+    //         PB_READ | PB_EXECUTE | PB_USER);
+    // // Map the trap stack
+    // mmu_map(p->rcb.ptable, process_asm_run, trans_process_asm_run, MMU_LEVEL_4K,
+    //         PB_READ | PB_EXECUTE | PB_USER);
+    // mmu_map(p->rcb.ptable, os_trap_handler, trans_os_trap_handler, MMU_LEVEL_4K,
+    //         PB_READ | PB_EXECUTE | PB_USER);
+    // mmu_map(p->rcb.ptable, trans_frame, trans_frame, MMU_LEVEL_4K, PB_READ | PB_WRITE | PB_EXECUTE | PB_USER);
+    // mmu_map(p->rcb.ptable, p->frame.stvec, p->frame.stvec, MMU_LEVEL_4K, PB_READ | PB_WRITE | PB_EXECUTE | PB_USER);
+
     // Create the process
     p->text = text;
     p->text_vaddr = text ? (uint8_t *)text_header.p_vaddr : NULL;
@@ -747,10 +869,6 @@ int elf_create_process(Process *p, const uint8_t *elf) {
     debugf("DATA vaddr: %p\n", p->data_vaddr);
     debugf("DATA size: %lu\n", p->data_size);
 
-    // Set the fields of the RCB
-    if (!p->rcb.image_pages) {
-        p->rcb.image_pages = list_new();
-    }
     // Store all the pages in the `segments` array
     for (uint64_t i = 0; i < total_size / PAGE_SIZE; i++) {
         list_add_ptr(p->rcb.image_pages, segments + i * PAGE_SIZE);
@@ -759,37 +877,164 @@ int elf_create_process(Process *p, const uint8_t *elf) {
     // Allocate stack and heap
     if (!p->rcb.heap_pages) {
         p->rcb.heap_pages = list_new();
+        memset(p->heap, 0, p->heap_size);
+        for (uint64_t i = 0; i < p->heap_size / PAGE_SIZE; i++) {
+            list_add_ptr(p->rcb.heap_pages, p->heap + i * PAGE_SIZE);
+            rcb_map(&p->rcb, 
+                    USER_HEAP_BOTTOM + i * PAGE_SIZE, 
+                    kernel_mmu_translate((uint64_t)p->heap + i * PAGE_SIZE), 
+                    PAGE_SIZE,
+                    permission_bits);
+        }
     }
-    p->heap_size = DEFAULT_HEAP_SIZE;
-    p->heap = page_nalloc(ALIGN_UP_POT(p->heap_size, PAGE_SIZE_4K) / PAGE_SIZE_4K);
     
-    memset(p->heap, 0, p->heap_size);
-    for (uint64_t i = 0; i < p->heap_size / PAGE_SIZE; i++) {
-        list_add_ptr(p->rcb.heap_pages, p->heap + i * PAGE_SIZE);
-    }
 
     if (!p->rcb.stack_pages) {
         p->rcb.stack_pages = list_new();
-    }
-    p->stack_size = DEFAULT_STACK_SIZE;
-    p->stack = page_nalloc(ALIGN_UP_POT(p->stack_size, PAGE_SIZE_4K) / PAGE_SIZE_4K);
-    memset(p->stack, 0, p->stack_size);
-    for (uint64_t i = 0; i < p->stack_size / PAGE_SIZE; i++) {
-        list_add_ptr(p->rcb.stack_pages, p->stack + i * PAGE_SIZE);
+        memset(p->stack, 0, p->stack_size);
+        for (uint64_t i = 0; i < p->stack_size / PAGE_SIZE; i++) {
+            list_add_ptr(p->rcb.stack_pages, p->stack + i * PAGE_SIZE);
+            rcb_map(&p->rcb, 
+                    USER_STACK_BOTTOM + i * PAGE_SIZE, 
+                    kernel_mmu_translate((uint64_t)p->stack + i * PAGE_SIZE), 
+                    PAGE_SIZE,
+                    permission_bits);
+        }
     }
 
     // Create the environment
-    if (!p->rcb.environemnt) {
-        p->rcb.environemnt = map_new();
-    }
+    // if (!p->rcb.environemnt) {
+    //     p->rcb.environemnt = map_new();
+    // }
 
-    // Create the file descriptors
-    if (!p->rcb.file_descriptors) {
-        p->rcb.file_descriptors = list_new();
-    }
+    // // Create the file descriptors
+    // if (!p->rcb.file_descriptors) {
+    //     p->rcb.file_descriptors = list_new();
+    // }
 
     // Set sepc of the process's trap frame
-    p->frame.sepc = header.e_entry;
-    debugf("SEPC: %p\n", p->frame.sepc);
+
+    p->frame->sepc = header.e_entry;
+
+    // mmu_translate(p->rcb.ptable, p->frame.stvec);
+
+    // CSR_READ(p->frame.sie, "sie");
+
+    // Map all the segments into the page table
+    // mmu_map_range(p->rcb.ptable, 
+    //             segments,
+    //             segments + total_size,
+    //             (uint64_t)segments,
+    //             MMU_LEVEL_4K,
+    //             permission_bits);
+    // rcb_map(&p->rcb, 
+    //             segments,
+    //             kernel_mmu_translate((uint64_t)segments), 
+    //             total_size,
+    //             permission_bits);
+
+    // // Map the segments into the page table
+    if (text) {
+        debugf("Mapping text segment\n");
+        rcb_map(&p->rcb, 
+                text_header.p_vaddr, 
+                kernel_mmu_translate((uint64_t)text), 
+                (text_size / 0x1000 + 1) * 0x1000,
+                permission_bits);
+    }
+    if (rodata) {
+        debugf("Mapping rodata segment\n");
+        // mmu_map_range(p->rcb.ptable, 
+        //             rodata_header.p_vaddr, 
+        //             rodata_header.p_vaddr + rodata_size, 
+        //             (uint64_t)rodata, 
+        //             MMU_LEVEL_4K,
+        //             permission_bits);
+        rcb_map(&p->rcb, 
+                rodata_header.p_vaddr, 
+                kernel_mmu_translate((uint64_t)rodata), 
+                (rodata_size / 0x1000 + 1) * 0x1000,
+                permission_bits);
+    }
+    if (bss) {
+        debugf("Mapping bss segment\n");
+        // mmu_map_range(p->rcb.ptable, 
+        //             bss_header.p_vaddr, 
+        //             bss_header.p_vaddr + bss_size, 
+        //             (uint64_t)bss, 
+        //             MMU_LEVEL_4K,
+        //             permission_bits);
+        rcb_map(&p->rcb, 
+                bss_header.p_vaddr, 
+                kernel_mmu_translate((uint64_t)bss), 
+                (bss_size / 0x1000 + 1) * 0x1000,
+                permission_bits);
+    }
+    if (data) {
+        debugf("Mapping data segment\n");
+        // mmu_map_range(p->rcb.ptable, 
+        //             data_head & ~0xfffer.p_vaddr, 
+        //             data_header.p_vaddr + data_size, 
+        //             (uint64_t)data, 
+        //             MMU_LEVEL_4K,
+        //             permission_bits);
+        rcb_map(&p->rcb, 
+                data_header.p_vaddr, 
+                kernel_mmu_translate((uint64_t)data), 
+                (data_size / 0x1000 + 1) * 0x1000,
+                permission_bits);
+    }
+
+    Elf64_Shdr *section_headers = kmalloc(header.e_shentsize * header.e_shnum);
+    memcpy(section_headers, elf + header.e_shoff, header.e_shentsize * header.e_shnum);
+    elf_print_symbols(header, section_headers, (uint8_t*)elf);
+
+    // Copy the data into the process's memory
+    if (text) {
+        debugf("Copying text segment from %p to %p\n", elf + text_header.p_offset, text);
+        memcpy(text, elf + text_header.p_offset, text_size);
+    }
+    if (rodata) {
+        debugf("Copying rodata segment\n");
+        memcpy(rodata, elf + rodata_header.p_offset, rodata_size);
+    }
+    if (data) {
+        debugf("Copying data segment\n");
+        memcpy(data, elf + data_header.p_offset, data_size);
+    }
+    if (bss) {
+        debugf("Copying data segment\n");
+        memcpy(bss, elf + bss_header.p_offset, data_size);
+    }
+    
+    // Get _bss_start and _bss_end
+    Elf64_Sym *bss_start_sym = elf_get_symbol(header, section_headers, elf, "_bss_start");
+    Elf64_Sym *bss_end_sym = elf_get_symbol(header, section_headers, elf, "_bss_end");
+
+    if (bss_start_sym && bss_end_sym) {
+        // Clear the bss segment
+        debugf("Found _bss_start=%p and _bss_end=%p symbols\n", bss_start_sym->st_value, bss_end_sym->st_value);
+        uint8_t *bss_start = mmu_translate(p->rcb.ptable, bss_start_sym->st_value);
+        uint8_t *bss_end = mmu_translate(p->rcb.ptable, bss_end_sym->st_value);
+        debugf("Clearing bss segment from %p to %p\n", bss_start, bss_end);
+        memset(bss_start, 0, bss_end - bss_start);
+    }
+
+
+    
+    trap_frame_set_stack_pointer(p->frame, USER_STACK_TOP);
+    trap_frame_set_heap_pointer(p->frame, USER_HEAP_BOTTOM);
+    // Section headers
+    // int64_t xregs[32];
+    // double fregs[32];
+    // uint64_t sepc;
+    // uint64_t sstatus;
+    // uint64_t sie;
+    // uint64_t satp;
+    // uint64_t sscratch;
+    // uint64_t stvec;
+    // uint64_t trap_satp;
+    // uint64_t trap_stack;
+    process_debug(p);
     return 0;
 }
