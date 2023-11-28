@@ -239,29 +239,12 @@ void main(unsigned int hart)
     // how the console works.
 
     // This is defined above main()
-#ifdef RUN_INTERNAL_CONSOLE
-    VirtioDevice *block_device = virtio_get_block_device(0);
-    // minix3_init(block_device, "/");
-
     vfs_init();
 
-    // File *file = vfs_open("/dev/sda/root.txt", 0, O_RDONLY, VFS_TYPE_FILE);
-    // uint8_t *buffer = kzalloc(2048);
-    // vfs_read(file, buffer, 1024);
-    // logf(LOG_INFO, "Read from file /dev/sda/root.txt: %1024s\n", buffer);
-    // // vfs_print_mounted_devices();
-
-
-    // File *file2 = vfs_open("/home/cosc562/subdir1/subdir2/subdir3/subdir4/subdir5/book1.txt", 0, O_RDONLY, VFS_TYPE_FILE);
-    // vfs_read(file2, buffer, 1024);
-    // logf(LOG_INFO, "Read 1024 bytes from file /home/cosc562/subdir1/subdir2/subdir3/subdir4/subdir5/book1.txt: %1024s\n", buffer);
-    // vfs_read(file2, buffer, 1024);
-    // logf(LOG_INFO, "Read another 1024 bytes from file /home/cosc562/subdir1/subdir2/subdir3/subdir4/subdir5/book1.txt: %1024s\n", buffer);
-
-    // vfs_close(file);
-    // vfs_close(file2);
-
     // Read in /home/cosc562/console.elf
+    // File *elf_file = vfs_open("/home/cosc562/console.elf", 0, O_RDONLY, VFS_TYPE_FILE);
+    // File *elf_file = vfs_open("/home/cosc562/calculator.elf", 0, O_RDONLY, VFS_TYPE_FILE);
+    // File *elf_file = vfs_open("/home/cosc562/hex_editor.elf", 0, O_RDONLY, VFS_TYPE_FILE);
     File *elf_file = vfs_open("/home/cosc562/bonzai.elf", 0, O_RDONLY, VFS_TYPE_FILE);
     Stat stat;
     vfs_stat(elf_file, &stat);
@@ -269,7 +252,6 @@ void main(unsigned int hart)
     uint8_t *elfcon = kzalloc(elf_file->size);
     vfs_read(elf_file, elfcon, elf_file->size);
     vfs_close(elf_file);
-
 
     Process *p = process_new(PM_USER);
     elf_create_process(p, elfcon);
@@ -287,17 +269,6 @@ void main(unsigned int hart)
     process_run(p, 0);
 
     console();
-#else
-    extern uint32_t *elfcon;
-    Process *con = process_new(PM_USER);
-    if (!elf_load(con, elfcon)) {
-        logf(LOG_INFO, "PANIC: Could not load init.\n");
-        WFI_LOOP();
-    }
-    sched_add(con);
-    con->state = PS_RUNNING;
-    sched_invoke(0);
-#endif
 }
 
 #ifdef RUN_INTERNAL_CONSOLE
