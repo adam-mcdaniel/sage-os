@@ -1,4 +1,4 @@
-// (Built with modified version of Sage compiler -- "associated-consts" branch -- to target our custom OS)
+// (Built with modified version of Sage compiler -- "associated-consts-my-os" branch -- to target our custom OS)
 
 enum Expr {
     Add (&Expr, &Expr),
