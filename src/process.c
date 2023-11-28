@@ -91,7 +91,7 @@ void trap_frame_debug(TrapFrame *tf) {
     // uint64_t trap_stack;
     debugf("  xregs:\n");
     for (int i = 0; i < 32; i++) {
-        debugf("    x%d: %d (0x%08x)\n", i, tf->xregs[i], tf->xregs[i]);
+        debugf("    x%d: %d (0x%p)\n", i, tf->xregs[i], tf->xregs[i]);
     }
     // debugf("  fregs:\n");
     // for (int i = 0; i < 32; i++) {
@@ -438,6 +438,9 @@ Process *process_new(ProcessMode mode)
     } while (!p->heap);
     debugf("Stack: %p\n", p->stack);
     debugf("Heap: %p\n", p->heap);
+    p->stack_vaddr = USER_STACK_TOP;
+    p->heap_vaddr = USER_HEAP_BOTTOM;
+
     trap_frame_set_stack_pointer(p->frame, USER_STACK_TOP);
     trap_frame_set_heap_pointer(p->frame, USER_HEAP_BOTTOM);
 
@@ -446,11 +449,11 @@ Process *process_new(ProcessMode mode)
     for (uint64_t i = 0; i < p->heap_size / PAGE_SIZE; i++) {
         list_add_ptr(p->rcb.heap_pages, p->heap + i * PAGE_SIZE);
         debugf("Mapping heap page\n");
-        if (USER_HEAP_BOTTOM + i * PAGE_SIZE > USER_HEAP_TOP) {
+        if (p->heap_vaddr + i * PAGE_SIZE > USER_HEAP_TOP) {
             fatalf("process.c (process_new): Heap overflow\n");
         }
         rcb_map(&p->rcb, 
-                USER_HEAP_BOTTOM + i * PAGE_SIZE, 
+                p->heap_vaddr + i * PAGE_SIZE, 
                 kernel_mmu_translate((uint64_t)p->heap + i * PAGE_SIZE), 
                 PAGE_SIZE,
                 permission_bits);
@@ -466,7 +469,7 @@ Process *process_new(ProcessMode mode)
         }
 
         rcb_map(&p->rcb, 
-                USER_STACK_BOTTOM + i * PAGE_SIZE, 
+                p->stack_vaddr - i * PAGE_SIZE, 
                 kernel_mmu_translate((uint64_t)p->stack + i * PAGE_SIZE), 
                 PAGE_SIZE,
                 permission_bits);

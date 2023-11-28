@@ -663,13 +663,13 @@ void minix3_get_data(VirtioDevice *block_device, uint32_t inode, uint8_t *data, 
 
     // Now, get the data
     // The first 7 zones are direct zones
-    for (uint8_t direct_zone=0; direct_zone<7; direct_zone++) {
+    for (uint32_t direct_zone=0; direct_zone<7; direct_zone++) {
         uint32_t zone = inode_data.zones[direct_zone];
         if (zone == 0) {
-            debugf("No direct zone %d\n", zone);
+            debugf("No direct zone %d\n", direct_zone);
             continue;
         } else {
-            debugf("Direct zone %d\n", zone);
+            debugf("Direct zone %d\n", direct_zone);
         }
         memset(zone_data, 0, minix3_get_zone_size(block_device));
 
@@ -716,10 +716,14 @@ void minix3_get_data(VirtioDevice *block_device, uint32_t inode, uint8_t *data, 
         minix3_get_zone(block_device, inode_data.zones[7], (uint8_t*)indirect_zones);
         
 
-        for (uint8_t indirect_zone=0; indirect_zone<minix3_get_zone_size(block_device) / sizeof(uint32_t); indirect_zone++) {
+        for (uint32_t indirect_zone=0; indirect_zone<minix3_get_zone_size(block_device) / sizeof(uint32_t); indirect_zone++) {
             uint32_t zone = indirect_zones[indirect_zone];
-            debugf("Reading indirect zone %d\n", zone);
-            if (zone == 0) continue;
+            debugf("Zone #%d\n", indirect_zone);
+            if (zone == 0) {
+                debugf("No indirect zone %d\n", indirect_zone);
+            } else {
+                debugf("Reading indirect zone %d\n", zone);
+            }
             
 
             if (file_cursor + minix3_get_zone_size(block_device) < offset) {
@@ -760,11 +764,12 @@ void minix3_get_data(VirtioDevice *block_device, uint32_t inode, uint8_t *data, 
 
     // The next zone is a double indirect zone
     if (inode_data.zones[8] != 0) {
+        debugf("Reading double indirect zone %d\n", inode_data.zones[8]);
         uint32_t double_indirect_zones[minix3_get_zone_size(block_device) / sizeof(uint32_t)];
         // We're done
         minix3_get_zone(block_device, inode_data.zones[8], (uint8_t*)double_indirect_zones);
 
-        for (uint8_t double_indirect_zone=0; double_indirect_zone<minix3_get_zone_size(block_device) / sizeof(uint32_t); double_indirect_zone++) {
+        for (uint32_t double_indirect_zone=0; double_indirect_zone<minix3_get_zone_size(block_device) / sizeof(uint32_t); double_indirect_zone++) {
             uint32_t indirect_zone = double_indirect_zones[double_indirect_zone];
             if (indirect_zone == 0) continue;
 
@@ -818,19 +823,19 @@ void minix3_get_data(VirtioDevice *block_device, uint32_t inode, uint8_t *data, 
         uint32_t triple_indirect_zones[minix3_get_zone_size(block_device) / sizeof(uint32_t)];
         minix3_get_zone(block_device, inode_data.zones[9], (uint8_t*)triple_indirect_zones);
 
-        for (uint8_t triple_indirect_zone=0; triple_indirect_zone<minix3_get_zone_size(block_device) / sizeof(uint32_t); triple_indirect_zone++) {
+        for (uint32_t triple_indirect_zone=0; triple_indirect_zone<minix3_get_zone_size(block_device) / sizeof(uint32_t); triple_indirect_zone++) {
             uint32_t double_indirect_zone = triple_indirect_zones[triple_indirect_zone];
             if (double_indirect_zone == 0) continue;
             uint32_t double_indirect_zones[minix3_get_zone_size(block_device) / sizeof(uint32_t)];
             minix3_get_zone(block_device, double_indirect_zone, (uint8_t*)double_indirect_zones);
 
-            for (uint8_t double_indirect_zone=0; double_indirect_zone<minix3_get_zone_size(block_device) / sizeof(uint32_t); double_indirect_zone++) {
+            for (uint32_t double_indirect_zone=0; double_indirect_zone<minix3_get_zone_size(block_device) / sizeof(uint32_t); double_indirect_zone++) {
                 uint32_t indirect_zone = double_indirect_zones[double_indirect_zone];
                 if (indirect_zone == 0) continue;
                 uint32_t indirect_zones[minix3_get_zone_size(block_device) / sizeof(uint32_t)];
                 minix3_get_zone(block_device, indirect_zone, (uint8_t*)indirect_zones);
 
-                for (uint8_t indirect_zone=0; indirect_zone<minix3_get_zone_size(block_device) / sizeof(uint32_t); indirect_zone++) {
+                for (uint32_t indirect_zone=0; indirect_zone<minix3_get_zone_size(block_device) / sizeof(uint32_t); indirect_zone++) {
                     uint32_t zone = indirect_zones[indirect_zone];
                     if (zone == 0) continue;
                     debugf("Reading triple indirect zone %d\n", zone);

@@ -21,7 +21,7 @@
 #include <process.h>
 #include <sched.h>
 
-// #define ELF_DEBUG
+#define ELF_DEBUG
 #ifdef ELF_DEBUG
 #define debugf(...) debugf(__VA_ARGS__)
 #else
@@ -663,10 +663,18 @@ Elf64_Sym *elf_get_symbol(Elf64_Ehdr header, Elf64_Shdr *section_headers, uint8_
     // Get the symbol table
     Elf64_Shdr symtab_header = elf_get_symbol_table_header(header, section_headers, elf);
     Elf64_Sym *symtab = elf_get_symbol_table(header, section_headers, elf);
+    if (symtab == NULL) {
+        debugf("No symbols\n");
+        return NULL;
+    }
     uint32_t num_symbols = symtab_header.sh_size / symtab_header.sh_entsize;
 
     // Get the string table
     char *strtab = elf_get_string_table(header, section_headers, elf);
+    if (symtab_header.sh_size == 0) {
+        debugf("No symbols\n");
+        return NULL;
+    }
 
     // Find the symbol
     for (uint32_t i = 0; i < num_symbols; i++) {
@@ -681,11 +689,20 @@ void elf_print_symbols(Elf64_Ehdr header, Elf64_Shdr *section_headers, uint8_t *
     // Get the symbol table
     Elf64_Shdr symtab_header = elf_get_symbol_table_header(header, section_headers, elf);
     Elf64_Sym *symtab = elf_get_symbol_table(header, section_headers, elf);
+    if (symtab == NULL) {
+        debugf("No symbols\n");
+        return;
+    }
     uint32_t num_symbols = symtab_header.sh_size / symtab_header.sh_entsize;
 
     // Get the string table
     Elf64_Shdr strtab_header = elf_get_string_table_header(header, section_headers, elf);
     char *strtab = (char*)(elf + strtab_header.sh_offset);
+
+    if (symtab_header.sh_size == 0) {
+        debugf("No symbols\n");
+        return;
+    }
 
     // Print the symbols
     debugf("Symbols:\n");
@@ -737,9 +754,6 @@ int elf_create_process(Process *p, const uint8_t *elf) {
     }
 
     // Go through the program headers and find the text, bss, rodata, srodata, and data segments
-    debugf("Text header:\n");
-
-
     uint64_t permission_bits = PB_READ | PB_EXECUTE | PB_WRITE | PB_USER;
 
     // Get sum of the sizes of all the segments
@@ -758,13 +772,15 @@ int elf_create_process(Process *p, const uint8_t *elf) {
 
     // Get the sizes of the segments
     debugf("Getting sizes of segments\n");
-    uint64_t text_size = ALIGN_UP_TO_PAGE(elf_is_valid_text(text_header)? text_header.p_memsz : 0);
+    #define min(a, b) ((a) < (b)? (a) : (b))
+    #define max(a, b) ((a) > (b)? (a) : (b))
+    uint64_t text_size = max(ALIGN_UP_TO_PAGE(elf_is_valid_text(text_header)? text_header.p_memsz : 0), 0x10000);
     debugf("Text size: %x\n", text_size);
-    uint64_t rodata_size = ALIGN_UP_TO_PAGE(elf_is_valid_rodata(rodata_header)? rodata_header.p_memsz : 0);
+    uint64_t rodata_size = max(ALIGN_UP_TO_PAGE(elf_is_valid_rodata(rodata_header)? rodata_header.p_memsz : 0), 0x10000);
     debugf("RODATA size: %x\n", rodata_size);
-    uint64_t bss_size = ALIGN_UP_TO_PAGE(elf_is_valid_bss(bss_header)? bss_header.p_memsz : 0);
+    uint64_t bss_size = max(ALIGN_UP_TO_PAGE(elf_is_valid_bss(bss_header)? bss_header.p_memsz : 0), 0x10000);
     debugf("BSS size: %x\n", bss_size);
-    uint64_t data_size = ALIGN_UP_TO_PAGE(elf_is_valid_data(data_header) && data_header.p_vaddr != bss_header.p_vaddr? data_header.p_memsz : 0);
+    uint64_t data_size = max(ALIGN_UP_TO_PAGE(elf_is_valid_data(data_header) && data_header.p_vaddr != bss_header.p_vaddr? data_header.p_memsz : 0), 0x10000);
     debugf("DATA size: %x\n", data_size);
 
     // p->heap_size = USER_HEAP_SIZE * 2;
