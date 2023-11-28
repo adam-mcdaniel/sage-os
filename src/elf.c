@@ -20,6 +20,7 @@
 #include <elf.h>
 #include <process.h>
 #include <sched.h>
+#include <uaccess.h>
 
 #define ELF_DEBUG
 #ifdef ELF_DEBUG
@@ -214,6 +215,11 @@ char *elf_get_os_abi(Elf64_Ehdr header) {
 }
 
 bool elf_is_valid_header(Elf64_Ehdr header) {
+    debugf("elf_is_valid_header:\n");
+    if (header.e_ident == NULL) {
+        debugf("Invalid ELF header\n");
+        return false;
+    }
     // Confirm magic number
     if (header.e_ident[EI_MAG0] != 0x7f ||
         header.e_ident[EI_MAG1] != 'E' ||
@@ -266,6 +272,7 @@ bool elf_is_valid_header(Elf64_Ehdr header) {
 }
 
 bool elf_is_valid_program_header(Elf64_Phdr header) {
+    debugf("elf_is_valid_program_header:\n");
     switch (header.p_type) {
     case PT_NULL:
         // Unused entry
@@ -598,6 +605,7 @@ bool elf_is_valid_text(Elf64_Phdr text) {
 }
 
 Elf64_Shdr elf_get_string_table_header(Elf64_Ehdr header, Elf64_Shdr *section_headers, uint8_t *elf) {
+    debugf("elf_get_string_table_header:\n");
     // Find the string table
     Elf64_Shdr strtab_header = {0};
     for (uint32_t i = 0; i < header.e_shnum; i++) {
@@ -616,6 +624,7 @@ Elf64_Shdr elf_get_string_table_header(Elf64_Ehdr header, Elf64_Shdr *section_he
 }
 
 char *elf_get_string_table(Elf64_Ehdr header, Elf64_Shdr *section_headers, uint8_t *elf) {
+    debugf("elf_get_string_table:\n");
     // Find the string table
     Elf64_Shdr strtab_header = elf_get_string_table_header(header, section_headers, elf);
     if (strtab_header.sh_size == 0) {
@@ -629,17 +638,29 @@ char *elf_get_string_table(Elf64_Ehdr header, Elf64_Shdr *section_headers, uint8
 }
 
 Elf64_Shdr elf_get_symbol_table_header(Elf64_Ehdr header, Elf64_Shdr *section_headers, uint8_t *elf) {
-    // Find the symbol table
+    debugf("elf_get_symbol_table_header:\n");
     Elf64_Shdr symtab_header = {0};
+    if (section_headers == NULL) {
+        debugf("Section headers are NULL\n");
+        return symtab_header;
+    }
+
+    if (elf == NULL) {
+        debugf("ELF is NULL\n");
+        return symtab_header;
+    }
+    // Find the symbol table
     for (uint32_t i = 0; i < header.e_shnum; i++) {
+        debugf("Section header #%u\n", i);
         if (section_headers[i].sh_type == SHT_SYMTAB) {
+            debugf("Found symbol table\n");
             symtab_header = section_headers[i];
             break;
         }
     }
 
     if (symtab_header.sh_size == 0) {
-        debugf("No symbols\n");
+        debugf("No symbol table?\n");
         return symtab_header;
     }
 
@@ -647,6 +668,17 @@ Elf64_Shdr elf_get_symbol_table_header(Elf64_Ehdr header, Elf64_Shdr *section_he
 }
 
 Elf64_Sym *elf_get_symbol_table(Elf64_Ehdr header, Elf64_Shdr *section_headers, uint8_t *elf) {
+    debugf("elf_get_symbol_table:\n");
+    if (section_headers == NULL) {
+        debugf("Section headers are NULL\n");
+        return NULL;
+    }
+
+    if (elf == NULL) {
+        debugf("ELF is NULL\n");
+        return NULL;
+    }
+    debugf("Getting symbol table\n");
     // Find the symbol table
     Elf64_Shdr symtab_header = elf_get_symbol_table_header(header, section_headers, elf);
     if (symtab_header.sh_size == 0) {
@@ -656,20 +688,47 @@ Elf64_Sym *elf_get_symbol_table(Elf64_Ehdr header, Elf64_Shdr *section_headers, 
 
     // Get the symbol table
     Elf64_Sym *symtab = (Elf64_Sym*)(elf + symtab_header.sh_offset);
+    debugf("Symbol table: %p\n", symtab);
     return symtab;
 }
 
 Elf64_Sym *elf_get_symbol(Elf64_Ehdr header, Elf64_Shdr *section_headers, uint8_t *elf, char *name) {
+    debugf("elf_get_symbol:\n");
+    if (section_headers == NULL) {
+        debugf("Section headers are NULL\n");
+        return NULL;
+    }
+
+    if (elf == NULL) {
+        debugf("ELF is NULL\n");
+        return NULL;
+    }
+
+    if (name == NULL) {
+        debugf("Name is NULL\n");
+        return NULL;
+    }
+    debugf("Looking for symbol: %s\n", name);
     // Get the symbol table
     Elf64_Shdr symtab_header = elf_get_symbol_table_header(header, section_headers, elf);
     Elf64_Sym *symtab = elf_get_symbol_table(header, section_headers, elf);
-    uint32_t num_symbols = symtab_header.sh_size / symtab_header.sh_entsize;
+    if (symtab == NULL) {
+        debugf("No symbols\n");
+        return NULL;
+    }
 
+    uint32_t num_symbols = symtab_header.sh_size / symtab_header.sh_entsize;
+    debugf("Number of symbols: %u\n", num_symbols);
     // Get the string table
     char *strtab = elf_get_string_table(header, section_headers, elf);
-
+    if (strtab == NULL) {
+        debugf("No string table\n");
+        return NULL;
+    }
+    debugf("String table: %p\n", strtab);
     // Find the symbol
     for (uint32_t i = 0; i < num_symbols; i++) {
+        debugf("Found symbol: %s\n", strtab + symtab[i].st_name);
         if (strcmp(strtab + symtab[i].st_name, name) == 0) {
             return &symtab[i];
         }
@@ -681,12 +740,19 @@ void elf_print_symbols(Elf64_Ehdr header, Elf64_Shdr *section_headers, uint8_t *
     // Get the symbol table
     Elf64_Shdr symtab_header = elf_get_symbol_table_header(header, section_headers, elf);
     Elf64_Sym *symtab = elf_get_symbol_table(header, section_headers, elf);
+    if (symtab == NULL) {
+        debugf("No symbols\n");
+        return;
+    }
     uint32_t num_symbols = symtab_header.sh_size / symtab_header.sh_entsize;
 
     // Get the string table
     Elf64_Shdr strtab_header = elf_get_string_table_header(header, section_headers, elf);
     char *strtab = (char*)(elf + strtab_header.sh_offset);
-
+    if (strtab == NULL) {
+        debugf("No string table\n");
+        return;
+    }
     // Print the symbols
     debugf("Symbols:\n");
     for (uint32_t i = 0; i < num_symbols; i++) {
@@ -695,6 +761,8 @@ void elf_print_symbols(Elf64_Ehdr header, Elf64_Shdr *section_headers, uint8_t *
 }
 
 int elf_create_process(Process *p, const uint8_t *elf) {
+    debugf("elf_create_process:\n");
+    process_debug(p);
     if (!elf_is_valid_header(*(Elf64_Ehdr*)elf)) {
         debugf("Invalid ELF header\n");
         return 1;
@@ -723,6 +791,9 @@ int elf_create_process(Process *p, const uint8_t *elf) {
         debugf("Invalid ELF header\n");
         return 1;
     }
+    p->frame->sepc = header.e_entry;
+    p->entry_point = header.e_entry;
+    debugf("Entry point: %p\n", p->entry_point);
     elf_debug_header(header);
     
     // Read the program headers
@@ -737,9 +808,6 @@ int elf_create_process(Process *p, const uint8_t *elf) {
     }
 
     // Go through the program headers and find the text, bss, rodata, srodata, and data segments
-    debugf("Text header:\n");
-
-
     uint64_t permission_bits = PB_READ | PB_EXECUTE | PB_WRITE | PB_USER;
 
     // Get sum of the sizes of all the segments
@@ -758,13 +826,13 @@ int elf_create_process(Process *p, const uint8_t *elf) {
 
     // Get the sizes of the segments
     debugf("Getting sizes of segments\n");
-    uint64_t text_size = ALIGN_UP_TO_PAGE(elf_is_valid_text(text_header)? text_header.p_memsz : 0);
+    uint64_t text_size = ALIGN_UP_TO_PAGE(elf_is_valid_text(text_header)? text_header.p_memsz + PAGE_SIZE * 2 : 0);
     debugf("Text size: %x\n", text_size);
-    uint64_t rodata_size = ALIGN_UP_TO_PAGE(elf_is_valid_rodata(rodata_header)? rodata_header.p_memsz : 0);
+    uint64_t rodata_size = ALIGN_UP_TO_PAGE(elf_is_valid_rodata(rodata_header)? rodata_header.p_memsz + PAGE_SIZE * 2 : 0);
     debugf("RODATA size: %x\n", rodata_size);
-    uint64_t bss_size = ALIGN_UP_TO_PAGE(elf_is_valid_bss(bss_header)? bss_header.p_memsz : 0);
+    uint64_t bss_size = ALIGN_UP_TO_PAGE(elf_is_valid_bss(bss_header)? bss_header.p_memsz + PAGE_SIZE * 2 : 0);
     debugf("BSS size: %x\n", bss_size);
-    uint64_t data_size = ALIGN_UP_TO_PAGE(elf_is_valid_data(data_header) && data_header.p_vaddr != bss_header.p_vaddr? data_header.p_memsz : 0);
+    uint64_t data_size = ALIGN_UP_TO_PAGE(elf_is_valid_data(data_header) && data_header.p_vaddr != bss_header.p_vaddr? data_header.p_memsz + PAGE_SIZE * 2 : 0);
     debugf("DATA size: %x\n", data_size);
 
     // p->heap_size = USER_HEAP_SIZE * 2;
@@ -782,6 +850,12 @@ int elf_create_process(Process *p, const uint8_t *elf) {
     uint8_t *rodata = text + text_size;
     uint8_t *bss = rodata + rodata_size;
     uint8_t *data = bss + bss_size;
+
+    text_size = ALIGN_UP_TO_PAGE(text_header.p_memsz);
+    rodata_size = ALIGN_UP_TO_PAGE(rodata_header.p_memsz);
+    bss_size = ALIGN_UP_TO_PAGE(bss_header.p_memsz);
+    data_size = ALIGN_UP_TO_PAGE(data_header.p_memsz);
+
     // p->heap = data + data_size;
     // p->stack = p->heap + p->heap_size;
     if (!text_size) text = NULL;
@@ -796,6 +870,14 @@ int elf_create_process(Process *p, const uint8_t *elf) {
     if (text) {
         debugf("Copying text segment\n");
         memcpy(text, elf + text_header.p_offset, text_header.p_filesz);
+        /*
+to: copy destination
+src: copy source
+from_table: page table to translate with
+size: size in bytes
+
+copies <size> bytes from the src address into the <to> address
+*/
     }
     if (rodata) {
         debugf("Copying rodata segment\n");
@@ -855,7 +937,7 @@ int elf_create_process(Process *p, const uint8_t *elf) {
 
     // Store all the pages in the `segments` array
     for (uint64_t i = 0; i < total_size / PAGE_SIZE; i++) {
-        list_add_ptr(p->rcb.image_pages, segments + i * PAGE_SIZE);
+        list_add_ptr(p->rcb.image_pages, kernel_mmu_translate(segments + i * PAGE_SIZE));
     }
 
     // // Allocate stack and heap
@@ -899,8 +981,7 @@ int elf_create_process(Process *p, const uint8_t *elf) {
     // }
 
     // Set sepc of the process's trap frame
-
-    p->frame->sepc = header.e_entry;
+    
 
     // mmu_translate(p->rcb.ptable, p->frame.stvec);
 
@@ -925,7 +1006,7 @@ int elf_create_process(Process *p, const uint8_t *elf) {
         rcb_map(&p->rcb, 
                 text_header.p_vaddr, 
                 kernel_mmu_translate((uint64_t)text),
-                text_size,
+                (text_size / 0x1000 + 1) * 0x1000,
                 permission_bits);
     }
     if (rodata) {
@@ -939,7 +1020,7 @@ int elf_create_process(Process *p, const uint8_t *elf) {
         rcb_map(&p->rcb, 
                 rodata_header.p_vaddr, 
                 kernel_mmu_translate((uint64_t)rodata), 
-                rodata_size,
+                (rodata_size / 0x1000 + 1) * 0x1000,
                 permission_bits);
     }
     if (bss) {
@@ -953,7 +1034,7 @@ int elf_create_process(Process *p, const uint8_t *elf) {
         rcb_map(&p->rcb, 
                 bss_header.p_vaddr, 
                 kernel_mmu_translate((uint64_t)bss), 
-                bss_size,
+                (bss_size / 0x1000 + 1) * 0x1000,
                 permission_bits);
     }
     if (data) {
@@ -967,10 +1048,10 @@ int elf_create_process(Process *p, const uint8_t *elf) {
         rcb_map(&p->rcb, 
                 data_header.p_vaddr, 
                 kernel_mmu_translate((uint64_t)data), 
-                data_size,
+                (data_size / 0x1000 + 1) * 0x1000,
                 permission_bits);
     }
-
+    debugf("Getting string table of size %d\n", header.e_shentsize * header.e_shnum);
     Elf64_Shdr *section_headers = kmalloc(header.e_shentsize * header.e_shnum);
     memcpy(section_headers, elf + header.e_shoff, header.e_shentsize * header.e_shnum);
     elf_print_symbols(header, section_headers, (uint8_t*)elf);
@@ -979,18 +1060,22 @@ int elf_create_process(Process *p, const uint8_t *elf) {
     if (text) {
         debugf("Copying text segment from %p to %p\n", elf + text_header.p_offset, text);
         memcpy(text, elf + text_header.p_offset, text_size);
+        // copy_to(p->text_vaddr, p->rcb.ptable, elf + text_header.p_offset, text_size);
     }
     if (rodata) {
         debugf("Copying rodata segment\n");
         memcpy(rodata, elf + rodata_header.p_offset, rodata_size);
+        // copy_to(p->rodata_vaddr, p->rcb.ptable, elf + rodata_header.p_offset, rodata_size);
     }
     if (data) {
         debugf("Copying data segment\n");
         memcpy(data, elf + data_header.p_offset, data_size);
+        // copy_to(p->data_vaddr, p->rcb.ptable, elf + data_header.p_offset, data_size);
     }
     if (bss) {
         debugf("Copying data segment\n");
         memcpy(bss, elf + bss_header.p_offset, data_size);
+        // copy_to(p->bss_vaddr, p->rcb.ptable, elf + bss_header.p_offset, bss_size);
     }
     
     // Get _bss_start and _bss_end
@@ -1008,8 +1093,8 @@ int elf_create_process(Process *p, const uint8_t *elf) {
 
 
     
-    trap_frame_set_stack_pointer(p->frame, USER_STACK_START);
-    trap_frame_set_heap_pointer(p->frame, USER_STACK_START);
+    // trap_frame_set_stack_pointer(p->frame, USER_STACK_START);
+    // trap_frame_set_heap_pointer(p->frame, USER_HEAP_START);
     // Section headers
     // int64_t xregs[32];
     // double fregs[32];
@@ -1022,6 +1107,7 @@ int elf_create_process(Process *p, const uint8_t *elf) {
     // uint64_t trap_satp;
     // uint64_t trap_stack;
     process_debug(p);
+    mmu_print_entries(p->rcb.ptable, MMU_LEVEL_1G);
     debugf("Loaded elf process\n");
     return 0;
 }

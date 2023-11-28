@@ -19,13 +19,15 @@
 #include <kmalloc.h>
 #include <lock.h>
 
-// #define USER_STACK_TOP   0x00000000000e0000UL
-// #define USER_STACK_BOTTOM 0x00000000000d0000UL
 // Define much larger stack and heap
+// #define USER_STACK_TOP    0xffffffffffff0000UL
+// #define USER_STACK_BOTTOM 0xfffffffffffa0000UL
+// #define USER_HEAP_TOP     0xeeeeeeeeeeef0000UL
+// #define USER_HEAP_BOTTOM  0xeeeeeeeeeeea0000UL
 #define USER_STACK_TOP    0x00000000000f0000UL
 #define USER_STACK_BOTTOM 0x00000000000a0000UL
-#define USER_HEAP_TOP    0x1c0fffe000UL
-#define USER_HEAP_BOTTOM 0x1c0ffee000UL
+#define USER_HEAP_TOP     0x1c0fffe000UL
+#define USER_HEAP_BOTTOM  0x1c0ffee000UL
 
 #define USER_STACK_START  USER_STACK_TOP
 #define USER_HEAP_START   USER_HEAP_BOTTOM
@@ -127,9 +129,9 @@ typedef struct Process {
     uint8_t *data, *data_vaddr;
     uint64_t data_size;
 
-    uint8_t *stack, *stack_vaddr;
+    uint8_t *stack_top, *stack_top_vaddr, *stack_bottom, *stack_bottom_vaddr;
     uint64_t stack_size;
-    uint8_t *heap, *heap_vaddr;
+    uint8_t *heap_top, *heap_top_vaddr, *heap_bottom, *heap_bottom_vaddr;
     uint64_t heap_size;
     
     // Resources

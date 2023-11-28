@@ -93,7 +93,7 @@ void get_input_device_config(VirtioDevice *device, uint8_t select, uint8_t subse
     debugf("set_input_device_config: select = 0x%x\n", config->select);
     config->subsel = subsel;
     debugf("set_input_device_config: subsel = 0x%x\n", config->subsel);
-    debugf("%.128s\n", config->string);
+    // debugf("%.128s\n", config->string);
 }
 
 uint16_t input_device_get_prod_id(volatile VirtioInputConfig *config) {

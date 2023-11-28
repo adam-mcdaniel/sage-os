@@ -50,6 +50,8 @@ bool mmu_map(PageTable *tab, uint64_t vaddr, uint64_t paddr, uint8_t lvl, uint64
         return false;
     }
 
+    bits |= PB_VALID;
+
     debugf("mmu_map: page table at 0x%08lx\n", tab);
     debugf("mmu_map: vaddr == 0x%08lx\n", vaddr);
     debugf("mmu_map: paddr == 0x%08lx\n", paddr);
@@ -70,12 +72,12 @@ bool mmu_map(PageTable *tab, uint64_t vaddr, uint64_t paddr, uint8_t lvl, uint64
             debugf("mmu_map: entry %d in page table at 0x%08lx is invalid\n", vpn[i], pt);
             PageTable *new_pt = mmu_table_create();
             if (new_pt == NULL) {
-                debugf("mmu_map: mmu_table_create returned null");
+                warnf("mmu_map: mmu_table_create returned null");
                 return false;
             }
             debugf("mmu_map: create a new page table at 0x%08lx\n", new_pt);
             if (pt->entries[vpn[i]]) {
-                debugf("Warning: overwriting page table entry at 0x%08lx = %p\n", &pt->entries[vpn[i]], pt->entries[vpn[i]]);
+                warnf("Warning: overwriting page table entry at 0x%08lx = %p\n", &pt->entries[vpn[i]], pt->entries[vpn[i]]);
             }
             pt->entries[vpn[i]] = (unsigned long)new_pt >> 2 | PB_VALID;
             debugf("mmu_map: set entry %d in page table at 0x%08lx as lvl %d branch to 0x%08lx\n", vpn[i], pt, i, new_pt);
@@ -129,7 +131,7 @@ uint64_t mmu_translate(const PageTable *tab, uint64_t vaddr)
     debugf("mmu_translate: vaddr == 0x%016lx\n", vaddr);
 
     if (tab == NULL) { 
-        debugf("mmu_translate: tab == NULL\n");
+        warnf("mmu_translate: tab == NULL\n");
         return MMU_TRANSLATE_PAGE_FAULT; 
     } 
 
@@ -207,13 +209,12 @@ uint64_t mmu_map_range(PageTable *tab,
     for (i = 0; i < num_bytes; i += PAGE_SIZE_AT_LVL(lvl)) {
         debugf("mmu_map_range: mapping %d bytes for page %d\n", PAGE_SIZE_AT_LVL(lvl), i / PAGE_SIZE_AT_LVL(lvl));
         if (!mmu_map(tab, start_virt + i, start_phys + i, lvl, bits)) {
-            debugf("mmu_map_range: failed to map page %d\n", i / PAGE_SIZE_AT_LVL(lvl));
+            warnf("mmu_map_range: failed to map page %d\n", i / PAGE_SIZE_AT_LVL(lvl));
             break;
         }
         pages_mapped += 1;
     }
     debugf("mmu_map_range: mapped %d pages\n", pages_mapped);
-    SFENCE_ALL();
     return pages_mapped;
 } 
 
@@ -267,14 +268,35 @@ void debug_page_table(PageTable *tab, uint8_t lvl) {
 }
 
 void mmu_print_entries(PageTable *tab, uint8_t lvl) {
-    infof("mmu_print_entries: printing entries for page table at 0x%016lx\n", tab);
+    if (lvl < MMU_LEVEL_4K) {
+        return;
+    } else if (lvl > MMU_LEVEL_1G) {
+        fatalf("mmu_print_entries: invalid level %d\n", lvl);
+    } else if (lvl == MMU_LEVEL_1G) {
+        infof("mmu_print_entries: printing entries for page table at 0x%016lx\n", tab);
+    }
     for (uint64_t i=0; i < 512; i++) {
-        if (tab->entries[i] & PB_VALID) {
-            infof("Address 0x%08lx is valid\n", i * PAGE_SIZE_AT_LVL(lvl));
-            if ((tab->entries[i] & 0xE) == 0) {
-                infof("Address 0x%08lx is a leaf\n", i * PAGE_SIZE_AT_LVL(lvl));
+
+        uintptr_t vaddr = i << (lvl * 9 + 12);
+        uintptr_t paddr = (tab->entries[i] & ~0x3FF) << 2;
+        bool is_leaf = (tab->entries[i] & 0xE) != 0;
+        bool is_valid = tab->entries[i] & PB_VALID;
+        // uint64_t vpn[] = {(vaddr >> ADDR_0_BIT) & 0x1FF, 
+        //                 (vaddr >> ADDR_1_BIT) & 0x1FF, 
+        //                 (vaddr >> ADDR_2_BIT) & 0x1FF};
+        if (is_valid) {
+            // Indentation
+            for (int j=0; j < (MMU_LEVEL_1G - lvl + 1); j++) {
+                infof("    ");
+            }
+            if (is_leaf) {
+                infof("Address vaddr=%p, paddr=0x%p is a leaf\n", vaddr, paddr);
             } else {
-                infof("Address 0x%08lx is a branch\n", i * PAGE_SIZE_AT_LVL(lvl));
+                infof("Address vaddr=%p, paddr=0x%p is a branch\n", vaddr, paddr);
+            }
+            
+            if (lvl > MMU_LEVEL_4K) {
+                mmu_print_entries((PageTable *)paddr, lvl - 1);
             }
         }
     }

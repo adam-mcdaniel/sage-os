@@ -91,7 +91,7 @@ void trap_frame_debug(TrapFrame *tf) {
     // uint64_t trap_stack;
     debugf("  xregs:\n");
     for (int i = 0; i < 32; i++) {
-        debugf("    x%d: %d (0x%08x)\n", i, tf->xregs[i], tf->xregs[i]);
+        debugf("    x%2d: %16u (0x%p)\n", i, tf->xregs[i], tf->xregs[i]);
     }
     // debugf("  fregs:\n");
     // for (int i = 0; i < 32; i++) {
@@ -140,6 +140,11 @@ void process_debug(Process *p) {
     }
     if (p->text) {
         debugf("  text: %p (physical address = %p)\n", p->text_vaddr, mmu_translate(p->rcb.ptable, (uintptr_t)p->text_vaddr));
+        // debugf("  text (end): %p (physical address = %p)\n", p->text_vaddr + p->text_size - 1, mmu_translate(p->rcb.ptable, (uintptr_t)p->text_vaddr + p->text_size - 1));
+        for (uint64_t i = 0; i < p->text_size / PAGE_SIZE_4K; i++) {
+            // Confirm the page is mapped
+            debugf("  text (page %d): %p (physical address = %p)\n", i, p->text_vaddr + i * PAGE_SIZE_4K, mmu_translate(p->rcb.ptable, (uintptr_t)p->text_vaddr + i * PAGE_SIZE_4K));
+        }
         debugf("  text_size: 0x%X (%d pages)\n", p->text_size, ALIGN_UP_POT(p->text_size, PAGE_SIZE_4K) / PAGE_SIZE_4K);
     } else {
         debugf("  text: NULL\n");
@@ -165,19 +170,26 @@ void process_debug(Process *p) {
         debugf("  data: NULL\n");
     }
 
-    if (p->stack) {
-        debugf("  stack: %p (physical address = %p)\n", p->stack_vaddr, mmu_translate(p->rcb.ptable, (uintptr_t)p->stack_vaddr));
+    if (p->stack_bottom && p->stack_top) {
+        // debugf("  stack: %p (physical address = %p)\n", p->stack_vaddr, mmu_translate(p->rcb.ptable, (uintptr_t)p->stack_vaddr));
+        // debugf("  stack_size: 0x%X (%d pages)\n", p->stack_size, ALIGN_UP_POT(p->stack_size, PAGE_SIZE_4K) / PAGE_SIZE_4K);
+
+        debugf("  stack_bottom: %p (physical address = %p)\n", p->stack_bottom_vaddr, mmu_translate(p->rcb.ptable, (uintptr_t)p->stack_bottom_vaddr));
+        debugf("  stack_top: %p (physical address = %p)\n", p->stack_top_vaddr, mmu_translate(p->rcb.ptable, (uintptr_t)p->stack_top_vaddr));
         debugf("  stack_size: 0x%X (%d pages)\n", p->stack_size, ALIGN_UP_POT(p->stack_size, PAGE_SIZE_4K) / PAGE_SIZE_4K);
     } else {
         debugf("  stack: NULL\n");
     }
 
-    if (p->heap) {
-        debugf("  heap: %p (physical address = %p)\n", p->heap_vaddr, mmu_translate(p->rcb.ptable, (uintptr_t)p->heap_vaddr));
+    if (p->heap_bottom && p->heap_top) {
+        debugf("  heap_bottom: %p (physical address = %p)\n", p->heap_bottom_vaddr, mmu_translate(p->rcb.ptable, (uintptr_t)p->heap_bottom_vaddr));
+        debugf("  heap_top: %p (physical address = %p)\n", p->heap_top_vaddr, mmu_translate(p->rcb.ptable, (uintptr_t)p->heap_top_vaddr));
         debugf("  heap_size: 0x%X (%d pages)\n", p->heap_size, ALIGN_UP_POT(p->heap_size, PAGE_SIZE_4K) / PAGE_SIZE_4K);
     } else {
         debugf("  heap: NULL\n");
     }
+
+    debugf("  entry_point: %p (physical address = %p)\n", p->entry_point, mmu_translate(p->rcb.ptable, (uintptr_t)p->entry_point));
 
     // // Resources
     // RCB rcb;
@@ -202,17 +214,14 @@ TrapFrame *trap_frame_new(bool is_user, PageTable *page_table, uint64_t pid) {
     } else {
         frame->sstatus |= SSTATUS_SPP_SUPERVISOR;
     }
-    frame->satp = SATP(kernel_mmu_translate((uintptr_t)page_table), pid % 0xffff);
+    debugf("Process ASID: %d\n", (pid + 5 % (0xffff - 10)) + 5);
+    frame->satp = SATP(kernel_mmu_translate((uintptr_t)page_table), (pid + 5 % (0xffff - 10)) + 5);
     frame->sscratch = (uintptr_t)frame;
     frame->trap_satp = SATP_KERNEL;
     frame->stvec = kernel_trap_frame->stvec;
     frame->trap_stack = kernel_trap_frame->trap_stack;
-    frame->sie = SIE_SEIE | SIE_SSIE | SIE_STIE;
-    // CSR_READ(frame->sie, "sie");
-    if (is_user) {
-        trap_frame_set_stack_pointer(frame, USER_STACK_TOP);
-        trap_frame_set_heap_pointer(frame, USER_HEAP_BOTTOM);
-    }
+    // frame->sie = SIE_SEIE | SIE_SSIE | SIE_STIE;
+    
 
     uint64_t permission_bits = PB_READ | PB_EXECUTE | PB_WRITE;
     debugf("process.c (trap_frame_new): Mapping trap stack 0x%08lx:0x%08lx to 0x%08lx\n", frame->trap_stack, frame->trap_stack + 0x10000, kernel_mmu_translate(frame->trap_stack));
@@ -222,16 +231,11 @@ TrapFrame *trap_frame_new(bool is_user, PageTable *page_table, uint64_t pid) {
                 kernel_mmu_translate(frame->trap_stack), 
                 MMU_LEVEL_4K,
                 permission_bits);
-    // mmu_map_range(page_table,
-    //             frame->sscratch,
-    //             frame->sscratch + 0x1000,
-    //             kernel_mmu_translate((unsigned long)frame),
-    //             MMU_LEVEL_4K,
-    //             permission_bits);
+
     debugf("process.c (trap_frame_new): Mapping page table 0x%08lx:0x%08lx to 0x%08lx\n", page_table, page_table + 0x1000, kernel_mmu_translate(page_table));
     mmu_map_range(page_table,
                 (uintptr_t)page_table,
-                (uintptr_t)(page_table + 0x1000),
+                (uintptr_t)(page_table) + 0x1000,
                 kernel_mmu_translate((uintptr_t)page_table),
                 MMU_LEVEL_4K,
                 permission_bits);
@@ -239,9 +243,8 @@ TrapFrame *trap_frame_new(bool is_user, PageTable *page_table, uint64_t pid) {
     debugf("process.c (trap_frame_new): Mapping trap frame 0x%08lx:0x%08lx to 0x%08lx\n", frame, frame + 0x1000, kernel_mmu_translate(frame));
     mmu_map_range(page_table,
                 (uintptr_t)frame,
-                (uintptr_t)(frame + 0x1000),
+                (uintptr_t)(frame) + 0x1000,
                 kernel_mmu_translate((uintptr_t)frame),
-                // (uint64_t)frame,
                 MMU_LEVEL_4K,
                 permission_bits);
 
@@ -286,12 +289,35 @@ void rcb_map(RCB *rcb, uint64_t vaddr, uint64_t paddr, uint64_t size, uint64_t b
         size = ALIGN_UP_POT(size, PAGE_SIZE_4K);
         size += PAGE_SIZE_4K;
     }
+    // size = ALIGN_UP_POT(size, PAGE_SIZE_4K);
+
+    bits |= PB_EXECUTE | PB_READ | PB_WRITE | PB_VALID;
 
     uint64_t alignment = ~(PAGE_SIZE_4K - 1);
-    for (uint64_t i = 0; i < size; i += PAGE_SIZE_4K) {
-        debugf("rcb_map: Mapping 0x%08lx to 0x%08lx\n", (vaddr + i) & alignment, (paddr + i) & alignment);
+    for (uint64_t i = 0; i < size / PAGE_SIZE_4K; i++) {
+        // debugf("rcb_map: Mapping 0x%08lx to 0x%08lx\n", (vaddr + i) & alignment, (paddr + i) & alignment);
+        // debugf("rcb_map: Mapping 0x%08lx to 0x%08lx\n", ALIGN_UP_POT(vaddr + i, PAGE_SIZE_4K), ALIGN_UP_POT(paddr + i, PAGE_SIZE_4K));
+        // mmu_map(rcb->ptable, (vaddr + i) & alignment, (paddr + i) & alignment, MMU_LEVEL_4K, bits);
+        // mmu_map(rcb->ptable, ALIGN_UP_POT(vaddr + i, PAGE_SIZE_4K), kernel_mmu_translate(ALIGN_UP_POT(paddr + i, PAGE_SIZE_4K)), MMU_LEVEL_4K, bits);
+        // mmu_map(rcb->ptable, vaddr + i * PAGE_SIZE_4K, kernel_mmu_translate(paddr + i * PAGE_SIZE_4K), MMU_LEVEL_4K, bits);
+        // debugf("Mapped 0x%08lx to 0x%08lx\n", vaddr + i * PAGE_SIZE_4K, kernel_mmu_translate(paddr + i * PAGE_SIZE_4K));
         mmu_map(rcb->ptable, (vaddr + i) & alignment, (paddr + i) & alignment, MMU_LEVEL_4K, bits);
     }
+
+    // for (uint64_t i = 0; i < p->heap_size / PAGE_SIZE; i++) {
+    //     list_add_ptr(p->rcb.heap_pages, kernel_mmu_translate(p->heap + i * PAGE_SIZE));
+    // // }
+    //     // debugf("Mapping heap page\n");
+    //     if (USER_HEAP_BOTTOM + i * PAGE_SIZE > USER_HEAP_TOP) {
+    //         fatalf("process.c (process_new): Heap overflow\n");
+    //     }
+    //     rcb_map(&p->rcb, 
+    //             USER_HEAP_BOTTOM + i * PAGE_SIZE, 
+    //             (uint64_t)p->heap + i * PAGE_SIZE,
+    //             PAGE_SIZE,
+    //             permission_bits);
+    //     // debugf("Heap page mapped\n");
+    // }
 }
 
 void trap_frame_set_stack_pointer(TrapFrame *frame, uint64_t stack_pointer) {
@@ -402,89 +428,120 @@ Process *process_new(ProcessMode mode)
     rcb_map(&p->rcb, (uintptr_t)os_trap_handler, kernel_mmu_translate((uintptr_t)os_trap_handler), 0x1000, PB_READ | PB_EXECUTE);
     rcb_map(&p->rcb, (uintptr_t)p->frame, kernel_mmu_translate((uintptr_t)p->frame), 0x1000, PB_READ | PB_WRITE | PB_EXECUTE);
 
-    uint64_t permission_bits = PB_READ | PB_EXECUTE | PB_WRITE;
+    uint64_t permission_bits = PB_READ | PB_WRITE | PB_EXECUTE;
     if (mode == PM_USER) {
         permission_bits |= PB_USER;
     }
 
     p->heap_size = USER_HEAP_SIZE;
     p->stack_size = USER_STACK_SIZE;
+    p->stack_top = NULL;
+    p->stack_bottom = NULL;
     do {
         debugf("Allocating %d pages for the stack\n", p->stack_size / PAGE_SIZE);
-        p->stack = page_znalloc(p->stack_size / PAGE_SIZE);
-        debugf("Stack address: %p\n", p->stack);
-        if (!p->stack) {
+        p->stack_size = ALIGN_UP_TO_PAGE(p->stack_size + 2);
+        p->stack_bottom = page_znalloc(p->stack_size / PAGE_SIZE + 2);
+        if (!p->stack_bottom) {
             p->stack_size /= 2;
             debugf("Stack allocation failed, trying with %d pages\n", p->stack_size / PAGE_SIZE);
+        } else {
+            debugf("Stack allocated %d pages\n", p->stack_size / PAGE_SIZE);
+            p->stack_top = p->stack_bottom + p->stack_size;
         }
 
         if (p->stack_size < PAGE_SIZE * 16) {
             fatalf("process.c (process_new): Stack size too small\n");
         }
-    } while (!p->stack);
+    } while (!p->stack_top || !p->stack_bottom);
     
     do {
         debugf("Allocating %d pages for the heap\n", p->heap_size / PAGE_SIZE);
-        p->heap = page_znalloc(p->heap_size / PAGE_SIZE);
-        debugf("Heap address: %p\n", p->heap);
-        if (!p->heap) {
+        p->heap_size = ALIGN_UP_TO_PAGE(p->heap_size + 2);
+        p->heap_bottom = page_znalloc(p->heap_size / PAGE_SIZE + 2);
+        if (!p->heap_bottom) {
             p->heap_size /= 2;
             debugf("Heap allocation failed, trying with %d pages\n", p->heap_size / PAGE_SIZE);
+        } else {
+            debugf("Heap allocated %d pages\n", p->heap_size / PAGE_SIZE);
+            p->heap_top = p->heap_bottom + p->heap_size;
         }
 
         if (p->heap_size < PAGE_SIZE * 16) {
             fatalf("process.c (process_new): Heap size too small\n");
         }
-    } while (!p->heap);
+    } while (!p->heap_top || !p->heap_bottom);
 
-    if (p->stack == NULL) {
+    p->stack_top_vaddr = USER_STACK_TOP;
+    p->stack_bottom_vaddr = p->stack_top_vaddr - p->stack_size;
+
+    p->heap_bottom_vaddr = USER_HEAP_BOTTOM;
+    p->heap_top_vaddr = p->heap_bottom_vaddr + p->heap_size;
+    // do {
+    //     debugf("Allocating %d pages for the heap\n", p->heap_size / PAGE_SIZE);
+    //     p->heap = page_znalloc(ALIGN_UP_TO_PAGE(p->heap_size) / PAGE_SIZE);
+    //     debugf("Heap address: %p\n", p->heap);
+    //     if (!p->heap) {
+    //         p->heap_size /= 2;
+    //         p->heap_size = ALIGN_UP_TO_PAGE(p->heap_size);
+    //         debugf("Heap allocation failed, trying with %d pages\n", p->heap_size / PAGE_SIZE);
+    //     }
+
+    //     if (p->heap_size < PAGE_SIZE * 16) {
+    //         fatalf("process.c (process_new): Heap size too small\n");
+    //     }
+    // } while (!p->heap);
+
+    if (p->stack_bottom == NULL || p->stack_top == NULL) {
         fatalf("process.c (process_new): Stack allocation failed\n");
     }
-    if (p->heap == NULL) {
+    if (p->heap_bottom == NULL || p->heap_top == NULL) {
         fatalf("process.c (process_new): Heap allocation failed\n");
     }
 
-    debugf("Stack: %p\n", p->stack);
-    debugf("Heap: %p\n", p->heap);
-    trap_frame_set_stack_pointer(p->frame, USER_STACK_START);
-    trap_frame_set_heap_pointer(p->frame, USER_STACK_START);
+    // debugf("Stack: %p\n", p->stack);
+    // debugf("Heap: %p\n", p->heap);
+    trap_frame_set_stack_pointer(p->frame, p->stack_top_vaddr);
+    trap_frame_set_heap_pointer(p->frame, p->heap_bottom_vaddr);
 
-    p->stack_vaddr = USER_STACK_START;
-    p->heap_vaddr = USER_HEAP_START;
+    debugf("Mapping stack\n");
+    // rcb_map(&p->rcb, p->stack_bottom_vaddr, (uint64_t)p->stack_bottom, p->stack_size + 1, permission_bits);
+    debugf("Mapping heap\n");
+    // rcb_map(&p->rcb, p->heap_bottom_vaddr, (uint64_t)p->heap_bottom, p->heap_size + 1, permission_bits);
+    // p->heap_vaddr = USER_HEAP_START;
 
-    debugf("Wiping the heap\n");
-    memset(p->heap, 0, p->heap_size);
+
     for (uint64_t i = 0; i < p->heap_size / PAGE_SIZE; i++) {
-        list_add_ptr(p->rcb.heap_pages, p->heap + i * PAGE_SIZE);
-        debugf("Mapping heap page\n");
+        list_add_ptr(p->rcb.heap_pages, kernel_mmu_translate(p->heap_bottom + i * PAGE_SIZE));
+    // }
+        // debugf("Mapping heap page\n");
         if (USER_HEAP_BOTTOM + i * PAGE_SIZE > USER_HEAP_TOP) {
             fatalf("process.c (process_new): Heap overflow\n");
         }
         rcb_map(&p->rcb, 
-                USER_HEAP_BOTTOM + i * PAGE_SIZE, 
-                (uint64_t)p->heap + i * PAGE_SIZE, 
+                (uint64_t)p->heap_bottom_vaddr + i * PAGE_SIZE, 
+                (uint64_t)p->heap_bottom + i * PAGE_SIZE,
                 PAGE_SIZE,
                 permission_bits);
-        debugf("Heap page mapped\n");
+        // debugf("Heap page mapped\n");
     }
-    debugf("Wiping the stack\n");
-    memset(p->stack, 0, p->stack_size);
     for (uint64_t i = 0; i < p->stack_size / PAGE_SIZE; i++) {
-        list_add_ptr(p->rcb.stack_pages, p->stack + i * PAGE_SIZE);
-        debugf("Mapping stack page\n");
-        if (USER_STACK_BOTTOM + i * PAGE_SIZE > USER_STACK_TOP) {
+        // list_add_ptr(p->rcb.stack_pages, p->stack + i * PAGE_SIZE);
+        list_add_ptr(p->rcb.stack_pages, kernel_mmu_translate(p->stack_bottom + i * PAGE_SIZE));
+    // }
+        // debugf("Mapping stack page\n");
+        if (p->stack_bottom_vaddr + i * PAGE_SIZE > USER_STACK_TOP) {
             fatalf("process.c (process_new): Stack overflow\n");
         }
         
         rcb_map(&p->rcb,
-                USER_STACK_BOTTOM + i * PAGE_SIZE,
-                (uint64_t)p->stack + i * PAGE_SIZE, 
+                (uint64_t)p->stack_bottom_vaddr + i * PAGE_SIZE, 
+                (uint64_t)p->stack_bottom + i * PAGE_SIZE,
                 PAGE_SIZE,
                 permission_bits);
-        debugf("Stack page mapped\n");
+        // debugf("Stack page mapped\n");
     }
-    debugf("Stack: %p\n", p->stack);
-    debugf("Heap: %p\n", p->heap);
+    // debugf("Stack: %p\n", p->stack);
+    // debugf("Heap: %p\n", p->heap);
     #ifdef DEBUG_PROCESS
     mmu_print_entries(p->rcb.ptable, MMU_LEVEL_4K);
     #endif
@@ -513,41 +570,7 @@ int process_free(Process *p)
     }
 
     // Free all resources allocated to the process.
-    if (p->rcb.image_pages) {
-        list_for_each(p->rcb.image_pages, e) {
-            page_free(list_elem_value_ptr(e));
-        }
-        list_free(p->rcb.image_pages);
-    }
-
-    if (p->rcb.stack_pages) {
-        list_for_each(p->rcb.stack_pages, e) {
-            page_free(list_elem_value_ptr(e));
-        }
-        list_free(p->rcb.stack_pages);
-    }
-
-    if (p->rcb.heap_pages) {
-        list_for_each(p->rcb.heap_pages, e) {
-            page_free(list_elem_value_ptr(e));
-        }
-        list_free(p->rcb.heap_pages);
-    }
-
-    if (p->rcb.file_descriptors) {
-        list_for_each(p->rcb.file_descriptors, e) {
-            page_free(list_elem_value_ptr(e));
-        }
-        list_free(p->rcb.file_descriptors);
-    }
-
-    if (p->rcb.environemnt) {
-        map_free(p->rcb.environemnt);
-    }
-
-    if (p->rcb.ptable) {
-        page_free(p->rcb.ptable);
-    }
+    rcb_free(&p->rcb);
 
     kfree(p);
     return 0;
@@ -577,7 +600,8 @@ bool process_run(Process *p, unsigned int hart)
         // trap_frame_debug((TrapFrame*)sscratch);
         // debugf("New SATP: 0x%08x\n", p->frame->satp);
         // trap_frame_debug(p->frame);
-        // debugf("Jumping to 0x%08lx\n", p->frame->sepc);
+        debugf("Process %d running on hart %d\n", p->pid, hart);
+        debugf("Jumping to 0x%08lx\n", p->frame->sepc);
         process_asm_run(p->frame);
         
         fatalf("process.c (process_run): process_asm_run returned\n");

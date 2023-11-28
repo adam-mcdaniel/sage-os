@@ -79,7 +79,7 @@ process_asm_run:
 		loadgp  %i
 		.set i, i + 1
 	.endr
-
+    # ebreak
 	sret
 
 process_asm_run_end:
