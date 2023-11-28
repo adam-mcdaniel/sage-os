@@ -4,9 +4,10 @@ CC=$(CROSS_COMPILE)gcc
 CXX=$(CROSS_COMPILE)g++
 OBJCOPY=$(CROSS_COMPILE)objcopy
 OBJDUMP=$(CROSS_COMPILE)objdump
-
+# Get the optimization level from the environment, or default to -O0
+OPT_LEVEL?=0
 LDSCRIPT=lds/riscv.lds
-CFLAGS=-g -O0 -Wall -Wextra -march=rv64gc -mabi=lp64d -ffreestanding -nostdlib -nostartfiles -Iutil/include -Isrc/include -Isbi/src/include -mcmodel=medany
+CFLAGS=-g -O$(OPT_LEVEL) -Wall -Wextra -march=rv64gc -mabi=lp64d -ffreestanding -nostdlib -nostartfiles -Iutil/include -Isrc/include -Isbi/src/include -mcmodel=medany
 LDFLAGS=-T$(LDSCRIPT) $(CFLAGS) -Lutil/
 LIBS=-lcosc562_util
 ASM_DIR=asm
