@@ -28,9 +28,9 @@ typedef struct InputDevice {
     Mutex lock;
     VirtioDevice *viodev;
     VirtioInputEvent event_buffer[INPUT_EVENT_BUFFER_SIZE];
-    int head;
-    int tail;
-    int buffer_size;
+    int buffer_head; // Index of next push
+    int buffer_tail; // Index of next pop
+    int buffer_count; // The current number of elements in the buffer
 } InputDevice;
 
 void input_device_init(VirtioDevice *device);
@@ -38,4 +38,7 @@ void get_input_device_config(VirtioDevice *device, uint8_t select, uint8_t subse
 void input_device_receive_buffer_init(InputDevice *input_dev);
 uint16_t input_device_get_prod_id(volatile VirtioInputConfig *config);
 void input_device_isr(VirtioDevice *device);
-// InputDevice *get_input_device_by_vdev(VirtioDevice *vdev);
+
+InputDevice *input_device_get_keyboard();
+InputDevice *input_device_get_tablet();
+bool input_device_buffer_pop(InputDevice *input_dev, VirtioInputEvent *event);
