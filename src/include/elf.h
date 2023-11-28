@@ -19,6 +19,7 @@
 #include <util.h>
 #include <stdint.h>
 #include <process.h>
+#include <virtio.h>
 
 struct process;
 /**
@@ -395,3 +396,9 @@ void elf_debug_header(Elf64_Ehdr header);
 void elf_debug_program_header(Elf64_Phdr header);
 
 int elf_create_process(Process *p, const uint8_t *elf);
+
+int elf_load_process(Process *p, const uint8_t *elf);
+
+int elf_load_file(const uint8_t *elf, uint64_t *entry_point);
+
+int elf_load_block_device(VirtioDevice *block_device, uint64_t offset, uint64_t *entry_point);

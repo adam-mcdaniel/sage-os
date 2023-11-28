@@ -16,9 +16,24 @@
 #include <vector.h>
 #include <map.h>
 #include <mmu.h>
+#include <kmalloc.h>
+#include <lock.h>
 
-#define DEFAULT_HEAP_SIZE (0x10000) // 16 KB
-#define DEFAULT_STACK_SIZE (0x2000) // 8 KB
+// #define USER_STACK_TOP   0x00000000000e0000UL
+// #define USER_STACK_BOTTOM 0x00000000000d0000UL
+// Define much larger stack and heap
+#define USER_STACK_TOP    0x00000000000f0000UL
+#define USER_STACK_BOTTOM 0x0000000000060000UL
+#define USER_HEAP_TOP    0x1c0fffe000UL
+#define USER_HEAP_BOTTOM 0x1c0ffee000UL
+// #define USER_HEAP_TOP    0x00000000000a0000UL
+// #define USER_HEAP_BOTTOM 0x0000000000080000UL
+
+#define ABS(x) ((x) < 0 ? -(x) : (x))
+
+#define USER_STACK_SIZE  (ABS(USER_STACK_TOP - USER_STACK_BOTTOM))
+#define USER_HEAP_SIZE   (ABS(USER_HEAP_TOP - USER_HEAP_BOTTOM))
+
 
 #define MAX_NUM_HARTS    (8) // We are gonna be scheduling 8 harts at most.
 #define HART_NONE        (-1U)
@@ -55,6 +70,11 @@ typedef struct TrapFrame {
 } TrapFrame;
 
 void trap_frame_debug(TrapFrame *frame);
+TrapFrame *trap_frame_new(bool is_user, PageTable *page_table, uint64_t pid);
+void trap_frame_free(TrapFrame *frame);
+
+void trap_frame_set_stack_pointer(TrapFrame *frame, uint64_t stack_pointer);
+void trap_frame_set_heap_pointer(TrapFrame *frame, uint64_t heap_pointer);
 
 // Resource Control Block
 typedef struct RCB {
@@ -66,14 +86,20 @@ typedef struct RCB {
     PageTable *ptable;
 } RCB;
 
+void rcb_init(RCB *rcb);
+void rcb_free(RCB *rcb);
+void rcb_map(RCB *rcb, uint64_t vaddr, uint64_t paddr, uint64_t size, uint64_t bits);
+
 void rcb_debug(RCB *rcb);
 
 typedef struct Process {
+    Mutex lock;
+
     uint16_t pid;
     uint32_t hart;
     ProcessMode mode;
     ProcessState state;
-    TrapFrame frame;
+    TrapFrame *frame;
     
     // Process stats
     uint64_t sleep_until;
@@ -81,6 +107,8 @@ typedef struct Process {
     uint64_t ran_at;
     uint64_t priority;
     uint64_t quantum;
+
+    uint8_t *entry_point;
 
     // Memory
     uint8_t *image;
@@ -117,7 +145,9 @@ bool process_run(Process *p, uint32_t hart);
 
 void process_map_init();
 void process_map_set(Process *p);
+void process_map_remove(uint16_t pid);
 Process *process_map_get(uint16_t pid);
+bool process_map_contains(uint16_t pid);
 
 void pid_harts_map_init();
 void pid_harts_map_set(uint32_t hart, uint16_t pid);

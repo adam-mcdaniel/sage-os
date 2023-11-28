@@ -10,6 +10,20 @@
  */
 #pragma once
 
+
+/**
+ * @brief Align value x up to the power of two value y. This returns
+ * an undefined value if y is NOT a power of two.
+ */
+#define ALIGN_UP_POT(x, y)   (((x) + (y)-1) & -(y))
+/**
+ * @brief Align value x down to the power of two value y. This returns
+ * an undefined value if y is NOT a power of two.
+ */
+#define ALIGN_DOWN_POT(x, y) ((x) & -(y))
+
+#define ALIGN_UP_TO_PAGE(x)  ALIGN_UP_POT(x, PAGE_SIZE)
+
 /**
  * @brief Initialize the page allocator. Clears the bookkeeping bytes, but does not initialize the
  * pages themselves.

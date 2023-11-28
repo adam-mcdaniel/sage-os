@@ -1,0 +1,184 @@
+// (Built with modified version of Sage compiler -- "associated-consts" branch -- to target our custom OS)
+
+const ROWS = 30;
+const COLS = 40;
+const MAX_BRANCHES = 1024;
+const LIFE = 29;
+const COLOR = True;
+const INIT_RANDOM_STATE = 12345;
+let static mut RANDOM_STATE: Int = INIT_RANDOM_STATE;
+let static mut GRID: &mut Char = Null;
+let static mut BRANCHES: Int = 0;
+
+enum Option<T> {
+    Nothing,
+    Some(T)
+}
+
+def main() {
+    GRID = allocate<Char>(ROWS * COLS);
+    print("+ Adam's Bonzai Tree Generator\n");
+    print("  Welcome to Adam's Bonzai Tree Generator!\n");
+    print("+ About\n");
+    print("  This is written in the Sage programming language: https:\/\/adam-mcdaniel.net\/sage\n");
+    print("  And compiled as an ELF userspace application for our custom OS!\n");
+    print("+ Usage\n");
+    print("  Enter a line of seed text to generate a tree!\n");
+    while (True) {
+        print("Enter some seed text: ");
+        RANDOM_STATE = INIT_RANDOM_STATE;
+
+        let mut ch = getchar();
+        while ch != '\n' {
+            seed(RANDOM_STATE + ch as Int);
+            ch = getchar();
+        }
+
+        bonzai();
+    }
+}
+
+def bonzai() {
+    init();
+    grow(LIFE);
+    display();
+}
+
+def sleep(ms: Int) {
+    let mut i = 0;
+    while i < ms * 1 {
+        i += 1;
+    }
+}
+
+def init() {
+    BRANCHES = 0;
+    for let mut row=0; row<ROWS; row+=1 {
+        for let mut col=0; col<COLS; col+=1 {
+            // *(cell(row, col)) = ' ';
+            if let of Some(x) = cell(row, col) {
+                *x = ' ';
+            }
+        }
+    }
+}
+
+def display() {
+    // clear_display();
+    for let mut row=0; row<ROWS; row+=1 {
+        for let mut col=0; col<COLS; col+=1 {
+            // str.push(*(cell(row, col)));
+            if let of Some(x) = cell(row, col) {
+                colorize(*x);
+                print(*x);
+                reset_color();
+            }
+        }
+        println();
+    }
+}
+
+def abs(x: Int): Int {
+    if x < 0 {
+        return -x;
+    }
+    return x;
+}
+
+def colorize(ch: Char) {
+    let ESC = 27 as Char;
+    match ch {
+        '/'
+        | '\\'
+        | '|'
+        | '~' => {
+            print(ESC, "[33m");
+        },
+        '&' => {
+            print(ESC, "[32m");
+        },
+        _ => ()
+    }
+}
+
+def reset_color() {
+    let ESC = 27 as Char;
+    print(ESC, "[0m");
+}
+
+def clear_display() {
+    let ESC = 27 as Char;
+    print(ESC, "[2J");
+}
+
+def seed(x: Int) {
+    RANDOM_STATE = x;
+}
+
+def rand(low: Int, high: Int): Int {
+    RANDOM_STATE = (RANDOM_STATE * 1103515245) % 0x1000000 + 12345;
+    return abs(RANDOM_STATE) % (high - low + 1) + low;
+}
+
+def grow(life: Int) {
+    let start = COLS / 2;
+    // let start = rand(-1 * COLS / 3, 2 * COLS / 3);
+    let x = start;
+    let y = ROWS - 3;
+
+    branch(x, y, life);
+}
+
+def cell(row: Int, col: Int): Option<&mut Char> {
+    let idx = row * COLS + col;
+    if idx < 0 || idx >= ROWS * COLS {
+        return Option<&mut Char> of Nothing;
+    }
+    return Option<&mut Char> of Some(&mut (GRID[idx]));
+}
+
+def branch(mut x: Int, mut y: Int, mut life: Int) {
+    BRANCHES += 1;
+    while life > 0 {
+        let dy = rand(0, 10) > 3? -1 : 0,
+            dx = rand(-3, 3);
+
+        life -= 1;
+
+        if BRANCHES < MAX_BRANCHES {
+            if life % 13 == 0 || rand(0, 40) < 2 || life < 5 {
+                branch(x, y, life);
+            }
+        }
+
+        x += dx;
+        y += dy;
+
+        let mut ch = dx > 0? '/' : '\\';
+        if dx == 0 {
+            ch = '|';
+        }
+        if dy == 0 {
+            ch = '~';
+        }
+        if life == 0 {
+            ch = '&';
+        }
+        if let of Some(cell) = cell(y, x) {
+            *cell = ch;
+        }
+    }
+}
+
+def allocate<T>(count: Int): &mut T {
+    let size = count * sizeof<T>();
+    return alloc(size) as &mut T;
+}
+
+def getchar(): Char {
+    let mut ch = ' ';
+    input(&mut ch);
+    return ch;
+}
+
+main();
