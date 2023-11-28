@@ -11,3 +11,6 @@ sbi/objs/*.o
 .vscode/*
 cosc562.dbg
 cosc562.sym
+*.sym
+*.dbg
+*.out
