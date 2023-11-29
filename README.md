@@ -15,9 +15,14 @@ Every week, you will need to write entries in this journal. Include brief inform
 
 Sort your entries in descending order (newest entries at the top).
 
+# 27-Nov-2023
+- `jpark78`: Added an interface to the input device driver so other parts of the kernel can interface with it. Added the event system call. Investigated why input device driver was causing an instruction page fault in `sbi_put_char` when there were too many interrupts. Turning off debugfs in the ISR helped with the problem.
+
 # 26-Nov-2023
 - `gmorale1`: Ongoing investigation for the inputs bug, which causes a an instruction page fault. Hydra machines under less cpu load seem to have less of a chance of encountering the bug. The chance of getting the bug also increases the faster input events are generated. Inside `input_device_isr`, messing with how we use `virtio_acquire_device()` affects how the bug impacts the system. I tried putting a lock on both the InputDevice, and on the actual `viodev`. In certain cases, the system gets a page fault, in other implementations, the system gets stuck in a mutex loop. I also tried moving the IRQ_OFF and IRQ_ON away from `virtio_acquire_device()` and instead put it into `os_trap_handler()`. This also caused a page fault.
 - `amcdan23`: Fixed bug with the trap frame being overwritten -- we were using a fresh trap stack for every process, when we should've just pointed to the kernel trap frame's trap stack. The stack was being smashed when we trapped. User processes can now be scheduled, executed, and then descheduled with an `exit` system call! Fixed where `start.S` code was causing a `Null` pointer dereference in the `bss` zeroing code -- the OS zeroes the BSS instead. Fixed where RODATA was copied incorrectly, so we could not use strings in user applications -- now we can compile and run programs arbitrarily! We can compile our programs, store them on the mounted disk, and then execute them with our ELF loader! `gmorale1` and `jpark78` were on a Discord call working through this with me for several hours, thank you guys!
+
+- `jpark78`: Implemented the sleep system call and fixed a bug where the scheduler was adding back sleeped process back into the scheduler tree.
 
 # 25-Nov-2023
 
