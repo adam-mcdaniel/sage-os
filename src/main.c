@@ -242,8 +242,8 @@ void main(unsigned int hart)
     vfs_init();
 
     // Read in /home/cosc562/console.elf
-    // File *elf_file = vfs_open("/home/cosc562/console.elf", 0, O_RDONLY, VFS_TYPE_FILE);
-    File *elf_file = vfs_open("/home/cosc562/bonzai.elf", 0, O_RDONLY, VFS_TYPE_FILE);
+    File *elf_file = vfs_open("/home/cosc562/console.elf", 0, O_RDONLY, VFS_TYPE_FILE);
+    // File *elf_file = vfs_open("/home/cosc562/bonzai.elf", 0, O_RDONLY, VFS_TYPE_FILE);
     // File *elf_file = vfs_open("/home/cosc562/bonzai.elf", 0, O_RDONLY, VFS_TYPE_FILE);
     // File *elf_file = vfs_open("/home/cosc562/hex_editor.elf", 0, O_RDONLY, VFS_TYPE_FILE);
     // File *elf_file = vfs_open("/home/cosc562/bonzai.elf", 0, O_RDONLY, VFS_TYPE_FILE);

@@ -19,6 +19,8 @@
 #include <kmalloc.h>
 #include <lock.h>
 
+#define ENV_VARIABLE_MAX_SIZE (1024)
+
 // #define USER_STACK_TOP   0x00000000000e0000UL
 // #define USER_STACK_BOTTOM 0x00000000000d0000UL
 // Define much larger stack and heap
@@ -39,7 +41,7 @@
 #define HART_NONE        (-1U)
 #define ON_HART_NONE(p)  (p->hart == HART_NONE)
 
-#define PID_LIMIT (0xFFFF) // Reserved for the kernel
+#define PID_LIMIT (0x500) // Reserved for the kernel
 
 typedef enum ProcessMode {
     PM_USER,
@@ -135,6 +137,8 @@ typedef struct Process {
 
 void process_debug(Process *p);
 
+const char *process_get_env(Process *p, const char *var);
+void process_put_env(Process *p, const char *var, const char *value);
 /**
  * Create a new process and return it.
  * mode - Either PM_USER or PM_SUPERVISOR to determine what mode to run in.
