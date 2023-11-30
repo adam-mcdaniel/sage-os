@@ -131,7 +131,7 @@ void input_device_isr(VirtioDevice* viodev) {
     uint16_t start_device_idx = viodev->device_idx;
     uint16_t num_received = 0;
     // Have to receive multiple descriptors
-    mutex_spinlock(&input_dev->lock);
+    virtio_acquire_device(input_dev);
     while (viodev->device_idx != viodev->device->idx) {
         // uint32_t id = viodev->device->ring[viodev->device_idx % queue_size].id;
         VirtioDescriptor received_desc;
@@ -160,7 +160,7 @@ void input_device_isr(VirtioDevice* viodev) {
         virtio_send_one_descriptor(viodev, 0, received_desc, true);
         ++num_received;
     }
-    mutex_unlock(&input_dev->lock);
+    virtio_release_device(input_dev);
 
     // Sanity check
     debugf("input_device_isr: After receiving descriptors\n");
