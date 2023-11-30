@@ -216,10 +216,8 @@ typedef struct VirtioDevice {
     Mutex lock;
 
     // Input device identification
-    struct {
-        unsigned is_keyboard : 1;
-        unsigned is_tablet : 1;
-    };
+    unsigned is_keyboard;
+    unsigned is_tablet;
 } VirtioDevice;
 
 // Read the queue size from the common configuration.

@@ -16,7 +16,7 @@
 #include <compiler.h>
 #include <csr.h>
 
-// #define INPUT_DEBUG
+#define INPUT_DEBUG
 #ifdef INPUT_DEBUG
 #define debugf(...) debugf(__VA_ARGS__)
 #else
@@ -25,9 +25,9 @@
 
 #define MAX_DESCRIPTORS 10
 
-static Vector *device_active_jobs;
-static InputDevice keyboard_dev;
-static InputDevice tablet_dev;
+static Vector *device_active_jobs = NULL;
+static InputDevice keyboard_dev = {0};
+static InputDevice tablet_dev = {0};
 // static Ring *input_events;  //TODO: use the ring to buffer input events and also limit the number of events
 // const int event_limit = 1000;   //limits number of events so we don't run out of memory
 
@@ -37,7 +37,7 @@ void input_device_init(VirtioDevice *device) {
     volatile VirtioInputConfig *config = virtio_get_input_config(device);
 
     uint16_t prod_id = input_device_get_prod_id(config);
-    InputDevice *input_dev;
+    InputDevice *input_dev = &keyboard_dev;
     switch (prod_id) {
     case EV_KEY:
         virtio_set_device_name(device, "Keyboard");
@@ -48,11 +48,11 @@ void input_device_init(VirtioDevice *device) {
         debugf("input_device_init: Input device initialized as keyboard\n");
         break;
     case EV_ABS:
+        input_dev = &tablet_dev;
         virtio_set_device_name(device, "Tablet");
         device->is_keyboard = 1;
         device->is_tablet = 0;
         tablet_dev.viodev = device;
-        input_dev = &tablet_dev;
         debugf("input_device_init: Input device initialized as tablet\n");
         break;
     default:
@@ -119,7 +119,7 @@ void input_device_isr(VirtioDevice* viodev) {
         fatalf("input_device_isr: Device not ready!\n");
     }
 
-    InputDevice *input_dev;
+    volatile InputDevice *input_dev;
     if (viodev->is_keyboard) {
         input_dev = &keyboard_dev;
     } else if (viodev->is_tablet) {
@@ -131,36 +131,47 @@ void input_device_isr(VirtioDevice* viodev) {
     uint16_t start_device_idx = viodev->device_idx;
     uint16_t num_received = 0;
     // Have to receive multiple descriptors
-    virtio_acquire_device(input_dev);
-    while (viodev->device_idx != viodev->device->idx) {
+    // virtio_acquire_device(input_dev);
+    while (virtio_has_received_descriptor(viodev, 0)) {
         // uint32_t id = viodev->device->ring[viodev->device_idx % queue_size].id;
         VirtioDescriptor received_desc;
-        virtio_receive_descriptor_chain(viodev, 0, &received_desc, 1, false);
+        virtio_receive_descriptor_chain(viodev, 0, &received_desc, 1, true);
         VirtioInputEvent *event_ptr = (VirtioInputEvent *)received_desc.addr;
+        debugf("About to read input event from descriptor at %p\n", received_desc.addr);
 
         uint32_t len = received_desc.len;
         if (len != sizeof(VirtioInputEvent)) {
             debugf("input_device_isr: Received invalid input event size: %d\n", len);
-            virtio_send_one_descriptor(viodev, 0, received_desc, true);
+            // virtio_send_one_descriptor(viodev, 0, received_desc, true);
             continue;
         }
 
         // Copy event to local buffer
+        // Add event to buffer
+        // input_dev->event_buffer[input_dev->buffer_head] = *event_ptr;
+        // input_dev->buffer_head = (input_dev->buffer_head + 1) % INPUT_EVENT_BUFFER_SIZE;
+        // ++input_dev->buffer_count;
+
+        
+        debugf("input_device_isr: Input event received: type = 0x%x, code = 0x%x, value = 0x%x\n", event_ptr->type, event_ptr->code, event_ptr->value);
+
+
         if (input_dev->buffer_count < INPUT_EVENT_BUFFER_SIZE) {
             // IRQ_OFF();
             // memcpy(&input_dev->event_buffer[input_dev->buffer_tail], event_ptr, sizeof(VirtioInputEvent));
             // IRQ_ON();
-            input_dev->event_buffer[input_dev->buffer_tail] = *event_ptr;
-            input_dev->buffer_head = (input_dev->buffer_head + 1) % INPUT_EVENT_BUFFER_SIZE;
+            debugf("Writing to input buffer at %p\n", &input_dev->event_buffer[input_dev->buffer_tail]);
             ++input_dev->buffer_count;
+            input_dev->event_buffer[input_dev->buffer_tail % INPUT_EVENT_BUFFER_SIZE] = *event_ptr;
+            input_dev->buffer_head = (input_dev->buffer_head + 1) % INPUT_EVENT_BUFFER_SIZE;
             debugf("input_device_isr: Input event received: type = 0x%x, code = 0x%x, value = 0x%x\n", event_ptr->type, event_ptr->code, event_ptr->value);
         } else {
             debugf("input_device_isr: Input event buffer full, event dropped\n");
         }
-        virtio_send_one_descriptor(viodev, 0, received_desc, true);
+        // virtio_send_one_descriptor(viodev, 0, received_desc, false);
         ++num_received;
     }
-    virtio_release_device(input_dev);
+    // virtio_release_device(input_dev);
 
     // Sanity check
     debugf("input_device_isr: After receiving descriptors\n");

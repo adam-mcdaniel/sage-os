@@ -264,7 +264,7 @@ void main(unsigned int hart)
     process_debug(p);
 
     CSR_READ(kernel_trap_frame->sie, "sie");
-    kernel_trap_frame->sie = SIE_STIE | SIE_SSIE | SIE_SEIE;
+    kernel_trap_frame->sie |= SIE_SSIE | SIE_SEIE;
     CSR_WRITE("sie", kernel_trap_frame->sie);
 
     process_run(p, 0);

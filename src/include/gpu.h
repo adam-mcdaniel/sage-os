@@ -147,6 +147,13 @@ typedef struct VirtioGpuMemEntry {
 
 /* methods */
 bool gpu_test();
+
+VirtioDevice *gpu_get_device();
+Console *gpu_get_console();
+
+void gpu_flush();
+void gpu_transfer_to_host_2d(const Rectangle *rect, uint32_t resource_id, uint64_t offset);
+
 void gpu_device_init();
 bool gpu_init(VirtioDevice *gpu_device);
 void gpu_send_command(VirtioDevice *gpu_device,

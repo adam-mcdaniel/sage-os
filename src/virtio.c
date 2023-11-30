@@ -19,7 +19,7 @@
 #include <gpu.h>
 #include <lock.h>
 
-// #define VIRTIO_DEBUG
+#define VIRTIO_DEBUG
 
 #ifdef VIRTIO_DEBUG
 #define debugf(...) debugf(__VA_ARGS__)
@@ -45,12 +45,16 @@ void virtio_create_job_with_data(VirtioDevice *dev, uint64_t pid_id, void (*call
 Job *virtio_get_job(VirtioDevice *dev, uint64_t job_id) {
     for (uint64_t i=0; i<vector_size(dev->jobs); i++) {
         Job *job = NULL;
-        vector_get_ptr(dev->jobs, i, &job);
+        if (!vector_get_ptr(dev->jobs, i, &job)) {
+            debugf("Could not get job\n");
+            continue;
+        }
         if (job == NULL) {
             debugf("No job\n");
             continue;
         }
         if (job->job_id == job_id) {
+            debugf("Found job with ID %d\n", job_id);
             return job;
         }
     }
