@@ -27,7 +27,7 @@ typedef struct VirtioInputEvent {
 typedef struct InputDevice {
     Mutex lock;
     VirtioDevice *viodev;
-    VirtioInputEvent event_buffer[INPUT_EVENT_BUFFER_SIZE];
+    VirtioInputEvent event_buffer[1024];
     int buffer_head; // Index of next push
     int buffer_tail; // Index of next pop
     int buffer_count; // The current number of elements in the buffer

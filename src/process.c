@@ -194,14 +194,17 @@ void process_debug(Process *p) {
 }
 
 const char *process_get_env(Process *p, const char *var) {
+    mutex_spinlock(&p->lock);
     char *value = NULL;
     if (!map_get(p->rcb.environemnt, var, (MapValue *)&value)) {
         return NULL;
     }
+    mutex_unlock(&p->lock);
     return value;
 }
 
 void process_put_env(Process *p, const char *var, const char *value) {
+    mutex_spinlock(&p->lock);
     char *buf = kmalloc(ENV_VARIABLE_MAX_SIZE);
     memset(buf, 0, ENV_VARIABLE_MAX_SIZE);
     for (int i = 0; i < ENV_VARIABLE_MAX_SIZE; i++) {
@@ -212,6 +215,7 @@ void process_put_env(Process *p, const char *var, const char *value) {
     }
     buf[ENV_VARIABLE_MAX_SIZE-1] = '\0';
     map_set(p->rcb.environemnt, var, buf);
+    mutex_unlock(&p->lock);
 }
 
 TrapFrame *trap_frame_new(bool is_user, PageTable *page_table, uint64_t pid) {
@@ -500,6 +504,8 @@ Process *process_new(ProcessMode mode)
     mmu_print_entries(p->rcb.ptable, MMU_LEVEL_4K);
     #endif
 
+
+
     mutex_unlock(&p->lock);
     debugf("process.c (process_new): Process created\n");
     process_map_set(p);
@@ -589,6 +595,7 @@ bool process_run(Process *p, unsigned int hart)
         }
 
         set_current_process(p);
+        p->frame->sie = SIE_SEIE | SIE_SSIE | SIE_STIE;
         // process_debug(p);
         // uint64_t satp, sscratch;
         // CSR_READ(satp, "satp");

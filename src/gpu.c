@@ -20,11 +20,19 @@
 #include "virtio.h"
 
 static Vector *device_active_jobs;
-static VirtioDevice *gpu_device;
+static VirtioDevice *gpu_device = NULL;
 static Console console; // NOTE: Figure how this is supposed to be interfaced, allocate appropriately
 
 bool gpu_test() {
     return gpu_init(gpu_device);
+}
+
+VirtioDevice *gpu_get_device() {
+    return gpu_device;
+}
+
+Console *gpu_get_console() {
+    return &console;
 }
 
 void gpu_device_init() {
@@ -135,26 +143,72 @@ bool gpu_init(VirtioDevice *gpu_device) {
     fill_rect(console.width, console.height, console.frame_buf, &r1, &p1);
     stroke_rect(console.width, console.height, console.frame_buf, &r2, &p2, 10);
 
+    // VirtioGpuTransferToHost2d tx;
+    // tx.hdr.type = VIRTIO_GPU_CMD_TRANSFER_TO_HOST_2D;
+    // tx.rect.x = 0;
+    // tx.rect.y = 0;
+    // tx.rect.width = console.width;
+    // tx.rect.height = console.height;
+    // tx.offset = 0;
+    // tx.resource_id = 1;
+    // tx.padding = 0;
+    // resp_hdr.type = 0;
+
+    // gpu_send_command(gpu_device, 0, &tx, sizeof(tx), NULL, 0, &resp_hdr, sizeof(resp_hdr));
+    
+    // if (resp_hdr.type == VIRTIO_GPU_RESP_OK_NODATA) {
+    //     debugf("gpu_init: Transfer OK\n");
+    // } else {
+    //     // debugf("gpu_init: Transfer failed with %s\n", gpu_get_resp_string(resp_hdr.type));
+    //     // return false;
+    // }
+    gpu_transfer_to_host_2d(&r1, 1, 0);
+
+    // VirtioGpuResourceFlush flush;
+    // flush.hdr.type = VIRTIO_GPU_CMD_RESOURCE_FLUSH;
+    // flush.rect.x = 0;
+    // flush.rect.y = 0;
+    // flush.rect.width = console.width;
+    // flush.rect.height = console.height;
+    // flush.resource_id = 1;
+    // flush.padding = 0;
+    // resp_hdr.type = 0;
+    // gpu_send_command(gpu_device, 0, &flush, sizeof(flush), NULL, 0, &resp_hdr, sizeof(resp_hdr));
+    
+    // if (resp_hdr.type == VIRTIO_GPU_RESP_OK_NODATA) {
+    //     debugf("gpu_init: Flush OK\n");
+    // } else {
+    //     // debugf("gpu_init: Flush failed with %s\n", gpu_get_resp_string(resp_hdr.type));
+    //     // return false;
+    // }
+    gpu_flush();
+
+    return true;
+}
+
+void gpu_transfer_to_host_2d(const Rectangle *rect, uint32_t resource_id, uint64_t offset) {
     VirtioGpuTransferToHost2d tx;
     tx.hdr.type = VIRTIO_GPU_CMD_TRANSFER_TO_HOST_2D;
-    tx.rect.x = 0;
-    tx.rect.y = 0;
-    tx.rect.width = console.width;
-    tx.rect.height = console.height;
-    tx.offset = 0;
-    tx.resource_id = 1;
+    tx.rect.x = rect->x;
+    tx.rect.y = rect->y;
+    tx.rect.width = rect->width;
+    tx.rect.height = rect->height;
+    tx.offset = offset;
+    tx.resource_id = resource_id;
     tx.padding = 0;
+    VirtioGpuCtrlHdr resp_hdr;
     resp_hdr.type = 0;
 
     gpu_send_command(gpu_device, 0, &tx, sizeof(tx), NULL, 0, &resp_hdr, sizeof(resp_hdr));
-    
     if (resp_hdr.type == VIRTIO_GPU_RESP_OK_NODATA) {
-        debugf("gpu_init: Transfer OK\n");
+        debugf("gpu_transfer_to_host_2d: Transfer OK\n");
     } else {
-        // debugf("gpu_init: Transfer failed with %s\n", gpu_get_resp_string(resp_hdr.type));
+        debugf("gpu_transfer_to_host_2d: Transfer failed with %s\n", gpu_get_resp_string(resp_hdr.type));
         // return false;
     }
+}
 
+void gpu_flush() {
     VirtioGpuResourceFlush flush;
     flush.hdr.type = VIRTIO_GPU_CMD_RESOURCE_FLUSH;
     flush.rect.x = 0;
@@ -163,17 +217,17 @@ bool gpu_init(VirtioDevice *gpu_device) {
     flush.rect.height = console.height;
     flush.resource_id = 1;
     flush.padding = 0;
+    VirtioGpuCtrlHdr resp_hdr;
     resp_hdr.type = 0;
     gpu_send_command(gpu_device, 0, &flush, sizeof(flush), NULL, 0, &resp_hdr, sizeof(resp_hdr));
     
     if (resp_hdr.type == VIRTIO_GPU_RESP_OK_NODATA) {
-        debugf("gpu_init: Flush OK\n");
+        debugf("gpu_flush: Flush OK\n");
     } else {
-        // debugf("gpu_init: Flush failed with %s\n", gpu_get_resp_string(resp_hdr.type));
+        // debugf("gpu_flush: Flush failed with %s\n", gpu_get_resp_string(resp_hdr.type));
         // return false;
     }
 
-    return true;
 }
 
 // Send a command to GPU.
@@ -187,6 +241,7 @@ void gpu_send_command(VirtioDevice *gpu_device,
                       size_t resp0_size,
                       void *resp1,
                       size_t resp1_size) {
+    // virtio_acquire_device(gpu_device);
     VirtioDescriptor cmd_desc;
     cmd_desc.addr = kernel_mmu_translate((uintptr_t)cmd);
     cmd_desc.len = cmd_size;
@@ -210,9 +265,10 @@ void gpu_send_command(VirtioDevice *gpu_device,
     
     // Wait until device_idx catches up 
     debugf("GPU WAITING\n");
-    while (gpu_device->device_idx != gpu_device->device->idx) {
-    }
+    // while (gpu_device->device_idx != gpu_device->device->idx) {
+    // }
     debugf("gpu_send_command: device_idx caught up\n");
+    // virtio_release_device(gpu_device);
 }
 
 // Get display info and set frame buffer's info.
@@ -328,4 +384,98 @@ void stroke_rect(uint32_t screen_width,
     RVALS(&r, rect->x + rect->width, rect->y,
               line_size, rect->height + line_size);
     fill_rect(screen_width, screen_height, frame_buf, &r, line_color);
+}
+
+
+void gpu_draw_pixel(uint32_t screen_width,
+                    uint32_t screen_height,
+                    Pixel *frame_buf,
+                    uint32_t x,
+                    uint32_t y,
+                    const Pixel *color)
+{
+    if (x >= screen_width || y >= screen_height) {
+        return;
+    }
+    frame_buf[y * screen_width + x] = *color;
+}
+
+void gpu_draw_circle(uint32_t screen_width,
+                     uint32_t screen_height,
+                     Pixel *frame_buf,
+                     uint32_t x,
+                     uint32_t y,
+                     uint32_t radius,
+                     const Pixel *color)
+{
+    int32_t x1 = 0;
+    int32_t y1 = radius;
+    int32_t d = 3 - 2 * radius;
+
+    while (x1 <= y1) {
+        gpu_draw_pixel(screen_width, screen_height, frame_buf, x + x1, y + y1, color);
+        gpu_draw_pixel(screen_width, screen_height, frame_buf, x + x1, y - y1, color);
+        gpu_draw_pixel(screen_width, screen_height, frame_buf, x - x1, y + y1, color);
+        gpu_draw_pixel(screen_width, screen_height, frame_buf, x - x1, y - y1, color);
+        gpu_draw_pixel(screen_width, screen_height, frame_buf, x + y1, y + x1, color);
+        gpu_draw_pixel(screen_width, screen_height, frame_buf, x + y1, y - x1, color);
+        gpu_draw_pixel(screen_width, screen_height, frame_buf, x - y1, y + x1, color);
+        gpu_draw_pixel(screen_width, screen_height, frame_buf, x - y1, y - x1, color);
+
+        if (d < 0) {
+            d = d + 4 * x1 + 6;
+        } else {
+            d = d + 4 * (x1 - y1) + 10;
+            y1--;
+        }
+        x1++;
+    }
+}
+
+void gpu_draw_line(uint32_t screen_width,
+                   uint32_t screen_height,
+                   Pixel *frame_buf,
+                   uint32_t x0,
+                   uint32_t y0,
+                   uint32_t x1,
+                   uint32_t y1,
+                   const Pixel *color)
+{
+    int32_t dx = x1 - x0;
+    int32_t dy = y1 - y0;
+
+    for (int32_t x = x0; x <= x1; x++) {
+        int32_t y = y0 + dy * (x - x0) / dx;
+        gpu_draw_pixel(screen_width, screen_height, frame_buf, x, y, color);
+    }
+}
+
+void gpu_draw_triangle(uint32_t screen_width,
+                       uint32_t screen_height,
+                       Pixel *frame_buf,
+                       uint32_t x0,
+                       uint32_t y0,
+                       uint32_t x1,
+                       uint32_t y1,
+                       uint32_t x2,
+                       uint32_t y2,
+                       const Pixel *color)
+{
+    gpu_draw_line(screen_width, screen_height, frame_buf, x0, y0, x1, y1, color);
+    gpu_draw_line(screen_width, screen_height, frame_buf, x1, y1, x2, y2, color);
+    gpu_draw_line(screen_width, screen_height, frame_buf, x2, y2, x0, y0, color);
+}
+
+void gpu_draw_rect(uint32_t screen_width,
+                   uint32_t screen_height,
+                   Pixel *frame_buf,
+                   uint32_t x,
+                   uint32_t y,
+                   uint32_t width,
+                   uint32_t height,
+                   const Pixel *color)
+{
+    struct Rectangle r;
+    RVALS(&r, x, y, width, height);
+    fill_rect(screen_width, screen_height, frame_buf, &r, color);
 }
