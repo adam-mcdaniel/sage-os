@@ -193,6 +193,27 @@ void process_debug(Process *p) {
     }
 }
 
+const char *process_get_env(Process *p, const char *var) {
+    char *value = NULL;
+    if (!map_get(p->rcb.environemnt, var, (MapValue *)&value)) {
+        return NULL;
+    }
+    return value;
+}
+
+void process_put_env(Process *p, const char *var, const char *value) {
+    char *buf = kmalloc(ENV_VARIABLE_MAX_SIZE);
+    memset(buf, 0, ENV_VARIABLE_MAX_SIZE);
+    for (int i = 0; i < ENV_VARIABLE_MAX_SIZE; i++) {
+        if (value[i] == '\0') {
+            break;
+        }
+        buf[i] = value[i];
+    }
+    buf[ENV_VARIABLE_MAX_SIZE-1] = '\0';
+    map_set(p->rcb.environemnt, var, buf);
+}
+
 TrapFrame *trap_frame_new(bool is_user, PageTable *page_table, uint64_t pid) {
     TrapFrame *frame = (TrapFrame *)kzalloc(sizeof(TrapFrame));
     memset(frame, 0, sizeof(TrapFrame));
@@ -529,7 +550,18 @@ int process_free(Process *p)
         list_free(p->rcb.file_descriptors);
     }
 
+
     if (p->rcb.environemnt) {
+        // Iterate over the keys and free the values
+        struct List *keys = map_get_keys(p->rcb.environemnt);
+        struct ListElem *k;
+        list_for_each(keys, k) {
+            char *key = list_elem_value_ptr(k);
+            char *value;
+            map_get(p->rcb.environemnt, key, (MapValue *)&value);
+            kfree(value);
+        }
+        map_free_get_keys(keys);
         map_free(p->rcb.environemnt);
     }
 

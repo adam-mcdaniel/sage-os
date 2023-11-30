@@ -1005,6 +1005,7 @@ int elf_create_process(Process *p, const uint8_t *elf) {
     if (bss) {
         debugf("Copying data segment\n");
         memcpy(bss, elf + bss_header.p_offset, data_size);
+        // memset(bss, 0, bss_size);
     }
     
     // Get _bss_start and _bss_end
@@ -1018,6 +1019,8 @@ int elf_create_process(Process *p, const uint8_t *elf) {
         uint8_t *bss_end = mmu_translate(p->rcb.ptable, bss_end_sym->st_value);
         debugf("Clearing bss segment from %p to %p\n", bss_start, bss_end);
         memset(bss_start, 0, bss_end - bss_start);
+    } else {
+        debugf("Could not find _bss_start and _bss_end symbols\n");
     }
 
 

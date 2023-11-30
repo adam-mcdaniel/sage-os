@@ -72,35 +72,105 @@ SYSCALL(get_env)
 {
     SYSCALL_ENTER();
 
-    const char *vaddr = (const char *)XREG(A0);
+    const char *var_vaddr = (const char *)XREG(A0);
     Process *p = sched_get_current();
 
-    const char *paddr = mmu_translate(p->rcb.ptable, (uintptr_t)vaddr);
-    if (paddr == -1UL) {
+    const char *var_paddr = mmu_translate(p->rcb.ptable, (uintptr_t)var_vaddr);
+    if (var_paddr == -1UL) {
         XREG(A0) = -EFAULT;
         return;
     }
 
-    infof("syscall.c (get_env): Getting env var %s\n", (char *)paddr);
+    infof("syscall.c (get_env): Getting env var %s\n", (char *)var_paddr);
+    
+    // Get the value pointer from the process
+    const char *value = process_get_env(p, (char *)var_paddr);
+    if (!value) {
+        infof("syscall.c (get_env): Env var %s not found\n", (char *)var_paddr);
+        XREG(A0) = -ENOENT;
+        return;
+    }
+    infof("syscall.c (get_env): Got env var %s\n", value);
 
-    // const char *env = process_get_env(p, (char *)paddr);
+    // Copy the value to the user address
+    uintptr_t value_vaddr = XREG(A1);
+    // infof("syscall.c (get_env): Copying env var %s to %lx\n", value, value_vaddr);
+    uintptr_t value_paddr = mmu_translate(p->rcb.ptable, value_vaddr);
+    if (value_paddr == -1UL) {
+        XREG(A0) = -EFAULT;
+        return;
+    }
+    // Copy the value to the user address
+    memcpy((void *)value_paddr, value, strlen(value) + 1);
 }
+
 SYSCALL(put_env)
 {
     SYSCALL_ENTER();
 
-    const char *vaddr = (const char *)XREG(A0);
+    const char *var_vaddr = (const char *)XREG(A0);
     Process *p = sched_get_current();
 
-    const char *paddr = mmu_translate(p->rcb.ptable, (uintptr_t)vaddr);
-    if (paddr == -1UL) {
+    const char *var_paddr = mmu_translate(p->rcb.ptable, (uintptr_t)var_vaddr);
+    if (var_paddr == -1UL) {
+        infof("syscall.c (put_env): MMU translated to null\n");
         XREG(A0) = -EFAULT;
         return;
     }
 
-    infof("syscall.c (put_env): Putting env var %s\n", (char *)paddr);
+    infof("syscall.c (get_env): Getting env var %s\n", (char *)var_paddr);
+    
+    // Get the value pointer from the process
+    // const char *value = process_get_env(p, (char *)var_paddr);
+    // if (!value) {
+    //     infof("syscall.c (get_env): Env var %s not found\n", (char *)var_paddr);
+    //     XREG(A0) = -ENOENT;
+    //     return;
+    // }
+    // infof("syscall.c (get_env): Got env var %s\n", value);
 
-    // const char *env = process_get_env(p, (char *)paddr);
+    // Copy the value from the user address to the process
+    uintptr_t value_vaddr = XREG(A1);
+    // infof("syscall.c (get_env): Copying env var %s to %lx\n", value, value_vaddr);
+    uintptr_t value_paddr = mmu_translate(p->rcb.ptable, value_vaddr);
+    if (value_paddr == -1UL) {
+        infof("syscall.c (put_env): MMU translated to null\n");
+        XREG(A0) = -EFAULT;
+        return;
+    }
+
+    // Copy the value to the process
+    process_put_env(p, (char *)var_paddr, (char *)value_paddr);
+    infof("syscall.c (put_env): Put env var %s\n", (char *)value_paddr);
+}
+
+SYSCALL(get_pid)
+{
+    SYSCALL_ENTER();
+    Process *p = sched_get_current();
+    XREG(A0) = p->pid;
+}
+
+SYSCALL(next_pid)
+{
+    SYSCALL_ENTER();
+    // Get a PID from the argument
+    int pid = XREG(A0);
+    infof("syscall.c (next_pid): Got PID %d\n", pid);
+    pid %= PID_LIMIT;
+
+    // Get the next highest PID
+    for (uint16_t i = pid + 1; i < PID_LIMIT; ++i) {
+        pid = i % PID_LIMIT;
+        // infof("syscall.c (next_pid): Checking PID %x\n", pid);
+        if (process_map_contains(pid)) {
+            XREG(A0) = pid;
+            return;
+        }
+    }
+
+    // No PIDs found
+    XREG(A0) = -1;
 }
 
 SYSCALL(yield)
@@ -218,14 +288,16 @@ SYSCALL(events)
 */
 // These syscall numbers MUST match the user/libc numbers!
 static SYSCALL_RETURN_TYPE (*const SYSCALLS[])(SYSCALL_PARAM_LIST) = {
-    SYSCALL_PTR(exit),    /* 0 */
-    SYSCALL_PTR(putchar), /* 1 */
-    SYSCALL_PTR(getchar), /* 2 */
-    SYSCALL_PTR(yield),   /* 3 */
-    SYSCALL_PTR(sleep),   /* 4 */
-    SYSCALL_PTR(events),  /* 5 */
-    SYSCALL_PTR(get_env), /* 6 */
-    SYSCALL_PTR(put_env), /* 7 */
+    SYSCALL_PTR(exit),     /* 0 */
+    SYSCALL_PTR(putchar),  /* 1 */
+    SYSCALL_PTR(getchar),  /* 2 */
+    SYSCALL_PTR(yield),    /* 3 */
+    SYSCALL_PTR(sleep),    /* 4 */
+    SYSCALL_PTR(events),   /* 5 */
+    SYSCALL_PTR(get_env),  /* 6 */
+    SYSCALL_PTR(put_env),  /* 7 */
+    SYSCALL_PTR(get_pid),  /* 8 */
+    SYSCALL_PTR(next_pid), /* 9 */
 };
 
 static const int NUM_SYSCALLS = sizeof(SYSCALLS) / sizeof(SYSCALLS[0]);
