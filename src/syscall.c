@@ -68,6 +68,41 @@ SYSCALL(getchar)
     XREG(A0) = sbi_getchar();
 }
 
+SYSCALL(get_env)
+{
+    SYSCALL_ENTER();
+
+    const char *vaddr = (const char *)XREG(A0);
+    Process *p = sched_get_current();
+
+    const char *paddr = mmu_translate(p->rcb.ptable, (uintptr_t)vaddr);
+    if (paddr == -1UL) {
+        XREG(A0) = -EFAULT;
+        return;
+    }
+
+    infof("syscall.c (get_env): Getting env var %s\n", (char *)paddr);
+
+    // const char *env = process_get_env(p, (char *)paddr);
+}
+SYSCALL(put_env)
+{
+    SYSCALL_ENTER();
+
+    const char *vaddr = (const char *)XREG(A0);
+    Process *p = sched_get_current();
+
+    const char *paddr = mmu_translate(p->rcb.ptable, (uintptr_t)vaddr);
+    if (paddr == -1UL) {
+        XREG(A0) = -EFAULT;
+        return;
+    }
+
+    infof("syscall.c (put_env): Putting env var %s\n", (char *)paddr);
+
+    // const char *env = process_get_env(p, (char *)paddr);
+}
+
 SYSCALL(yield)
 {
     SYSCALL_ENTER();
@@ -189,6 +224,8 @@ static SYSCALL_RETURN_TYPE (*const SYSCALLS[])(SYSCALL_PARAM_LIST) = {
     SYSCALL_PTR(yield),   /* 3 */
     SYSCALL_PTR(sleep),   /* 4 */
     SYSCALL_PTR(events),  /* 5 */
+    SYSCALL_PTR(get_env), /* 6 */
+    SYSCALL_PTR(put_env), /* 7 */
 };
 
 static const int NUM_SYSCALLS = sizeof(SYSCALLS) / sizeof(SYSCALLS[0]);

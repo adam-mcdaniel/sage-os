@@ -17,7 +17,7 @@
 #include <lock.h>
 #include <sched.h>
 
-// #define DEBUG_PROCESS
+#define DEBUG_PROCESS
 #ifdef DEBUG_PROCESS
 #define debugf(...) debugf(__VA_ARGS__)
 #else
