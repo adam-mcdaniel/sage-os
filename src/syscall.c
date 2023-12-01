@@ -440,6 +440,7 @@ SYSCALL(screen_draw)
     // }
     // memcpy(gpu_get_console()->frame_buf, 
     // gpu_draw_rect(rect_paddr, );
+    
     Rectangle screen_rect;
     screen_rect.x = 0;
     screen_rect.y = 0;
@@ -452,7 +453,7 @@ SYSCALL(screen_draw)
     infof("syscall.c (screen_draw): Flushed\n");
 
     // Flush the buffer
-    // gpu_flush();
+    gpu_flush();
 
     IRQ_ON();
 }
