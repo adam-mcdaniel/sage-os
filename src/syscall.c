@@ -526,7 +526,7 @@ SYSCALL(screen_get_dims)
 SYSCALL(get_time)
 {
     SYSCALL_ENTER();
-    debug("syscall.c (get_time): Getting time\n");
+    debugf("syscall.c (get_time): Getting time\n");
     XREG(A0) = sbi_get_time();
 }
 
