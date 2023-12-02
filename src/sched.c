@@ -290,7 +290,6 @@ Process *sched_get_next() {
                 debugf("sched_get_next: Process %d is not ready to run\n", min_process->pid);
             }
         }
-        // rb_delete(sched_tree, min_process->runtime * min_process->priority);
     }
     debugf("sched_get_next: Next Process to run is %d\n", min_process->pid);
     mutex_unlock(&sched_lock);

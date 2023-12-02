@@ -394,7 +394,7 @@ SYSCALL(screen_draw)
     Process *p = sched_get_current();
     // p->state = PS_WAITING;
 
-    p->sleep_until = sbi_get_time() + VIRT_TIMER_FREQ / 10000;
+    p->sleep_until = sbi_get_time() + VIRT_TIMER_FREQ / 1000;
     p->state = PS_SLEEPING;
     infof("syscall.c (screen_draw): Got process %d\n", p->pid);
 
@@ -452,22 +452,20 @@ SYSCALL(screen_draw)
     }
     // memcpy(gpu_get_console()->frame_buf, 
     // gpu_draw_rect(rect_paddr, );
-    
     Rectangle screen_rect;
     screen_rect.x = 0;
     screen_rect.y = 0;
     screen_rect.width = screen_width;
     screen_rect.height = screen_height;
     // gpu_fill_rect(screen_rect, pixel);
-    IRQ_OFF();
-
+    // CSR_CLEAR("sie");
     infof("syscall.c (screen_draw): Flushing\n");
     gpu_transfer_to_host_2d(&screen_rect, 1, 0);
     infof("syscall.c (screen_draw): Flushed\n");
 
+    WFI();
     // Flush the buffer
     gpu_flush();
-    IRQ_ON();
     // Rectangle screen_rect;
     // screen_rect.x = 0;
     // screen_rect.y = 0;
@@ -483,7 +481,6 @@ SYSCALL(screen_draw)
 
     // // Flush the buffer
     // gpu_flush();
-    // IRQ_ON();
 }
 
 SYSCALL(screen_get_dims)
