@@ -28,7 +28,31 @@
 #endif
 
 
-
+void job_debug(Job *job) {
+    if (job == NULL) {
+        debugf("No job\n");
+        return;
+    }
+    debugf("Job {\n");
+    debugf("  job_id: %d\n", job->job_id);
+    debugf("  pid_id: %d\n", job->pid_id);
+    debugf("  callback: %p\n", job->callback);
+    debugf("  context {\n");
+    debugf("    num_descriptors: %d\n", job->context.num_descriptors);
+    debugf("    descriptors {\n");
+    for (uint16_t i=0; i<job->context.num_descriptors; i++) {
+        debugf("      Descriptor %d {\n", i);
+        debugf("        addr: %p\n", job->context.desc[i].addr);
+        debugf("        len: %d\n", job->context.desc[i].len);
+        debugf("        flags: %d\n", job->context.desc[i].flags);
+        debugf("        next: %d\n", job->context.desc[i].next);
+        debugf("      }\n");
+    }
+    debugf("    }\n");
+    debugf("  }\n");
+    debugf("  is_done: %d\n", job->done);
+    debugf("}\n");
+}
 
 static Vector *virtio_devices = NULL;
 
@@ -64,6 +88,10 @@ Job *virtio_get_job(VirtioDevice *dev, uint64_t job_id) {
 
 Job job_create(uint64_t job_id, uint64_t pid_id, void (*callback)(struct VirtioDevice *device, struct Job *job)) {
     return job_create_with_data(job_id, pid_id, callback, NULL);
+}
+
+bool virtio_has_jobs_left(VirtioDevice *dev) {
+    return vector_size(dev->jobs) > 0;
 }
 
 Job job_create_with_data(uint64_t job_id, uint64_t pid_id, void (*callback)(struct VirtioDevice *device, struct Job *job), void *data) {
@@ -670,5 +698,6 @@ void virtio_wait_for_descriptor(VirtioDevice *device, uint16_t which_queue) {
     while (!virtio_has_received_descriptor(device, which_queue)) {
         debugf("Blocking on descriptor\n");
         // Do nothing
+        WFI();
     }
 }

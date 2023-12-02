@@ -19,7 +19,7 @@ Scheduler - uses completely fair scheduler approach
 #include <compiler.h>
 #include <config.h>
 
-// #define DEBUG_SCHED
+#define DEBUG_SCHED
 #ifdef DEBUG_SCHED
 #define debugf(...) debugf(__VA_ARGS__)
 #else
@@ -56,6 +56,7 @@ void idle_process_main() {
         #ifdef DEBUG_SCHED
         sbi_print("Idle woke up!\n");
         #endif
+        infof("Idle woke up!\n");
         WFI();
     }
 }
@@ -64,6 +65,8 @@ Process *sched_get_idle_process() {
     return idle_process;
 }
 
+
+static bool is_init = false;
 //initialize scheduler tree
 void sched_init() {
     mutex_spinlock(&sched_lock);
@@ -159,11 +162,11 @@ void sched_init() {
     // uint64_t  trap_stack;
 
     // memcpy(idle_process->frame->xregs, kernel_trap_frame->xregs, sizeof(kernel_trap_frame->xregs));
-    rcb_map(&idle_process->rcb, idle_process_main, idle_process_main, 0x1000, PB_READ | PB_EXECUTE);
-    rcb_map(&idle_process->rcb, sbi_putchar, sbi_putchar, 0x1000, PB_READ | PB_EXECUTE);
-    rcb_map(&idle_process->rcb, sbi_get_time, sbi_get_time, 0x1000, PB_READ | PB_EXECUTE);
-    rcb_map(&idle_process->rcb, sbi_print, sbi_print, 0x1000, PB_READ | PB_EXECUTE);
-    rcb_map(&idle_process->rcb, &start_time, &start_time, 0x1000, PB_READ | PB_WRITE | PB_EXECUTE);
+    // rcb_map(&idle_process->rcb, idle_process_main, idle_process_main, 0x1000, PB_READ | PB_EXECUTE);
+    // rcb_map(&idle_process->rcb, sbi_putchar, sbi_putchar, 0x1000, PB_READ | PB_EXECUTE);
+    // rcb_map(&idle_process->rcb, sbi_get_time, sbi_get_time, 0x1000, PB_READ | PB_EXECUTE);
+    // rcb_map(&idle_process->rcb, sbi_print, sbi_print, 0x1000, PB_READ | PB_EXECUTE);
+    // rcb_map(&idle_process->rcb, &start_time, &start_time, 0x1000, PB_READ | PB_WRITE | PB_EXECUTE);
     debugf("sched_init: Idle Process RCB initialized\n");
     // rcb_map(&idle_process->rcb, TE)
 
@@ -221,6 +224,13 @@ void sched_add(Process *p) {
     debugf("Scheduled Process %d with runtime %d and priority %d\n", p->pid, p->runtime, p->priority);
     mutex_unlock(&p->lock);
     mutex_unlock(&sched_lock);
+}
+
+void sched_invoke(Process *p, int hart) {
+    is_init = true;
+    debugf("sched_invoke: Invoking scheduler on hart %d\n", hart);
+    sched_add(p);
+    process_run(p, hart);
 }
 
 //get (pop) Process with the lowest vruntime
@@ -326,11 +336,20 @@ Process *sched_get_next() {
 
 // Function to handle the timer interrupt for context switching
 void sched_handle_timer_interrupt(int hart) {
+    if (!is_init) {
+        fatalf("sched_handle_timer_interrupt: Scheduler not initialized\n");
+        return;
+    }
+
     debugf("sched_handle_timer_interrupt: hart %d\n", hart);
     //put Process currently on the hart back in the scheduler to recalc priority
     // uint16_t pid = pid_harts_map_get(hart);
     // Process *current_proc = process_map_get(pid);
     Process *current_proc = sched_get_current();
+    if (current_proc == NULL) {
+        debugf("sched_handle_timer_interrupt: No Process to interrupt\n");
+        return;
+    }
 
     if (current_proc == sched_get_idle_process()) {
         debugf("sched_handle_timer_interrupt: Idle Process interrupted\n");
@@ -458,6 +477,11 @@ void sched_remove(Process *p) {
 
 Process *sched_get_current(void) {
     mutex_spinlock(&sched_lock);
+    if (!is_init) {
+        debugf("sched_get_current: Scheduler not initialized\n");
+        mutex_unlock(&sched_lock);
+        return NULL;
+    }
     // return current_process;
     int hart = sbi_whoami();
     uint16_t pid = pid_harts_map_get(hart);

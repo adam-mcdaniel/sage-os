@@ -7,7 +7,7 @@
 #include <util.h>
 #include <input.h>
 
-// #define PCI_DEBUG
+#define PCI_DEBUG
 
 #ifdef PCI_DEBUG
 #define debugf(...) debugf(__VA_ARGS__)

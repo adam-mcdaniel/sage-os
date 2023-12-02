@@ -59,19 +59,21 @@ SYSCALL(putchar)
 {
     SYSCALL_ENTER();
 
-    debugf("syscall.c (putchar) with args: %lx %lx %lx %lx %lx %lx\n", XREG(A0), XREG(A1), XREG(A2), XREG(A3), XREG(A4), XREG(A5));
+    // debugf("syscall.c (putchar) with args: %lx %lx %lx %lx %lx %lx\n", XREG(A0), XREG(A1), XREG(A2), XREG(A3), XREG(A4), XREG(A5));
     sbi_putchar(XREG(A0));
 }
 
 SYSCALL(getchar)
 {
     SYSCALL_ENTER();
+    // debugf("syscall.c (getchar) with args: %lx %lx %lx %lx %lx %lx\n", XREG(A0), XREG(A1), XREG(A2), XREG(A3), XREG(A4), XREG(A5));
     XREG(A0) = sbi_getchar();
 }
 
 SYSCALL(get_env)
 {
     SYSCALL_ENTER();
+    debugf("syscall.c (get_env) with args: %lx %lx %lx %lx %lx %lx\n", XREG(A0), XREG(A1), XREG(A2), XREG(A3), XREG(A4), XREG(A5));
 
     const char *var_vaddr = (const char *)XREG(A0);
     Process *p = sched_get_current();
@@ -108,6 +110,7 @@ SYSCALL(get_env)
 SYSCALL(put_env)
 {
     SYSCALL_ENTER();
+    debugf("syscall.c (put_env) with args: %lx %lx %lx %lx %lx %lx\n", XREG(A0), XREG(A1), XREG(A2), XREG(A3), XREG(A4), XREG(A5));
 
     const char *var_vaddr = (const char *)XREG(A0);
     Process *p = sched_get_current();
@@ -140,6 +143,7 @@ SYSCALL(pid_get_env)
 {
     // Take a PID argument, a variable name, and a buffer to write the value to
     SYSCALL_ENTER();
+    infof("syscall.c (pid_get_env): Got args: %lx %lx %lx %lx %lx %lx\n", XREG(A0), XREG(A1), XREG(A2), XREG(A3), XREG(A4), XREG(A5));
     // Get the first argument, the PID
     int pid = XREG(A0);
     Process *parent = sched_get_current();
@@ -202,6 +206,8 @@ SYSCALL(pid_put_env)
 {
     // Take a PID argument, a variable name, and a buffer to read the value from
     SYSCALL_ENTER();
+    infof("syscall.c (pid_put_env): Got args: %lx %lx %lx %lx %lx %lx\n", XREG(A0), XREG(A1), XREG(A2), XREG(A3), XREG(A4), XREG(A5));
+
     // Get the first argument, the PID
     int pid = XREG(A0);
     Process *parent = sched_get_current();
@@ -257,12 +263,15 @@ SYSCALL(get_pid)
 {
     SYSCALL_ENTER();
     Process *p = sched_get_current();
+    infof("syscall.c (get_pid): Got PID %d\n", p->pid);
     XREG(A0) = p->pid;
 }
 
 SYSCALL(next_pid)
 {
     SYSCALL_ENTER();
+    infof("syscall.c (next_pid): Got args: %lx %lx %lx %lx %lx %lx\n", XREG(A0), XREG(A1), XREG(A2), XREG(A3), XREG(A4), XREG(A5));
+    trap_frame_debug(scratch);
     // Get a PID from the argument
     int pid = XREG(A0);
     infof("syscall.c (next_pid): Got PID %d\n", pid);
@@ -284,6 +293,7 @@ SYSCALL(next_pid)
 
 SYSCALL(yield)
 {
+    infof("syscall.c (yield): Got args: %lx %lx %lx %lx %lx %lx\n", XREG(A0), XREG(A1), XREG(A2), XREG(A3), XREG(A4), XREG(A5));
     SYSCALL_ENTER();
     // sched_invoke(hart);
 }
@@ -298,15 +308,11 @@ SYSCALL(sleep)
         // fatalf("syscall.c (sleep): Process %d not found on hart %d\n", pid, hart);
         process_debug(p);
         fatalf("syscall.c (sleep): Process %d not found on hart %d\n", pid, hart);
-    } else {
-        debugf("syscall.c (sleep): Process %d found on hart %d\n", pid, hart);
     }
 
     if (p->pid != pid) {
         process_debug(p);
         fatalf("syscall.c (sleep): Process %d not found on hart %d\n", pid, hart);
-    } else {
-        debugf("syscall.c (sleep): Process %d found on hart %d\n", pid, hart);
     }
     
     if (!p) {
@@ -317,14 +323,15 @@ SYSCALL(sleep)
     /*
     // Commented out until we implement an IO buffer for the process
     // infof("syscall.c (sleep) Sleeping PID %d at %d until %d\n", p->pid, sbi_get_time(), sbi_get_time() + XREG(A0) * VIRT_TIMER_FREQ / 1000);
-    p->sleep_until = sbi_get_time() + XREG(A0) * VIRT_TIMER_FREQ / 1000;
-    p->state = PS_SLEEPING;
+    // p->sleep_until = sbi_get_time() + XREG(A0) * VIRT_TIMER_FREQ / 1000;
+    // p->state = PS_SLEEPING;
     */
 }
 
 SYSCALL(events)
 {
     SYSCALL_ENTER();
+    infof("syscall.c (events): Got args: %lx %lx %lx %lx %lx %lx\n", XREG(A0), XREG(A1), XREG(A2), XREG(A3), XREG(A4), XREG(A5));
     
     uint16_t pid = pid_harts_map_get(hart);
     Process *p = sched_get_current();
@@ -385,6 +392,11 @@ SYSCALL(screen_draw)
     infof("syscall.c (screen_draw): Drawing\n");
 
     Process *p = sched_get_current();
+    // p->state = PS_WAITING;
+
+    // p->sleep_until = sbi_get_time() + VIRT_TIMER_FREQ / 1000;
+    // p->state = PS_SLEEPING;
+    infof("syscall.c (screen_draw): Got process %d\n", p->pid);
 
     // Get the first argument, the buffer to draw
     const Pixel *buf_vaddr = (const Pixel *)XREG(A0);
@@ -441,20 +453,34 @@ SYSCALL(screen_draw)
     // memcpy(gpu_get_console()->frame_buf, 
     // gpu_draw_rect(rect_paddr, );
     
+    // Rectangle screen_rect;
+    // screen_rect.x = 0;
+    // screen_rect.y = 0;
+    // screen_rect.width = screen_width;
+    // screen_rect.height = screen_height;
+
+    // infof("syscall.c (screen_draw): Flushing\n");
+    // gpu_transfer_to_host_2d(&screen_rect, 1, 0);
+    // infof("syscall.c (screen_draw): Flushed\n");
+
+    // // Flush the buffer
+    // gpu_flush();
+    IRQ_OFF();
     Rectangle screen_rect;
     screen_rect.x = 0;
     screen_rect.y = 0;
-    screen_rect.width = screen_width;
-    screen_rect.height = screen_height;
+    screen_rect.width = 256;
+    screen_rect.height = 256;
+    // Draw a rectangle
+    Pixel pixel = {0xFF, 0x00, 0x00, 0xFF};
+    gpu_fill_rect(screen_rect, pixel);
 
-    IRQ_OFF();
     infof("syscall.c (screen_draw): Flushing\n");
     gpu_transfer_to_host_2d(&screen_rect, 1, 0);
     infof("syscall.c (screen_draw): Flushed\n");
 
     // Flush the buffer
     gpu_flush();
-
     IRQ_ON();
 }
 
@@ -501,6 +527,8 @@ void syscall_handle(int hart, uint64_t epc, int64_t *scratch)
     // Sched invoke will save sepc, so we want it to resume
     // 4 bytes ahead, which will be the next instruction.
     CSR_WRITE("sepc", epc + 4);
+    TrapFrame *tf = (TrapFrame *)scratch;
+    tf->sepc = epc + 4;
 
     if (XREG(A7) >= NUM_SYSCALLS || SYSCALLS[XREG(A7)] == NULL) {
         // Invalid syscall
