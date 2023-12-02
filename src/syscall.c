@@ -394,8 +394,8 @@ SYSCALL(screen_draw)
     Process *p = sched_get_current();
     // p->state = PS_WAITING;
 
-    // p->sleep_until = sbi_get_time() + VIRT_TIMER_FREQ / 1000;
-    // p->state = PS_SLEEPING;
+    p->sleep_until = sbi_get_time() + VIRT_TIMER_FREQ / 10000;
+    p->state = PS_SLEEPING;
     infof("syscall.c (screen_draw): Got process %d\n", p->pid);
 
     // Get the first argument, the buffer to draw
@@ -441,39 +441,25 @@ SYSCALL(screen_draw)
 
     infof("syscall.c (screen_draw): Drawing rect %d %d %d %d\n", x, y, width, height);
     // Draw the buffer
-    // for (unsigned y_ = 0; y_ < height; ++y_) {
-    //     for (unsigned x_ = 0; x_ < width; ++x_) {
-    //         if (x + x_ >= screen_width || y + y_ >= screen_height) {
-    //             continue;
-    //         }
-    //         // infof("syscall.c (screen_draw): Drawing pixel %d %d\n", x + x_, y + y_);
-    //         frame_buf[(y + y_) * screen_width + (x + x_)] = buf_paddr[y_ * width + x_];
-    //     }
-    // }
+    for (unsigned y_ = 0; y_ < height; ++y_) {
+        for (unsigned x_ = 0; x_ < width; ++x_) {
+            if (x + x_ >= screen_width || y + y_ >= screen_height) {
+                continue;
+            }
+            // infof("syscall.c (screen_draw): Drawing pixel %d %d\n", x + x_, y + y_);
+            frame_buf[(y + y_) * screen_width + (x + x_)] = buf_paddr[y_ * width + x_];
+        }
+    }
     // memcpy(gpu_get_console()->frame_buf, 
     // gpu_draw_rect(rect_paddr, );
     
-    // Rectangle screen_rect;
-    // screen_rect.x = 0;
-    // screen_rect.y = 0;
-    // screen_rect.width = screen_width;
-    // screen_rect.height = screen_height;
-
-    // infof("syscall.c (screen_draw): Flushing\n");
-    // gpu_transfer_to_host_2d(&screen_rect, 1, 0);
-    // infof("syscall.c (screen_draw): Flushed\n");
-
-    // // Flush the buffer
-    // gpu_flush();
-    IRQ_OFF();
     Rectangle screen_rect;
     screen_rect.x = 0;
     screen_rect.y = 0;
-    screen_rect.width = 256;
-    screen_rect.height = 256;
-    // Draw a rectangle
-    Pixel pixel = {0xFF, 0x00, 0x00, 0xFF};
-    gpu_fill_rect(screen_rect, pixel);
+    screen_rect.width = screen_width;
+    screen_rect.height = screen_height;
+    // gpu_fill_rect(screen_rect, pixel);
+    IRQ_OFF();
 
     infof("syscall.c (screen_draw): Flushing\n");
     gpu_transfer_to_host_2d(&screen_rect, 1, 0);
@@ -482,6 +468,66 @@ SYSCALL(screen_draw)
     // Flush the buffer
     gpu_flush();
     IRQ_ON();
+    // Rectangle screen_rect;
+    // screen_rect.x = 0;
+    // screen_rect.y = 0;
+    // screen_rect.width = 256;
+    // screen_rect.height = 256;
+    // // Draw a rectangle
+    // Pixel pixel = {0xFF, 0x00, 0x00, 0xFF};
+    // gpu_fill_rect(screen_rect, pixel);
+
+    // infof("syscall.c (screen_draw): Flushing\n");
+    // gpu_transfer_to_host_2d(&screen_rect, 1, 0);
+    // infof("syscall.c (screen_draw): Flushed\n");
+
+    // // Flush the buffer
+    // gpu_flush();
+    // IRQ_ON();
+}
+
+SYSCALL(screen_get_dims)
+{
+    SYSCALL_ENTER();
+    infof("syscall.c (screen_get_dims): Writing dims to rectangle in userspace\n");
+    Process *p = sched_get_current();
+    // p->state = PS_WAITING;
+    infof("syscall.c (screen_draw): Got process %d\n", p->pid);
+
+    // Get the first argument, the buffer to draw
+    // const Pixel *buf_vaddr = (const Pixel *)XREG(A0);
+    // infof("syscall.c (screen_draw): Got buf vaddr %p\n", buf_vaddr);
+    // Get the second argument, the rectangle to draw to
+    const Rectangle *rect_vaddr = (const Rectangle *)XREG(A0);
+    infof("syscall.c (screen_draw): Got rect vaddr %p\n", rect_vaddr);
+
+    // Translate the buffer to a physical address
+    const Pixel *rect_paddr = mmu_translate(p->rcb.ptable, (uintptr_t)rect_vaddr);
+
+    if (rect_paddr == -1UL) {
+        warnf("syscall.c (screen_draw): MMU translated to null\n");
+        // MMU translated to null
+        XREG(A0) = -EFAULT;
+        return;
+    } else {
+        infof("syscall.c (screen_draw): Rect %p found\n", (char *)rect_paddr);
+    }
+
+    Console *console = gpu_get_console();
+    infof("Console at %p\n", console);
+    Rectangle screen_rect;
+    screen_rect.x = 0;
+    screen_rect.y = 0;
+    screen_rect.width = console->width;
+    screen_rect.height = console->height;
+    memcpy((void *)rect_paddr, &screen_rect, sizeof(Rectangle));
+}
+
+SYSCALL(get_time)
+{
+    SYSCALL_ENTER();
+    debug("syscall.c (get_time): Getting time\n");
+    XREG(A0) = sbi_get_time();
 }
 
 /**
@@ -514,9 +560,9 @@ static SYSCALL_RETURN_TYPE (*const SYSCALLS[])(SYSCALL_PARAM_LIST) = {
     SYSCALL_PTR(next_pid), /* 9 */
     SYSCALL_PTR(pid_get_env),  /* 10 */
     SYSCALL_PTR(pid_put_env),  /* 11 */
-
     SYSCALL_PTR(screen_draw),  /* 12 */
-    // SYSCALL_PTR(screen_clear), /* 13 */
+    SYSCALL_PTR(screen_clear), /* 13 */
+    SYSCALL_PTR(get_time),   /* 14 */
 };
 
 static const int NUM_SYSCALLS = sizeof(SYSCALLS) / sizeof(SYSCALLS[0]);

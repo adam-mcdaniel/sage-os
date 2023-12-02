@@ -30,7 +30,7 @@ static InputDevice keyboard_dev = {0};
 static InputDevice tablet_dev = {0};
 // static Ring *input_events;  //TODO: use the ring to buffer input events and also limit the number of events
 // const int event_limit = 1000;   //limits number of events so we don't run out of memory
-
+static bool input_device_initialized = false;
 void input_device_init(VirtioDevice *device) {
     IRQ_OFF();
     device_active_jobs = vector_new();
@@ -68,6 +68,10 @@ void input_device_init(VirtioDevice *device) {
     IRQ_ON();
     input_device_receive_buffer_init(input_dev);
     debugf("Input device init done for device at %p\n", device->pcidev->ecam_header);
+}
+
+void done_init() {
+    input_device_initialized = true;
 }
 
 // // get an InputDevice, which holds the input events for that device
@@ -113,6 +117,9 @@ uint16_t input_device_get_prod_id(volatile VirtioInputConfig *config) {
 }
 
 void input_device_isr(VirtioDevice* viodev) {
+    if (!input_device_initialized) {
+        warnf("input_device_isr: Input device not initialized\n");
+    }
     debugf("input_device_isr: Starting ISR\n");
     
     if(!viodev->ready){

@@ -661,6 +661,7 @@ bool process_run(Process *p, unsigned int hart)
         if (p->mode == PM_SUPERVISOR) {
             p->frame->sstatus |= SSTATUS_SPP_SUPERVISOR | SSTATUS_SPIE_BIT;
         }
+        kernel_trap_frame->sie |= SIE_SSIE | SIE_STIE;
         // infof("Jumping to 0x%08lx\n", (uintptr_t)p->frame->sepc);
         process_asm_run(p->frame);
         
