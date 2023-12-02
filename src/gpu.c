@@ -186,6 +186,22 @@ bool gpu_init(VirtioDevice *gpu_device) {
     return true;
 }
 
+void gpu_handle_job(VirtioDevice *block_device, Job *job) {
+    infof("Handling GPU device job %u\n", job->job_id);
+    job_debug(job);
+    if (job->data == NULL) {
+        warnf("gpu_handle_job: job->data is NULL\n");
+        return;
+    }
+    VirtioGpuCtrlType *result = (VirtioGpuCtrlType *)job->data;
+    // debugf("Packet status in handle: %x\n", packet->status);
+
+    infof("GPU job result: %s\n", gpu_get_resp_string(*result));
+    
+    // kf
+    job->data = NULL;
+}
+
 void gpu_transfer_to_host_2d(const Rectangle *rect, uint32_t resource_id, uint64_t offset) {
     VirtioGpuTransferToHost2d tx;
     tx.hdr.type = VIRTIO_GPU_CMD_TRANSFER_TO_HOST_2D;
@@ -196,15 +212,15 @@ void gpu_transfer_to_host_2d(const Rectangle *rect, uint32_t resource_id, uint64
     tx.offset = offset;
     tx.resource_id = resource_id;
     tx.padding = 0;
-    VirtioGpuCtrlHdr resp_hdr;
-    resp_hdr.type = 0;
+    VirtioGpuCtrlHdr *resp_hdr = (VirtioGpuCtrlHdr*)kzalloc(sizeof(VirtioGpuCtrlHdr));
+    resp_hdr->type = 0;
 
-    gpu_send_command(gpu_device, 0, &tx, sizeof(tx), NULL, 0, &resp_hdr, sizeof(resp_hdr));
-    if (resp_hdr.type == VIRTIO_GPU_RESP_OK_NODATA) {
+    gpu_send_command(gpu_device, 0, &tx, sizeof(tx), NULL, 0, resp_hdr, sizeof(resp_hdr));
+    if (resp_hdr->type == VIRTIO_GPU_RESP_OK_NODATA) {
         debugf("gpu_transfer_to_host_2d: Transfer OK\n");
+        kfree(resp_hdr);
     } else {
-        debugf("gpu_transfer_to_host_2d: Transfer failed with %s\n", gpu_get_resp_string(resp_hdr.type));
-        // return false;
+        fatalf("gpu_transfer_to_host_2d: Transfer failed with %s\n", gpu_get_resp_string(resp_hdr->type));
     }
 }
 
@@ -217,11 +233,11 @@ void gpu_flush() {
     flush.rect.height = console.height;
     flush.resource_id = 1;
     flush.padding = 0;
-    VirtioGpuCtrlHdr resp_hdr;
-    resp_hdr.type = 0;
-    gpu_send_command(gpu_device, 0, &flush, sizeof(flush), NULL, 0, &resp_hdr, sizeof(resp_hdr));
+    VirtioGpuCtrlHdr *resp_hdr = (VirtioGpuCtrlHdr*)kzalloc(sizeof(VirtioGpuCtrlHdr));
+    resp_hdr->type = 0;
+    gpu_send_command(gpu_device, 0, &flush, sizeof(flush), NULL, 0, resp_hdr, sizeof(resp_hdr));
     
-    if (resp_hdr.type == VIRTIO_GPU_RESP_OK_NODATA) {
+    if (resp_hdr->type == VIRTIO_GPU_RESP_OK_NODATA) {
         debugf("gpu_flush: Flush OK\n");
     } else {
         // debugf("gpu_flush: Flush failed with %s\n", gpu_get_resp_string(resp_hdr.type));
@@ -241,7 +257,6 @@ void gpu_send_command(VirtioDevice *gpu_device,
                       size_t resp0_size,
                       void *resp1,
                       size_t resp1_size) {
-    // virtio_acquire_device(gpu_device);
     VirtioDescriptor cmd_desc;
     cmd_desc.addr = kernel_mmu_translate((uintptr_t)cmd);
     cmd_desc.len = cmd_size;
@@ -261,14 +276,14 @@ void gpu_send_command(VirtioDevice *gpu_device,
     VirtioDescriptor chain1[3] = {cmd_desc, resp0_desc, resp1_desc};
     VirtioDescriptor *chain = resp0 == NULL ? chain0 : chain1;
     unsigned num_descriptors = resp0 == NULL ? 2 : 3;
+    virtio_create_job_with_data(gpu_device, 1, gpu_handle_job, resp1);
     virtio_send_descriptor_chain(gpu_device, which_queue, chain, num_descriptors, true);
-    
     // Wait until device_idx catches up 
     debugf("GPU WAITING\n");
+    // WFI();
     // while (gpu_device->device_idx != gpu_device->device->idx) {
     // }
     debugf("gpu_send_command: device_idx caught up\n");
-    // virtio_release_device(gpu_device);
 }
 
 // Get display info and set frame buffer's info.
@@ -343,6 +358,10 @@ void fill_rect(uint32_t screen_width,
             frame_buf[row * screen_width + col] = *fill_color;
         }
    }
+}
+
+void gpu_fill_rect(Rectangle rect, Pixel color) {
+    fill_rect(console.width, console.height, console.frame_buf, &rect, &color);
 }
 
 static inline void RVALS(Rectangle *r,

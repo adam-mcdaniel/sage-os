@@ -26,10 +26,10 @@
 // Define much larger stack and heap
 #define USER_STACK_TOP    0x00000000000f0000UL
 #define USER_STACK_BOTTOM 0x0000000000050000UL
-#define USER_HEAP_TOP    0x1c0fffe000UL
-#define USER_HEAP_BOTTOM 0x1c0ffee000UL
-// #define USER_HEAP_TOP    0x00000000000a0000UL
-// #define USER_HEAP_BOTTOM 0x0000000000080000UL
+// #define USER_HEAP_TOP    0x1c0fffe000UL
+// #define USER_HEAP_BOTTOM 0x1c0ffee000UL
+#define USER_HEAP_TOP    0x00000000000a0000UL
+#define USER_HEAP_BOTTOM 0x0000000000080000UL
 
 #define ABS(x) ((x) < 0 ? -(x) : (x))
 
@@ -102,6 +102,8 @@ typedef struct Process {
     ProcessMode mode;
     ProcessState state;
     TrapFrame *frame;
+
+    
     
     // Process stats
     uint64_t sleep_until;
