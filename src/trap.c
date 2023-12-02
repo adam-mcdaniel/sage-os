@@ -38,8 +38,8 @@ void os_trap_handler(void)
     CSR_READ(epc, "sepc");
     CSR_READ(tval, "stval");
     CSR_READ(sie, "sie");
-    CSR_CLEAR("sie");
     CSR_READ(sstatus, "sstatus");
+    CSR_CLEAR("sie");
 
     Process *p;
     TrapFrame *frame = (TrapFrame*)scratch;
@@ -167,7 +167,14 @@ void os_trap_handler(void)
 
                 switch (p->state) {
                 case PS_RUNNING:
-                    sched_handle_timer_interrupt(hart);
+                    // sched_handle_timer_interrupt(hart);
+                    if (p == sched_get_idle_process()) {
+                        debugf("Process %d is idle. Scheduling next process\n", p->pid);
+                        sched_handle_timer_interrupt(hart);
+                    }  else {
+                        debugf("Process %d is running. Resuming process\n", p->pid);
+                        process_run(p, hart);
+                    }
                     return;
                 case PS_SLEEPING:
                     debugf("Process %d is sleeping. Scheduling next process\n", p->pid);

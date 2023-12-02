@@ -17,6 +17,7 @@
 #include <stdint.h>
 #include <vector.h>
 #include <mmu.h>
+#include <lock.h>
 #include "virtio.h"
 
 static Vector *device_active_jobs;
@@ -186,66 +187,69 @@ bool gpu_init(VirtioDevice *gpu_device) {
     return true;
 }
 
-void gpu_handle_job(VirtioDevice *block_device, Job *job) {
+void gpu_handle_job(VirtioDevice *dev, Job *job) {
+    if (job == NULL) {
+        warnf("gpu_handle_job: job is NULL\n");
+        return;
+    }
     infof("Handling GPU device job %u\n", job->job_id);
     job_debug(job);
     if (job->data == NULL) {
         warnf("gpu_handle_job: job->data is NULL\n");
         return;
     }
-    VirtioGpuCtrlType *result = (VirtioGpuCtrlType *)job->data;
+    // VirtioGpuCtrlType *result = (VirtioGpuCtrlType *)job->data;
     // debugf("Packet status in handle: %x\n", packet->status);
 
-    infof("GPU job result: %s\n", gpu_get_resp_string(*result));
+    // infof("GPU job result: %p -> %s\n", gpu_get_resp_string(*result));
     
-    // kf
+    // kfree(job->data);
     job->data = NULL;
 }
 
 void gpu_transfer_to_host_2d(const Rectangle *rect, uint32_t resource_id, uint64_t offset) {
-    VirtioGpuTransferToHost2d tx;
-    tx.hdr.type = VIRTIO_GPU_CMD_TRANSFER_TO_HOST_2D;
-    tx.rect.x = rect->x;
-    tx.rect.y = rect->y;
-    tx.rect.width = rect->width;
-    tx.rect.height = rect->height;
-    tx.offset = offset;
-    tx.resource_id = resource_id;
-    tx.padding = 0;
+    VirtioGpuTransferToHost2d *tx = (VirtioGpuTransferToHost2d*)kzalloc(sizeof(VirtioGpuTransferToHost2d));
+    tx->hdr.type = VIRTIO_GPU_CMD_TRANSFER_TO_HOST_2D;
+    tx->rect.x = rect->x;
+    tx->rect.y = rect->y;
+    tx->rect.width = rect->width;
+    tx->rect.height = rect->height;
+    tx->offset = offset;
+    tx->resource_id = resource_id;
+    tx->padding = 0;
     VirtioGpuCtrlHdr *resp_hdr = (VirtioGpuCtrlHdr*)kzalloc(sizeof(VirtioGpuCtrlHdr));
     resp_hdr->type = 0;
 
-    gpu_send_command(gpu_device, 0, &tx, sizeof(tx), NULL, 0, resp_hdr, sizeof(resp_hdr));
-    if (resp_hdr->type == VIRTIO_GPU_RESP_OK_NODATA) {
-        debugf("gpu_transfer_to_host_2d: Transfer OK\n");
-        kfree(resp_hdr);
-    } else {
-        fatalf("gpu_transfer_to_host_2d: Transfer failed with %s\n", gpu_get_resp_string(resp_hdr->type));
-    }
+    gpu_send_command(gpu_device, 0, tx, sizeof(*tx), NULL, 0, resp_hdr, sizeof(*resp_hdr));
+    // if (resp_hdr->type == VIRTIO_GPU_RESP_OK_NODATA) {
+    //     debugf("gpu_transfer_to_host_2d: Transfer OK\n");
+    //     kfree(resp_hdr);
+    // } else {
+    //     fatalf("gpu_transfer_to_host_2d: Transfer failed with %s\n", gpu_get_resp_string(resp_hdr->type));
+    // }
 }
 
 void gpu_flush() {
-    VirtioGpuResourceFlush flush;
-    flush.hdr.type = VIRTIO_GPU_CMD_RESOURCE_FLUSH;
-    flush.rect.x = 0;
-    flush.rect.y = 0;
-    flush.rect.width = console.width;
-    flush.rect.height = console.height;
-    flush.resource_id = 1;
-    flush.padding = 0;
+    VirtioGpuResourceFlush *flush = (VirtioGpuResourceFlush*)kzalloc(sizeof(VirtioGpuResourceFlush));
+    flush->hdr.type = VIRTIO_GPU_CMD_RESOURCE_FLUSH;
+    flush->rect.x = 0;
+    flush->rect.y = 0;
+    flush->rect.width = console.width;
+    flush->rect.height = console.height;
+    flush->resource_id = 1;
+    flush->padding = 0;
     VirtioGpuCtrlHdr *resp_hdr = (VirtioGpuCtrlHdr*)kzalloc(sizeof(VirtioGpuCtrlHdr));
     resp_hdr->type = 0;
-    gpu_send_command(gpu_device, 0, &flush, sizeof(flush), NULL, 0, resp_hdr, sizeof(resp_hdr));
+    gpu_send_command(gpu_device, 0, flush, sizeof(*flush), NULL, 0, resp_hdr, sizeof(*resp_hdr));
     
-    if (resp_hdr->type == VIRTIO_GPU_RESP_OK_NODATA) {
-        debugf("gpu_flush: Flush OK\n");
-    } else {
-        // debugf("gpu_flush: Flush failed with %s\n", gpu_get_resp_string(resp_hdr.type));
-        // return false;
-    }
-
+    // if (resp_hdr->type == VIRTIO_GPU_RESP_OK_NODATA) {
+    //     debugf("gpu_flush: Flush OK\n");
+    // } else {
+    //     // debugf("gpu_flush: Flush failed with %s\n", gpu_get_resp_string(resp_hdr.type));
+    //     // return false;
+    // }
 }
-
+static Mutex gpu_device_mutex = MUTEX_UNLOCKED;
 // Send a command to GPU.
 // To send a command/response or a command/data pair set resp0 to NULL and resp0_size to 0.
 // To send a command/data/response chain set every argument in order.
@@ -257,6 +261,7 @@ void gpu_send_command(VirtioDevice *gpu_device,
                       size_t resp0_size,
                       void *resp1,
                       size_t resp1_size) {
+    mutex_spinlock(&gpu_device_mutex);
     VirtioDescriptor cmd_desc;
     cmd_desc.addr = kernel_mmu_translate((uintptr_t)cmd);
     cmd_desc.len = cmd_size;
@@ -281,9 +286,9 @@ void gpu_send_command(VirtioDevice *gpu_device,
     // Wait until device_idx catches up 
     debugf("GPU WAITING\n");
     // WFI();
-    // while (gpu_device->device_idx != gpu_device->device->idx) {
-    // }
+    // while (gpu_device->device_idx != gpu_device->device->idx) {}
     debugf("gpu_send_command: device_idx caught up\n");
+    mutex_unlock(&gpu_device_mutex);
 }
 
 // Get display info and set frame buffer's info.
