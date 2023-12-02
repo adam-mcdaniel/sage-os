@@ -561,7 +561,7 @@ static SYSCALL_RETURN_TYPE (*const SYSCALLS[])(SYSCALL_PARAM_LIST) = {
     SYSCALL_PTR(pid_get_env),  /* 10 */
     SYSCALL_PTR(pid_put_env),  /* 11 */
     SYSCALL_PTR(screen_draw),  /* 12 */
-    SYSCALL_PTR(screen_clear), /* 13 */
+    SYSCALL_PTR(screen_get_dims), /* 13 */
     SYSCALL_PTR(get_time),   /* 14 */
 };
 
