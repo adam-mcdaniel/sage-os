@@ -118,6 +118,7 @@ _spawn_kthread:
     # We need a proper sscratch before we
     # turn on the MMU
 	csrw	satp, t1
+    sfence.vma
 
     # We usually don't care about the FP regs,
     # but just in case.
@@ -176,6 +177,7 @@ _trap:
     ld      t5, 560(t6)
     ld      sp, 568(t6)
     csrw    satp, t5
+    sfence.vma
 
     # src/trap.c
     call    os_trap_handler
@@ -185,6 +187,7 @@ _trap:
     csrr    t6, sscratch
     ld      t5, 536(t6)
     csrw    satp, t5
+    sfence.vma
 
     # Check to see if we need to load the floating point registers
     # This is based on the 2-bit FS field in the sstatus register

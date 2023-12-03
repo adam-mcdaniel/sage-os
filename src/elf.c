@@ -1,4 +1,5 @@
 #include <compiler.h>
+#include <debug.h>
 #include <config.h>
 #include <csr.h>
 #include <gpu.h>
@@ -8,7 +9,6 @@
 #include <sbi.h>  // sbi_xxx()
 #include <symbols.h>
 #include <util.h>  // strcmp
-#include <debug.h>
 #include <mmu.h>
 #include <page.h>
 #include <csr.h>

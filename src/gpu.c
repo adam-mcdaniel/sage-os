@@ -204,7 +204,7 @@ void gpu_handle_job(VirtioDevice *dev, Job *job) {
     // infof("GPU job result: %p -> %s\n", gpu_get_resp_string(*result));
     
     // kfree(job->data);
-    job->data = NULL;
+    // job->data = NULL;
 }
 
 void gpu_transfer_to_host_2d(const Rectangle *rect, uint32_t resource_id, uint64_t offset) {
@@ -284,7 +284,8 @@ void gpu_send_command(VirtioDevice *gpu_device,
     virtio_create_job_with_data(gpu_device, 1, gpu_handle_job, resp1);
     virtio_send_descriptor_chain(gpu_device, which_queue, chain, num_descriptors, true);
     // Wait until device_idx catches up 
-    debugf("GPU WAITING\n");
+    // debugf("GPU WAITING\n");
+    // virtio_wait_for_descriptor(gpu_device, which_queue);
     // WFI();
     // while (gpu_device->device_idx != gpu_device->device->idx) {}
     debugf("gpu_send_command: device_idx caught up\n");

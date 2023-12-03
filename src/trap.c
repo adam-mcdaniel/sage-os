@@ -11,7 +11,7 @@
 #include <process.h>
 #include <sched.h>
 
-// #define TRAP_DEBUG
+#define TRAP_DEBUG
 #ifdef TRAP_DEBUG
 #define debugf(...) debugf(__VA_ARGS__)
 #else
@@ -40,6 +40,7 @@ void os_trap_handler(void)
     CSR_READ(sie, "sie");
     CSR_READ(sstatus, "sstatus");
     CSR_CLEAR("sie");
+    CSR_CLEAR("sip");
 
     Process *p;
     TrapFrame *frame = (TrapFrame*)scratch;
@@ -96,7 +97,6 @@ void os_trap_handler(void)
     if (SCAUSE_IS_ASYNC(cause)) {
         debugf("os_trap_handler: Is async!\n");
         cause = SCAUSE_NUM(cause);
-        frame->sepc = epc;
 
         switch (cause) {
             case CAUSE_SSIP:
@@ -107,8 +107,10 @@ void os_trap_handler(void)
                 // Ack timer will reset the timer to INFINITE
                 // In src/sbi.c
                 debugf("os_trap_handler: Supervisor timer interrupt!\n");
-                CSR_CLEAR("sip");
                 sbi_ack_timer();
+                infof("Timer: old sepc: %p\n", frame->sepc);
+                frame->sepc = epc;
+                infof("Timer: new sepc: %p\n", frame->sepc);
                 // We typically invoke our scheduler if we get a timer
                 sched_handle_timer_interrupt(hart);
                 break;
@@ -122,6 +124,13 @@ void os_trap_handler(void)
                 //     frame->sepc = epc;
                 // }
                 plic_handle_irq(hart);
+                if (frame->sstatus | SSTATUS_SPP_SUPERVISOR) {
+                    infof("External interrupt: old sepc: %p\n", frame->sepc);
+                    frame->sepc = epc;
+                    infof("External interrupt: new sepc: %p\n", frame->sepc);
+                } else if (sched_get_idle_process() != NULL) {
+                    process_run(sched_get_idle_process(), hart);
+                }
                 // p = sched_get_current();
                 // // If there is a current process, we should schedule it
                 // if (p != NULL) {
@@ -161,6 +170,10 @@ void os_trap_handler(void)
                 // Forward to src/syscall.c
                 // debugf("Handling syscall\n");
                 // trap_frame_debug(scratch);
+                infof("Syscall (U): old sepc: %p\n", frame->sepc);
+                frame->sepc = epc + 4;
+                infof("Syscall (U): new sepc: %p\n", frame->sepc);
+
                 syscall_handle(hart, epc, scratch);
                 // Get the process
                 p = sched_get_current();
@@ -192,6 +205,9 @@ void os_trap_handler(void)
                 // We have to move beyond the ECALL instruction, which is exactly 4 bytes.
                 break;
             case CAUSE_ECALL_S_MODE:  // ECALL U-Mode
+                infof("Syscall (S): old sepc: %p\n", frame->sepc);
+                frame->sepc = epc + 4;
+                infof("Syscall (S): new sepc: %p\n", frame->sepc);
                 // Forward to src/syscall.c
                 // debugf("Handling supervisor syscall\n");
                 syscall_handle(hart, epc, scratch);
@@ -223,6 +239,7 @@ void os_trap_handler(void)
         }
         // CSR_WRITE("sepc", epc + 4);
     }
+    // CSR_WRITE("sepc", frame->sepc);
     CSR_WRITE("sie", sie);
 
     // debugf("Jumping to %p...\n", epc + 4);

@@ -17,7 +17,7 @@
 #include <lock.h>
 #include <sched.h>
 
-// #define DEBUG_PROCESS
+#define DEBUG_PROCESS
 #ifdef DEBUG_PROCESS
 #define debugf(...) debugf(__VA_ARGS__)
 #else
@@ -241,7 +241,7 @@ TrapFrame *trap_frame_new(bool is_user, PageTable *page_table, uint64_t pid) {
         frame->stvec = kernel_trap_frame->stvec;
         frame->trap_stack = kernel_trap_frame->trap_stack;
         // frame->sie = SIE_SEIE | SIE_SSIE | SIE_STIE;
-        frame->sie = SIE_SSIE | SIE_STIE;
+        frame->sie = SIE_STIE;
         // CSR_READ(frame->sie, "sie");
         trap_frame_set_stack_pointer(frame, USER_STACK_TOP);
         trap_frame_set_heap_pointer(frame, USER_HEAP_BOTTOM);
@@ -269,7 +269,7 @@ TrapFrame *trap_frame_new(bool is_user, PageTable *page_table, uint64_t pid) {
         frame->stvec = kernel_trap_frame->stvec;
         frame->trap_stack = kernel_trap_frame->trap_stack;
         // frame->sie = SIE_SEIE | SIE_SSIE | SIE_STIE;
-        frame->sie = SIE_SSIE | SIE_STIE;
+        frame->sie = SIE_STIE;
         // frame->sstatus = SSTATUS_SPP_SUPERVISOR | SSTATUS_SPIE_BIT;
         // frame->satp = SATP_KERNEL;
         // frame->trap_satp = SATP_KERNEL;
@@ -644,6 +644,11 @@ int process_free(Process *p)
 
 bool process_run(Process *p, unsigned int hart)
 {
+    if (p == NULL) {
+        warnf("process.c (process_run): Process is NULL\n");
+        return false;
+    }
+
     void process_asm_run(void *frame_addr);
     unsigned int me = sbi_whoami();
 
@@ -662,8 +667,8 @@ bool process_run(Process *p, unsigned int hart)
         if (p->mode == PM_SUPERVISOR) {
             p->frame->sstatus |= SSTATUS_SPP_SUPERVISOR | SSTATUS_SPIE_BIT;
         }
-        kernel_trap_frame->sie |= SIE_SSIE | SIE_STIE;
-        // infof("Jumping to 0x%08lx\n", (uintptr_t)p->frame->sepc);
+        // kernel_trap_frame->sie |= SIE_SSIE | SIE_STIE;
+        infof("Jumping to 0x%08lx\n", (uintptr_t)p->frame->sepc);
         process_asm_run(p->frame);
         
         fatalf("process.c (process_run): process_asm_run returned\n");
@@ -707,7 +712,9 @@ Process *process_map_get(uint16_t pid)
         return NULL;
     }
     MapValue val;
-    map_get_int(processes, pid, &val);
+    if (!map_get_int(processes, pid, &val)) {
+        return NULL;
+    }
     return (Process *)val;
 }
 
