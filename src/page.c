@@ -5,6 +5,7 @@
 #include <util.h>
 #include <symbols.h>
 #include <debug.h>
+#include <mmu.h>
 
 // #define PAGE_DEBUG
 #ifdef PAGE_DEBUG
@@ -18,11 +19,6 @@ Mutex page_lock;
 
 // Bookkeeping calculation
 // #define ALIGN_UP(x, a) (((x) + (a) - 1) & ~((a) - 1))
-
-#define HEAP_SIZE_IN_BYTES (uint64_t)(sym_end(heap) - sym_start(heap))
-#define HEAP_SIZE_IN_PAGES (HEAP_SIZE_IN_BYTES / PAGE_SIZE)
-#define BK_SIZE_IN_BYTES ALIGN_UP_POT(HEAP_SIZE_IN_PAGES / 4, PAGE_SIZE)
-#define BK_SIZE_IN_PAGES (BK_SIZE_IN_BYTES / PAGE_SIZE)
 
 static uint8_t *bookkeeping;  // Pointer to the bookkeeping area
 
@@ -136,6 +132,7 @@ void page_init(void)
     // logf(LOG_INFO, "  Free pages: %lu\n", page_count_free());
 }
 
+
 void *page_nalloc(int n)
 {
     if (n <= 0) {
@@ -171,6 +168,10 @@ void *page_nalloc(int n)
                 void *result = (void*)((uint64_t)bookkeeping + ((uint64_t)start * PAGE_SIZE));
 
                 debugf("Found %d free pages at %p\n", n, result);
+                // Print remaining pages
+                uint64_t remaining = page_count_free();
+                debugf("Remaining pages: %lu\n", remaining);
+
                 return result;
             }
         } else {

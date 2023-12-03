@@ -19,7 +19,7 @@
 #include <gpu.h>
 #include <lock.h>
 
-#define VIRTIO_DEBUG
+// #define VIRTIO_DEBUG
 
 #ifdef VIRTIO_DEBUG
 #define debugf(...) debugf(__VA_ARGS__)
@@ -67,7 +67,7 @@ void virtio_create_job_with_data(VirtioDevice *dev, uint64_t pid_id, void (*call
 }
 
 Job *virtio_get_job(VirtioDevice *dev, uint64_t job_id) {
-    infof("Getting job from %p with ID %d\n", dev, job_id);
+    debugf("Getting job from %p with ID %d\n", dev, job_id);
     for (uint64_t i=0; i<vector_size(dev->jobs); i++) {
         Job *job = NULL;
         if (!vector_get_ptr(dev->jobs, i, &job)) {
@@ -88,7 +88,7 @@ Job *virtio_get_job(VirtioDevice *dev, uint64_t job_id) {
 }
 
 Job job_create(uint64_t job_id, uint64_t pid_id, void (*callback)(struct VirtioDevice *device, struct Job *job)) {
-    infof("Creating job %d\n", job_id);
+    debugf("Creating job %d\n", job_id);
     return job_create_with_data(job_id, pid_id, callback, NULL);
 }
 
@@ -116,7 +116,7 @@ void job_set_context(Job *job, VirtioDescriptor *desc, uint16_t num_descriptors)
 }
 
 void job_destroy(Job *job) {
-    infof("Destroying job %p\n", job);
+    debugf("Destroying job %p\n", job);
     if (job->data != NULL) {
         debugf("About to free non-nulled Job data\n");
         kfree(job->data);
@@ -168,7 +168,7 @@ void virtio_add_job(VirtioDevice *dev, Job job) {
         warnf("No callback\n");
         return;
     }
-    infof("Adding job %d to device %p\n", job.job_id, dev);
+    debugf("Adding job %d to device %p\n", job.job_id, dev);
     Job *mem = (Job *)kzalloc(sizeof(Job));
     if (mem == NULL) {
         warnf("Could not allocate memory for job\n");
@@ -263,9 +263,9 @@ void virtio_complete_job(VirtioDevice *dev, uint64_t job_id) {
     }
     virtio_callback_and_free_job(dev, job_id);
     if (job->done && virtio_has_jobs_left(dev)) {
-        infof("Job %d done\n", job_id);
+        debugf("Job %d done\n", job_id);
         vector_remove_val_ptr(dev->jobs, job);
-        infof("Removed job %d\n", job_id);
+        debugf("Removed job %d\n", job_id);
     } else {
         debugf("Job %d not done\n", job_id);
     }
@@ -516,7 +516,7 @@ void virtio_init(void) {
     }
     for (uint16_t i=0; i<virtio_count_saved_devices(); i++) {
         VirtioDevice *dev = virtio_get_nth_saved_device(i);
-        infof("Found device #%u: \"%s\"\n", i, virtio_get_device_name(dev));
+        debugf("Found device #%u: \"%s\"\n", i, virtio_get_device_name(dev));
     }
     debugf("virtio_init: Done initializing virtio system\n");
 }

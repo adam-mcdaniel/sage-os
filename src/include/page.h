@@ -10,6 +10,7 @@
  */
 #pragma once
 
+#include <symbols.h>
 
 /**
  * @brief Align value x up to the power of two value y. This returns
@@ -85,3 +86,8 @@ int page_count_free(void);
 int page_count_taken(void);
 
 #define PAGE_SIZE 4096
+
+#define HEAP_SIZE_IN_BYTES (uint64_t)(sym_end(heap) - sym_start(heap))
+#define HEAP_SIZE_IN_PAGES (HEAP_SIZE_IN_BYTES / PAGE_SIZE)
+#define BK_SIZE_IN_BYTES ALIGN_UP_POT(HEAP_SIZE_IN_PAGES / 4, PAGE_SIZE)
+#define BK_SIZE_IN_PAGES (BK_SIZE_IN_BYTES / PAGE_SIZE)

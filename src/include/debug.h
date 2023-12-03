@@ -29,7 +29,7 @@ void logset(log_type lt);
 void logclear(log_type lt);
 
 
-// #define ENABLE_DEBUG
+#define ENABLE_DEBUG
 // #ifdef ENABLE_DEBUG
 // #define debugf(...) debugf(__VA_ARGS__)
 // #else
@@ -37,14 +37,14 @@ void logclear(log_type lt);
 // #endif
 
 
-// #define ENABLE_INFO
+#define ENABLE_INFO
 // #ifdef ENABLE_INFO
 // #define infof(...) infof(__VA_ARGS__)
 // #else
 // #define infof(...)
 // #endif
 
-// #define ENABLE_WARN
+#define ENABLE_WARN
 // #ifdef ENABLE_WARN
 // #define warnf(...) warnf(__VA_ARGS__)
 // #else

@@ -17,7 +17,7 @@
 #include <lock.h>
 #include <sched.h>
 
-#define DEBUG_PROCESS
+// #define DEBUG_PROCESS
 #ifdef DEBUG_PROCESS
 #define debugf(...) debugf(__VA_ARGS__)
 #else
@@ -376,6 +376,11 @@ void rcb_map(RCB *rcb, uint64_t vaddr, uint64_t paddr, uint64_t size, uint64_t b
     for (uint64_t i = 0; i < size; i += PAGE_SIZE_4K) {
         debugf("rcb_map: Mapping 0x%08lx to 0x%08lx\n", (vaddr + i) & alignment, (paddr + i) & alignment);
         mmu_map(rcb->ptable, (vaddr + i) & alignment, (paddr + i) & alignment, MMU_LEVEL_4K, bits);
+        if (kernel_mmu_translate((paddr + i) & alignment) == MMU_TRANSLATE_PAGE_FAULT) {
+            warnf("%p not mapped in kernel space\n", (paddr + i) & alignment);
+            mmu_map(kernel_mmu_table, (paddr + i) & alignment, (paddr + i) & alignment, MMU_LEVEL_4K, bits & ~PB_USER | PB_WRITE | PB_READ);
+        }
+        SFENCE_ALL();
     }
 }
 
@@ -498,33 +503,33 @@ Process *process_new(ProcessMode mode)
     p->heap_size = USER_HEAP_SIZE;
     p->stack_size = USER_STACK_SIZE;
     do {
-        debugf("Allocating %d pages for the stack\n", p->stack_size / PAGE_SIZE);
+        infof("Allocating %d pages for the stack\n", p->stack_size / PAGE_SIZE);
         p->stack = page_znalloc(p->stack_size / PAGE_SIZE);
         if (!p->stack) {
             p->stack_size /= 2;
-            debugf("Stack allocation failed, trying with %d pages\n", p->stack_size / PAGE_SIZE);
+            warnf("Stack allocation failed, trying with %d pages\n", p->stack_size / PAGE_SIZE);
         }
 
-        if (p->stack_size < PAGE_SIZE * 16) {
+        if (p->stack_size < PAGE_SIZE * 32) {
             fatalf("process.c (process_new): Stack size too small\n");
         }
     } while (!p->stack);
-    debugf("Allocating %d pages for the heap\n", p->heap_size / PAGE_SIZE);
     
     do {
-        debugf("Allocating %d pages for the heap\n", p->heap_size / PAGE_SIZE);
+        infof("Allocating %d pages for the heap\n", p->heap_size / PAGE_SIZE);
         p->heap = page_znalloc(p->heap_size / PAGE_SIZE);
         if (!p->heap) {
             p->heap_size /= 2;
-            debugf("Heap allocation failed, trying with %d pages\n", p->heap_size / PAGE_SIZE);
+            warnf("Heap allocation failed, trying with %d pages\n", p->heap_size / PAGE_SIZE);
         }
 
-        if (p->heap_size < PAGE_SIZE * 16) {
+        if (p->heap_size < PAGE_SIZE * 4) {
             fatalf("process.c (process_new): Heap size too small\n");
         }
     } while (!p->heap);
-    debugf("Stack: %p\n", p->stack);
-    debugf("Heap: %p\n", p->heap);
+
+    infof("Stack: %p\n", p->stack);
+    infof("Heap: %p\n", p->heap);
     p->stack_vaddr = USER_STACK_TOP;
     p->heap_vaddr = USER_HEAP_BOTTOM;
     if (mode == PM_USER) {
@@ -663,12 +668,12 @@ bool process_run(Process *p, unsigned int hart)
         }
 
         set_current_process(p);
-        // infof("process.c (process_run): Running process %d on hart %d\n", p->pid, hart);
+        // debugf("process.c (process_run): Running process %d on hart %d\n", p->pid, hart);
         if (p->mode == PM_SUPERVISOR) {
             p->frame->sstatus |= SSTATUS_SPP_SUPERVISOR | SSTATUS_SPIE_BIT;
         }
         // kernel_trap_frame->sie |= SIE_SSIE | SIE_STIE;
-        infof("Jumping to 0x%08lx\n", (uintptr_t)p->frame->sepc);
+        debugf("Jumping to 0x%08lx\n", (uintptr_t)p->frame->sepc);
         process_asm_run(p->frame);
         
         fatalf("process.c (process_run): process_asm_run returned\n");
@@ -695,7 +700,7 @@ void process_map_init()
 void process_map_set(Process *p)
 {
     mutex_spinlock(&p->lock);
-    infof("process.c (process_map_set): Setting PID %d\n", p->pid);
+    debugf("process.c (process_map_set): Setting PID %d\n", p->pid);
     map_set_int(processes, p->pid, (MapValue)p);
     mutex_unlock(&p->lock);
 }

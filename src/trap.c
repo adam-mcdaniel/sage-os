@@ -11,7 +11,7 @@
 #include <process.h>
 #include <sched.h>
 
-#define TRAP_DEBUG
+// #define TRAP_DEBUG
 #ifdef TRAP_DEBUG
 #define debugf(...) debugf(__VA_ARGS__)
 #else
@@ -24,7 +24,7 @@ void syscall_handle(int hart, uint64_t epc, int64_t *scratch);
 // Called from asm/spawn.S: _spawn_kthread
 void os_trap_handler(void)
 {
-    // infof("Entering OS trap handler\n");
+    // debugf("Entering OS trap handler\n");
     // SFENCE_ALL();
 
     unsigned long cause;
@@ -47,21 +47,21 @@ void os_trap_handler(void)
 
 
     // debugf("os_trap_handler: Trap frame @ %p\n", frame);
-    // infof("os_trap_handler: old sepc: %p\n", frame->sepc);
-    // infof("sstatus: %lx\n", sstatus);
+    // debugf("os_trap_handler: old sepc: %p\n", frame->sepc);
+    // debugf("sstatus: %lx\n", sstatus);
     // // Process *p = sched_get_current();
-    // // infof("os_trap_handler: current process: %d\n", p->pid);
+    // // debugf("os_trap_handler: current process: %d\n", p->pid);
     
 
     // if (sstatus & frame->sstatus & SSTATUS_SPP_SUPERVISOR) {
-    //     // infof("sstatus=%lx, frame->sstatus=%lx\n", sstatus, frame->sstatus);
+    //     // debugf("sstatus=%lx, frame->sstatus=%lx\n", sstatus, frame->sstatus);
     //     frame->sepc = epc;
     // } else if (~sstatus & ~frame->sstatus & SSTATUS_SPP_SUPERVISOR) {
     //     // If the bit is not set, we are in user mode
-    //     // infof("sstatus=%lx, frame->sstatus=%lx\n", sstatus, frame->sstatus);
+    //     // debugf("sstatus=%lx, frame->sstatus=%lx\n", sstatus, frame->sstatus);
     //     frame->sepc = epc;
     // }
-    // infof("os_trap_handler: new sepc: %p\n", frame->sepc);
+    // debugf("os_trap_handler: new sepc: %p\n", frame->sepc);
 
 
     // CSR_WRITE("sscratch", kernel_trap_frame);
@@ -108,9 +108,9 @@ void os_trap_handler(void)
                 // In src/sbi.c
                 debugf("os_trap_handler: Supervisor timer interrupt!\n");
                 sbi_ack_timer();
-                infof("Timer: old sepc: %p\n", frame->sepc);
+                debugf("Timer: old sepc: %p\n", frame->sepc);
                 frame->sepc = epc;
-                infof("Timer: new sepc: %p\n", frame->sepc);
+                debugf("Timer: new sepc: %p\n", frame->sepc);
                 // We typically invoke our scheduler if we get a timer
                 sched_handle_timer_interrupt(hart);
                 break;
@@ -118,23 +118,23 @@ void os_trap_handler(void)
                 debugf("os_trap_handler: Supervisor external interrupt!\n");
                 // Forward to src/plic.c
                 // if (sstatus & SSTATUS_SPP_SUPERVISOR) {
-                //     infof("os_trap_handler: SPP is set\n");
+                //     debugf("os_trap_handler: SPP is set\n");
                 // } else {
-                //     infof("os_trap_handler: SPP is not set\n");
+                //     debugf("os_trap_handler: SPP is not set\n");
                 //     frame->sepc = epc;
                 // }
                 plic_handle_irq(hart);
                 if (frame->sstatus | SSTATUS_SPP_SUPERVISOR) {
-                    infof("External interrupt: old sepc: %p\n", frame->sepc);
+                    debugf("External interrupt: old sepc: %p\n", frame->sepc);
                     frame->sepc = epc;
-                    infof("External interrupt: new sepc: %p\n", frame->sepc);
+                    debugf("External interrupt: new sepc: %p\n", frame->sepc);
                 } else if (sched_get_idle_process() != NULL) {
                     process_run(sched_get_idle_process(), hart);
                 }
                 // p = sched_get_current();
                 // // If there is a current process, we should schedule it
                 // if (p != NULL) {
-                //     infof("Resuming process %d\n", p->pid);
+                //     debugf("Resuming process %d\n", p->pid);
                 //     process_debug(p);
                 //     process_run(p, hart);
                 // // } else {
@@ -160,9 +160,9 @@ void os_trap_handler(void)
             trap_frame_debug(scratch);
         }
         // if (sstatus & SSTATUS_SPP_SUPERVISOR) {
-        //     infof("os_trap_handler: SPP is set\n");
+        //     debugf("os_trap_handler: SPP is set\n");
         // } else {
-        //     infof("os_trap_handler: SPP is not set\n");
+        //     debugf("os_trap_handler: SPP is not set\n");
         // }
         // frame->sepc = epc + 4;
         switch (cause) {
@@ -170,9 +170,9 @@ void os_trap_handler(void)
                 // Forward to src/syscall.c
                 // debugf("Handling syscall\n");
                 // trap_frame_debug(scratch);
-                infof("Syscall (U): old sepc: %p\n", frame->sepc);
+                debugf("Syscall (U): old sepc: %p\n", frame->sepc);
                 frame->sepc = epc + 4;
-                infof("Syscall (U): new sepc: %p\n", frame->sepc);
+                debugf("Syscall (U): new sepc: %p\n", frame->sepc);
 
                 syscall_handle(hart, epc, scratch);
                 // Get the process
@@ -205,9 +205,9 @@ void os_trap_handler(void)
                 // We have to move beyond the ECALL instruction, which is exactly 4 bytes.
                 break;
             case CAUSE_ECALL_S_MODE:  // ECALL U-Mode
-                infof("Syscall (S): old sepc: %p\n", frame->sepc);
+                debugf("Syscall (S): old sepc: %p\n", frame->sepc);
                 frame->sepc = epc + 4;
-                infof("Syscall (S): new sepc: %p\n", frame->sepc);
+                debugf("Syscall (S): new sepc: %p\n", frame->sepc);
                 // Forward to src/syscall.c
                 // debugf("Handling supervisor syscall\n");
                 syscall_handle(hart, epc, scratch);
@@ -252,6 +252,6 @@ void os_trap_handler(void)
     // __asm__ volatile ("savegp");
 
     // SRET();
-    // infof("Leaving OS trap handler\n");
+    // debugf("Leaving OS trap handler\n");
     // fatalf("Could not return from trap\n");
 }
