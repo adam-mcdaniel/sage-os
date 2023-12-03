@@ -10,10 +10,14 @@
  */
 #pragma once
 #include <stddef.h>
+#include <page.h>
 
 #define KERNEL_HEAP_START_VADDR 0x1c0ffee000UL
-#define KERNEL_HEAP_PAGES       0x4000
+#define KERNEL_HEAP_PAGES       (HEAP_SIZE_IN_PAGES) / 20
 #define KERNEL_HEAP_END_VADDR   (KERNEL_HEAP_START_VADDR + (KERNEL_HEAP_PAGES * 4096))
+
+// #define DEBUG_KMALLOC
+// #define DEBUG_HEAP
 
 /// @brief Allocate <bytes> number of bytes and return
 /// a memory address to the start of these bytes.

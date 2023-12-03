@@ -84,20 +84,20 @@ SYSCALL(get_env)
         return;
     }
 
-    infof("syscall.c (get_env): Getting env var %s\n", (char *)var_paddr);
+    debugf("syscall.c (get_env): Getting env var %s\n", (char *)var_paddr);
     
     // Get the value pointer from the process
     const char *value = process_get_env(p, (char *)var_paddr);
     if (!value) {
-        infof("syscall.c (get_env): Env var %s not found\n", (char *)var_paddr);
+        debugf("syscall.c (get_env): Env var %s not found\n", (char *)var_paddr);
         XREG(A0) = -ENOENT;
         return;
     }
-    infof("syscall.c (get_env): Got env var %s\n", value);
+    debugf("syscall.c (get_env): Got env var %s\n", value);
 
     // Copy the value to the user address
     uintptr_t value_vaddr = XREG(A1);
-    // infof("syscall.c (get_env): Copying env var %s to %lx\n", value, value_vaddr);
+    // debugf("syscall.c (get_env): Copying env var %s to %lx\n", value, value_vaddr);
     uintptr_t value_paddr = mmu_translate(p->rcb.ptable, value_vaddr);
     if (value_paddr == -1UL) {
         XREG(A0) = -EFAULT;
@@ -117,33 +117,33 @@ SYSCALL(put_env)
 
     const char *var_paddr = mmu_translate(p->rcb.ptable, (uintptr_t)var_vaddr);
     if (var_paddr == -1UL) {
-        infof("syscall.c (put_env): MMU translated to null\n");
+        debugf("syscall.c (put_env): MMU translated to null\n");
         XREG(A0) = -EFAULT;
         return;
     }
 
-    infof("syscall.c (get_env): Getting env var %s\n", (char *)var_paddr);
+    debugf("syscall.c (get_env): Getting env var %s\n", (char *)var_paddr);
     
     // Copy the value from the user address to the process
     uintptr_t value_vaddr = XREG(A1);
-    // infof("syscall.c (get_env): Copying env var %s to %lx\n", value, value_vaddr);
+    // debugf("syscall.c (get_env): Copying env var %s to %lx\n", value, value_vaddr);
     uintptr_t value_paddr = mmu_translate(p->rcb.ptable, value_vaddr);
     if (value_paddr == -1UL) {
-        infof("syscall.c (put_env): MMU translated to null\n");
+        debugf("syscall.c (put_env): MMU translated to null\n");
         XREG(A0) = -EFAULT;
         return;
     }
 
     // Copy the value to the process
     process_put_env(p, (char *)var_paddr, (char *)value_paddr);
-    infof("syscall.c (put_env): Put env var %s\n", (char *)value_paddr);
+    debugf("syscall.c (put_env): Put env var %s\n", (char *)value_paddr);
 }
 
 SYSCALL(pid_get_env)
 {
     // Take a PID argument, a variable name, and a buffer to write the value to
     SYSCALL_ENTER();
-    infof("syscall.c (pid_get_env): Got args: %lx %lx %lx %lx %lx %lx\n", XREG(A0), XREG(A1), XREG(A2), XREG(A3), XREG(A4), XREG(A5));
+    debugf("syscall.c (pid_get_env): Got args: %lx %lx %lx %lx %lx %lx\n", XREG(A0), XREG(A1), XREG(A2), XREG(A3), XREG(A4), XREG(A5));
     // Get the first argument, the PID
     int pid = XREG(A0);
     Process *parent = sched_get_current();
@@ -152,10 +152,10 @@ SYSCALL(pid_get_env)
     const char *var_vaddr = (const char *)XREG(A1);
     // Get the third argument, the buffer to write the value to
     const char *value_vaddr = (const char *)XREG(A2);
-    infof("syscall.c (pid_get_env): Got PID %d\n", pid);
+    debugf("syscall.c (pid_get_env): Got PID %d\n", pid);
     pid %= PID_LIMIT;
-    infof("syscall.c (pid_get_env): Got var vaddr %p\n", var_vaddr);
-    infof("syscall.c (pid_get_env): Got value vaddr %p\n", value_vaddr);
+    debugf("syscall.c (pid_get_env): Got var vaddr %p\n", var_vaddr);
+    debugf("syscall.c (pid_get_env): Got value vaddr %p\n", value_vaddr);
 
     // Get the process from the PID
     Process *p = process_map_get(pid);
@@ -206,7 +206,7 @@ SYSCALL(pid_put_env)
 {
     // Take a PID argument, a variable name, and a buffer to read the value from
     SYSCALL_ENTER();
-    infof("syscall.c (pid_put_env): Got args: %lx %lx %lx %lx %lx %lx\n", XREG(A0), XREG(A1), XREG(A2), XREG(A3), XREG(A4), XREG(A5));
+    debugf("syscall.c (pid_put_env): Got args: %lx %lx %lx %lx %lx %lx\n", XREG(A0), XREG(A1), XREG(A2), XREG(A3), XREG(A4), XREG(A5));
 
     // Get the first argument, the PID
     int pid = XREG(A0);
@@ -216,10 +216,10 @@ SYSCALL(pid_put_env)
     const char *var_vaddr = (const char *)XREG(A1);
     // Get the third argument, the buffer to write the value to
     const char *value_vaddr = (const char *)XREG(A2);
-    infof("syscall.c (pid_put_env): Got PID %d\n", pid);
+    debugf("syscall.c (pid_put_env): Got PID %d\n", pid);
     pid %= PID_LIMIT;
-    infof("syscall.c (pid_put_env): Got var vaddr %p\n", var_vaddr);
-    infof("syscall.c (pid_put_env): Got value vaddr %p\n", value_vaddr);
+    debugf("syscall.c (pid_put_env): Got var vaddr %p\n", var_vaddr);
+    debugf("syscall.c (pid_put_env): Got value vaddr %p\n", value_vaddr);
 
     // Get the process from the PID
     Process *p = process_map_get(pid);
@@ -263,24 +263,24 @@ SYSCALL(get_pid)
 {
     SYSCALL_ENTER();
     Process *p = sched_get_current();
-    infof("syscall.c (get_pid): Got PID %d\n", p->pid);
+    debugf("syscall.c (get_pid): Got PID %d\n", p->pid);
     XREG(A0) = p->pid;
 }
 
 SYSCALL(next_pid)
 {
     SYSCALL_ENTER();
-    infof("syscall.c (next_pid): Got args: %lx %lx %lx %lx %lx %lx\n", XREG(A0), XREG(A1), XREG(A2), XREG(A3), XREG(A4), XREG(A5));
+    debugf("syscall.c (next_pid): Got args: %lx %lx %lx %lx %lx %lx\n", XREG(A0), XREG(A1), XREG(A2), XREG(A3), XREG(A4), XREG(A5));
     trap_frame_debug(scratch);
     // Get a PID from the argument
     int pid = XREG(A0);
-    infof("syscall.c (next_pid): Got PID %d\n", pid);
+    debugf("syscall.c (next_pid): Got PID %d\n", pid);
     pid %= PID_LIMIT;
 
     // Get the next highest PID
     for (uint16_t i = pid + 1; i < PID_LIMIT; ++i) {
         pid = i % PID_LIMIT;
-        // infof("syscall.c (next_pid): Checking PID %x\n", pid);
+        // debugf("syscall.c (next_pid): Checking PID %x\n", pid);
         if (process_map_contains(pid)) {
             XREG(A0) = pid;
             return;
@@ -293,7 +293,7 @@ SYSCALL(next_pid)
 
 SYSCALL(yield)
 {
-    infof("syscall.c (yield): Got args: %lx %lx %lx %lx %lx %lx\n", XREG(A0), XREG(A1), XREG(A2), XREG(A3), XREG(A4), XREG(A5));
+    debugf("syscall.c (yield): Got args: %lx %lx %lx %lx %lx %lx\n", XREG(A0), XREG(A1), XREG(A2), XREG(A3), XREG(A4), XREG(A5));
     SYSCALL_ENTER();
     // sched_invoke(hart);
 }
@@ -322,7 +322,7 @@ SYSCALL(sleep)
 
     /*
     // Commented out until we implement an IO buffer for the process
-    // infof("syscall.c (sleep) Sleeping PID %d at %d until %d\n", p->pid, sbi_get_time(), sbi_get_time() + XREG(A0) * VIRT_TIMER_FREQ / 1000);
+    // debugf("syscall.c (sleep) Sleeping PID %d at %d until %d\n", p->pid, sbi_get_time(), sbi_get_time() + XREG(A0) * VIRT_TIMER_FREQ / 1000);
     // p->sleep_until = sbi_get_time() + XREG(A0) * VIRT_TIMER_FREQ / 1000;
     // p->state = PS_SLEEPING;
     */
@@ -331,7 +331,7 @@ SYSCALL(sleep)
 SYSCALL(events)
 {
     SYSCALL_ENTER();
-    infof("syscall.c (events): Got args: %lx %lx %lx %lx %lx %lx\n", XREG(A0), XREG(A1), XREG(A2), XREG(A3), XREG(A4), XREG(A5));
+    debugf("syscall.c (events): Got args: %lx %lx %lx %lx %lx %lx\n", XREG(A0), XREG(A1), XREG(A2), XREG(A3), XREG(A4), XREG(A5));
     
     uint16_t pid = pid_harts_map_get(hart);
     Process *p = sched_get_current();
@@ -389,114 +389,151 @@ SYSCALL(events)
 SYSCALL(screen_draw)
 {
     SYSCALL_ENTER();
-    infof("syscall.c (screen_draw): Drawing\n");
+    debugf("syscall.c (screen_draw): Drawing\n");
 
-    Process *p = sched_get_current();
+    Process *proc = sched_get_current();
     // p->state = PS_WAITING;
 
-    p->sleep_until = sbi_get_time() + VIRT_TIMER_FREQ / 100;
-    p->state = PS_SLEEPING;
-    infof("syscall.c (screen_draw): Got process %d\n", p->pid);
+    // p->sleep_until = sbi_get_time() + VIRT_TIMER_FREQ / 1000000;
+    // p->state = PS_SLEEPING;
+    debugf("syscall.c (screen_draw): Got process %d\n", proc->pid);
 
     // Get the first argument, the buffer to draw
     const Pixel *buf_vaddr = (const Pixel *)XREG(A0);
-    infof("syscall.c (screen_draw): Got buf vaddr %p\n", buf_vaddr);
+    debugf("syscall.c (screen_draw): Got buf vaddr %p\n", buf_vaddr);
     // Get the second argument, the rectangle to draw to
     const Rectangle *rect_vaddr = (const Rectangle *)XREG(A1);
-    infof("syscall.c (screen_draw): Got rect vaddr %p\n", rect_vaddr);
+    debugf("syscall.c (screen_draw): Got rect vaddr %p\n", rect_vaddr);
+
+    // Get the scale factor
+    uint64_t x_scale = XREG(A2);
+    debugf("syscall.c (screen_draw): Got scale %d\n", x_scale);
+    // Get the scale factor
+    uint64_t y_scale = XREG(A3);
+    debugf("syscall.c (screen_draw): Got scale %d\n", y_scale);
 
     // Translate the buffer to a physical address
-    const Pixel *buf_paddr = mmu_translate(p->rcb.ptable, (uintptr_t)buf_vaddr);
+    const Pixel *buf_paddr = mmu_translate(proc->rcb.ptable, (uintptr_t)buf_vaddr);
     if (buf_paddr == -1UL) {
         warnf("syscall.c (screen_draw): MMU translated to null\n");
         // MMU translated to null
         XREG(A0) = -EFAULT;
         return;
     } else {
-        infof("syscall.c (screen_draw): Buffer %p found\n", (char *)buf_paddr);
+        debugf("syscall.c (screen_draw): Buffer %p found\n", (char *)buf_paddr);
     }
 
-    const Rectangle *rect_paddr = mmu_translate(p->rcb.ptable, (uintptr_t)rect_vaddr);
+    const Rectangle *rect_paddr = mmu_translate(proc->rcb.ptable, (uintptr_t)rect_vaddr);
     if (rect_paddr == -1UL) {
         warnf("syscall.c (screen_draw): MMU translated to null\n");
         // MMU translated to null
         XREG(A0) = -EFAULT;
         return;
     } else {
-        infof("syscall.c (screen_draw): Rect %p found\n", (char *)rect_paddr);
+        debugf("syscall.c (screen_draw): Rect %p found\n", (char *)rect_paddr);
     }
 
     Console *console = gpu_get_console();
-    infof("Console at %p\n", console);
-    Pixel *frame_buf = console->frame_buf;
-    uint32_t screen_width = console->width;
-    uint32_t screen_height = console->height;
-    infof("Screen width %d\n", screen_width);
-    infof("Screen height %d\n", screen_height);
+    debugf("Console at %p\n", console);
+    Pixel *frame_buf = gpu_get_frame_buf();
+    Rectangle *screen_rect = gpu_get_screen_rect();
+    uint32_t screen_width = screen_rect->width;
+    uint32_t screen_height = screen_rect->height;
+    debugf("Screen width %d\n", screen_width);
+    debugf("Screen height %d\n", screen_height);
 
-    uint32_t x = rect_paddr->x;
-    uint32_t y = rect_paddr->y;
+    uint32_t base_x = rect_paddr->x;
+    uint32_t base_y = rect_paddr->y;
     uint32_t width = rect_paddr->width;
     uint32_t height = rect_paddr->height;
 
-    infof("syscall.c (screen_draw): Drawing rect %d %d %d %d\n", x, y, width, height);
     // Draw the buffer
+    // for (unsigned y_ = 0; y_ < height; ++y_) {
+    //     for (unsigned x_ = 0; x_ < width; ++x_) {
+    //         if (base_x + x_ >= screen_width || base_y + y_ >= screen_height) {
+    //             continue;
+    //         }
+    //         // debugf("syscall.c (screen_draw): Drawing pixel %d %d\n", x + x_, y + y_);
+    //         frame_buf[(base_y + y_) * screen_width + (base_x + x_)] = buf_paddr[y_ * width + x_];
+    //     }
+    // }
+    XREG(A0) = 0;
+    // for (uint32_t y=0; y < height * y_scale; y += y_scale) {
+    //     for (uint32_t x=0; x < width * x_scale; x += x_scale) {
+    //         uint32_t frame_buf_x = base_x + x;
+    //         uint32_t frame_buf_y = base_y + y;
+    //         uint32_t frame_buff_offset = frame_buf_y * screen_width + frame_buf_x;
+    //         if (frame_buf_x >= screen_width || frame_buf_y >= screen_height) {
+    //             XREG(A0) = -EFAULT;
+    //             continue;
+    //         }
+    //         uint32_t user_buf_x = x / x_scale;
+    //         uint32_t user_buf_y = y / y_scale;
+    //         uint32_t user_buf_offset = user_buf_y * width + user_buf_x;
+    //         Pixel p = buf_paddr[user_buf_offset];
+    //         debugf("syscall.c (screen_draw): Drawing pixel r=%d g=%d b=%d a=%d at (%d,%d)\n", p.r, p.g, p.b, p.a, frame_buf_x, frame_buf_y);
+    //         for (uint32_t sy = 0; sy < y_scale; ++sy) {
+    //             for (uint32_t sx = 0; sx < x_scale; ++sx) {
+    //                 uint32_t frame_buf_x = base_x + x + sx;
+    //                 uint32_t frame_buf_y = base_y + y + sy;
+    //                 uint32_t frame_buff_offset = frame_buf_y * screen_width + frame_buf_x;
+    //                 if (frame_buf_x >= screen_width || frame_buf_y >= screen_height) {
+    //                     XREG(A0) = -EFAULT;
+    //                     continue;
+    //                 }
+    //                 // If the pixel is non-zero, print it
+    //                 if (p.r || p.g || p.b || p.a) {
+    //                     // debugf("syscall.c (screen_draw): Drawing pixel r=%d g=%d b=%d a=%d at (%d,%d)\n", p.r, p.g, p.b, p.a, frame_buf_x, frame_buf_y);
+    //                 }
+    //                 frame_buf[frame_buff_offset] = p;
+    //             }
+    //         }
+
+    //     }
+    // }
+
+    // Draw the buffer scaled by `scale`
     for (unsigned y_ = 0; y_ < height; ++y_) {
         for (unsigned x_ = 0; x_ < width; ++x_) {
-            if (x + x_ >= screen_width || y + y_ >= screen_height) {
-                continue;
+            // if (x + x_ * x_scale >= screen_width || y + y_ * y_scale >= screen_height) {
+            //     XREG(A0) = -EFAULT;
+            //     continue;
+            // }
+            // debugf("syscall.c (screen_draw): Drawing pixel %d %d\n", x + x_, y + y_);
+            Pixel p = *(Pixel*)mmu_translate(proc->rcb.ptable, &buf_vaddr[y_ * width + x_]);
+            for (unsigned sy = 0; sy < y_scale; ++sy) {
+                for (unsigned sx = 0; sx < x_scale; ++sx) {
+                    uint64_t x_pos = base_x + x_ * x_scale + sx;
+                    uint64_t y_pos = base_y + y_ * y_scale + sy;
+
+                    if (x_pos >= screen_width || y_pos >= screen_height) {
+                        XREG(A0) = -EFAULT;
+                        continue;
+                    }
+
+                    frame_buf[y_pos * screen_width + x_pos] = p;
+                }
             }
-            // infof("syscall.c (screen_draw): Drawing pixel %d %d\n", x + x_, y + y_);
-            frame_buf[(y + y_) * screen_width + (x + x_)] = buf_paddr[y_ * width + x_];
         }
     }
-    // memcpy(gpu_get_console()->frame_buf, 
-    // gpu_draw_rect(rect_paddr, );
-    Rectangle screen_rect;
-    screen_rect.x = 0;
-    screen_rect.y = 0;
-    screen_rect.width = screen_width;
-    screen_rect.height = screen_height;
-    // gpu_fill_rect(screen_rect, pixel);
-    // CSR_CLEAR("sie");
-    infof("syscall.c (screen_draw): Flushing\n");
-    gpu_transfer_to_host_2d(&screen_rect, 1, 0);
-    gpu_flush();
-    infof("syscall.c (screen_draw): Flushed\n");
-
-    // WFI();
-    // Flush the buffer
-    // Rectangle screen_rect;
-    // screen_rect.x = 0;
-    // screen_rect.y = 0;
-    // screen_rect.width = 256;
-    // screen_rect.height = 256;
-    // // Draw a rectangle
-    // Pixel pixel = {0xFF, 0x00, 0x00, 0xFF};
-    // gpu_fill_rect(screen_rect, pixel);
-
-    // infof("syscall.c (screen_draw): Flushing\n");
-    // gpu_transfer_to_host_2d(&screen_rect, 1, 0);
-    // infof("syscall.c (screen_draw): Flushed\n");
-
-    // // Flush the buffer
-    // gpu_flush();
+    debugf("syscall.c (screen_draw): Drawn\n");
+    
 }
 
 SYSCALL(screen_get_dims)
 {
     SYSCALL_ENTER();
-    infof("syscall.c (screen_get_dims): Writing dims to rectangle in userspace\n");
+    debugf("syscall.c (screen_get_dims): Writing dims to rectangle in userspace\n");
     Process *p = sched_get_current();
     // p->state = PS_WAITING;
-    infof("syscall.c (screen_draw): Got process %d\n", p->pid);
+    debugf("syscall.c (screen_draw): Got process %d\n", p->pid);
 
     // Get the first argument, the buffer to draw
     // const Pixel *buf_vaddr = (const Pixel *)XREG(A0);
-    // infof("syscall.c (screen_draw): Got buf vaddr %p\n", buf_vaddr);
+    // debugf("syscall.c (screen_draw): Got buf vaddr %p\n", buf_vaddr);
     // Get the second argument, the rectangle to draw to
     const Rectangle *rect_vaddr = (const Rectangle *)XREG(A0);
-    infof("syscall.c (screen_draw): Got rect vaddr %p\n", rect_vaddr);
+    debugf("syscall.c (screen_draw): Got rect vaddr %p\n", rect_vaddr);
 
     // Translate the buffer to a physical address
     const Pixel *rect_paddr = mmu_translate(p->rcb.ptable, (uintptr_t)rect_vaddr);
@@ -507,17 +544,18 @@ SYSCALL(screen_get_dims)
         XREG(A0) = -EFAULT;
         return;
     } else {
-        infof("syscall.c (screen_draw): Rect %p found\n", (char *)rect_paddr);
+        debugf("syscall.c (screen_draw): Rect %p found\n", (char *)rect_paddr);
     }
+    memcpy((void *)rect_paddr, gpu_get_screen_rect(), sizeof(Rectangle));
 
-    Console *console = gpu_get_console();
-    infof("Console at %p\n", console);
-    Rectangle screen_rect;
-    screen_rect.x = 0;
-    screen_rect.y = 0;
-    screen_rect.width = console->width;
-    screen_rect.height = console->height;
-    memcpy((void *)rect_paddr, &screen_rect, sizeof(Rectangle));
+}
+
+SYSCALL(screen_flush) {
+    SYSCALL_ENTER();
+    debugf("syscall.c (screen_flush): Flushing\n");
+    gpu_transfer_to_host_2d(gpu_get_screen_rect(), 1, 0);
+    gpu_flush();
+    debugf("syscall.c (screen_flush): Flushed\n");
 }
 
 SYSCALL(get_time)
@@ -560,6 +598,7 @@ static SYSCALL_RETURN_TYPE (*const SYSCALLS[])(SYSCALL_PARAM_LIST) = {
     SYSCALL_PTR(screen_draw),  /* 12 */
     SYSCALL_PTR(screen_get_dims), /* 13 */
     SYSCALL_PTR(get_time),   /* 14 */
+    SYSCALL_PTR(screen_flush), /* 15 */
 };
 
 static const int NUM_SYSCALLS = sizeof(SYSCALLS) / sizeof(SYSCALLS[0]);

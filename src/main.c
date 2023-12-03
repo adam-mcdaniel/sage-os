@@ -43,9 +43,13 @@ static void init_systems(void)
     debugf("Kernel page table at %p\n", pt);
     // Map memory segments for our kernel
     debugf("Mapping kernel segments\n");
-    mmu_map_range(pt, sym_start(text), sym_end(heap), sym_start(text), MMU_LEVEL_1G,
+    uint64_t size_of_mem = sym_end(memory) - sym_start(memory);
+    infof("Size of memory: %x\n", size_of_mem);
+    mmu_map_range(pt, sym_start(memory), sym_end(memory), sym_start(memory), MMU_LEVEL_1G,
                   PB_READ | PB_WRITE | PB_EXECUTE);
-    // PLIC
+    // // PLIC
+    // mmu_map_range(pt, sym_start(memory) + 0x40000000, sym_end(memory), sym_start(memory) + 0x40000000, MMU_LEVEL_1G,
+    //               PB_READ | PB_WRITE | PB_EXECUTE);
     debugf("Mapping PLIC\n");
     mmu_map_range(pt, 0x0C000000, 0x0C2FFFFF, 0x0C000000, MMU_LEVEL_2M, PB_READ | PB_WRITE);
     // PCIe ECAM
@@ -241,7 +245,8 @@ void main(unsigned int hart)
     vfs_init();
 
     // Read in /home/cosc562/console.elf
-    File *elf_file = vfs_open("/home/cosc562/console.elf", 0, O_RDONLY, VFS_TYPE_FILE);
+    File *elf_file = vfs_open("/home/cosc562/draw.elf", 0, O_RDONLY, VFS_TYPE_FILE);
+    // File *elf_file = vfs_open("/home/cosc562/console.elf", 0, O_RDONLY, VFS_TYPE_FILE);
     // File *elf_file = vfs_open("/home/cosc562/bonzai.elf", 0, O_RDONLY, VFS_TYPE_FILE);
     // File *elf_file = vfs_open("/home/cosc562/bonzai.elf", 0, O_RDONLY, VFS_TYPE_FILE);
     // File *elf_file = vfs_open("/home/cosc562/hex_editor.elf", 0, O_RDONLY, VFS_TYPE_FILE);

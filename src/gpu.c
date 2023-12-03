@@ -23,9 +23,14 @@
 static Vector *device_active_jobs;
 static VirtioDevice *gpu_device = NULL;
 static Console console; // NOTE: Figure how this is supposed to be interfaced, allocate appropriately
+static Rectangle screen_rect;
 
 bool gpu_test() {
     return gpu_init(gpu_device);
+}
+
+uint64_t rect_area(const Rectangle *rect) {
+    return rect->width * rect->height;
 }
 
 VirtioDevice *gpu_get_device() {
@@ -34,6 +39,14 @@ VirtioDevice *gpu_get_device() {
 
 Console *gpu_get_console() {
     return &console;
+}
+
+Pixel *gpu_get_frame_buf() {
+    return console.frame_buf;
+}
+
+Rectangle *gpu_get_screen_rect() {
+    return &screen_rect;
 }
 
 void gpu_device_init() {
@@ -75,6 +88,12 @@ bool gpu_init(VirtioDevice *gpu_device) {
     // Allocate memory for frame buffer
     console.width = disp_info.displays[0].rect.width;
     console.height = disp_info.displays[0].rect.height;
+    
+    screen_rect.x = 0;
+    screen_rect.y = 0;
+    screen_rect.width = console.width;
+    screen_rect.height = console.height;
+
     console.frame_buf = kcalloc(console.width * console.height, sizeof(Pixel));
     debugf("gpu_init: Allocated frame buffer of (%d * %d) bytes at %p\n",
            sizeof(Pixel), console.width * console.height, console.frame_buf);

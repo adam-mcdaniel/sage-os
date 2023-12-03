@@ -177,3 +177,7 @@ void stroke_rect(uint32_t screen_width,
                  const Pixel *line_color,
                  uint32_t line_size);
 void gpu_fill_rect(Rectangle rect, Pixel color);
+Pixel *gpu_get_frame_buf();
+Rectangle *gpu_get_screen_rect();
+
+uint64_t rect_area(const Rectangle *rect);

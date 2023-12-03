@@ -21,7 +21,7 @@
 #include <process.h>
 #include <sched.h>
 
-#define ELF_DEBUG
+// #define ELF_DEBUG
 #ifdef ELF_DEBUG
 #define debugf(...) debugf(__VA_ARGS__)
 #else
@@ -774,13 +774,13 @@ int elf_create_process(Process *p, const uint8_t *elf) {
     debugf("Getting sizes of segments\n");
     #define min(a, b) ((a) < (b)? (a) : (b))
     #define max(a, b) ((a) > (b)? (a) : (b))
-    uint64_t text_size = max(ALIGN_UP_TO_PAGE(elf_is_valid_text(text_header)? text_header.p_memsz : 0), 0x10000);
+    uint64_t text_size = max(ALIGN_UP_TO_PAGE(elf_is_valid_text(text_header)? text_header.p_memsz : 0), 0x1000);
     debugf("Text size: %x\n", text_size);
-    uint64_t rodata_size = max(ALIGN_UP_TO_PAGE(elf_is_valid_rodata(rodata_header)? rodata_header.p_memsz : 0), 0x10000);
+    uint64_t rodata_size = max(ALIGN_UP_TO_PAGE(elf_is_valid_rodata(rodata_header)? rodata_header.p_memsz : 0), 0x1000);
     debugf("RODATA size: %x\n", rodata_size);
-    uint64_t bss_size = max(ALIGN_UP_TO_PAGE(elf_is_valid_bss(bss_header)? bss_header.p_memsz : 0), 0x10000);
+    uint64_t bss_size = max(ALIGN_UP_TO_PAGE(elf_is_valid_bss(bss_header)? bss_header.p_memsz : 0), 0x1000);
     debugf("BSS size: %x\n", bss_size);
-    uint64_t data_size = max(ALIGN_UP_TO_PAGE(elf_is_valid_data(data_header) && data_header.p_vaddr != bss_header.p_vaddr? data_header.p_memsz : 0), 0x10000);
+    uint64_t data_size = max(ALIGN_UP_TO_PAGE(elf_is_valid_data(data_header) && data_header.p_vaddr != bss_header.p_vaddr? data_header.p_memsz : 0), 0x1000);
     debugf("DATA size: %x\n", data_size);
 
     // p->heap_size = USER_HEAP_SIZE * 2;
@@ -841,14 +841,14 @@ int elf_create_process(Process *p, const uint8_t *elf) {
 
     // Create the process
     p->text = text;
-    p->text_vaddr = text ? (uint8_t *)text_header.p_vaddr : NULL;
+    p->text_vaddr = text? (uint8_t *)text_header.p_vaddr : NULL;
     p->text_size = text_size;
     debugf("Text: %p\n", p->text);
     debugf("Text vaddr: %p\n", p->text_vaddr);
     debugf("Text size: %lu\n", p->text_size);
     
     p->bss = bss;
-    p->bss_vaddr = bss ? (uint8_t *)bss_header.p_vaddr : NULL;
+    p->bss_vaddr = bss? (uint8_t *)bss_header.p_vaddr : NULL;
     p->bss_size = bss_size;
     debugf("BSS: %p\n", p->bss);
     debugf("BSS vaddr: %p\n", p->bss_vaddr);
@@ -856,14 +856,14 @@ int elf_create_process(Process *p, const uint8_t *elf) {
     
 
     p->rodata = rodata;
-    p->rodata_vaddr = rodata ? (uint8_t *)rodata_header.p_vaddr : NULL;
+    p->rodata_vaddr = rodata? (uint8_t *)rodata_header.p_vaddr : NULL;
     p->rodata_size = rodata_size;
     debugf("RODATA: %p\n", p->rodata);
     debugf("RODATA vaddr: %p\n", p->rodata_vaddr);
     debugf("RODATA size: %lu\n", p->rodata_size);
 
     p->data = data;
-    p->data_vaddr = data ? (uint8_t *)data_header.p_vaddr : NULL;
+    p->data_vaddr = data? (uint8_t *)data_header.p_vaddr : NULL;
     p->data_size = data_size;
     debugf("DATA: %p\n", p->data);
     debugf("DATA vaddr: %p\n", p->data_vaddr);
@@ -953,7 +953,7 @@ int elf_create_process(Process *p, const uint8_t *elf) {
         rcb_map(&p->rcb, 
                 rodata_header.p_vaddr, 
                 kernel_mmu_translate((uint64_t)rodata), 
-                (rodata_size / 0x1000 + 1) * 0x1000,
+                (rodata_size / 0x1000) * 0x1000,
                 permission_bits);
     }
     if (bss) {
@@ -967,7 +967,7 @@ int elf_create_process(Process *p, const uint8_t *elf) {
         rcb_map(&p->rcb, 
                 bss_header.p_vaddr, 
                 kernel_mmu_translate((uint64_t)bss), 
-                (bss_size / 0x1000 + 1) * 0x1000,
+                (bss_size / 0x1000) * 0x1000,
                 permission_bits);
     }
     if (data) {
@@ -981,7 +981,7 @@ int elf_create_process(Process *p, const uint8_t *elf) {
         rcb_map(&p->rcb, 
                 data_header.p_vaddr, 
                 kernel_mmu_translate((uint64_t)data), 
-                (data_size / 0x1000 + 1) * 0x1000,
+                (data_size / 0x1000) * 0x1000,
                 permission_bits);
     }
 
@@ -1004,8 +1004,8 @@ int elf_create_process(Process *p, const uint8_t *elf) {
     }
     if (bss) {
         debugf("Copying data segment\n");
+        memset(bss, 0, bss_size);
         memcpy(bss, elf + bss_header.p_offset, data_size);
-        // memset(bss, 0, bss_size);
     }
     
     // Get _bss_start and _bss_end
@@ -1018,7 +1018,7 @@ int elf_create_process(Process *p, const uint8_t *elf) {
         uint8_t *bss_start = mmu_translate(p->rcb.ptable, bss_start_sym->st_value);
         uint8_t *bss_end = mmu_translate(p->rcb.ptable, bss_end_sym->st_value);
         debugf("Clearing bss segment from %p to %p\n", bss_start, bss_end);
-        memset(bss_start, 0, bss_end - bss_start);
+        // memset(bss_start, 0, bss_end - bss_start);
     } else {
         debugf("Could not find _bss_start and _bss_end symbols\n");
     }

@@ -6,12 +6,6 @@
 #include <debug.h>
 
 // The heap virtual address will NOT map 1-to-1 with physical addresses.
-// #define KERNEL_HEAP_START_VADDR 0x1c0ffee000UL
-// #define KERNEL_HEAP_PAGES       4096
-// #define KERNEL_HEAP_END_VADDR   (KERNEL_HEAP_START_VADDR + (KERNEL_HEAP_PAGES * 4096))
-
-#define DEBUG_KMALLOC
-// #define DEBUG_HEAP
 
 typedef struct Block {
     void *addr;
