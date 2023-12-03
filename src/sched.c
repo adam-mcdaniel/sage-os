@@ -29,7 +29,7 @@ Scheduler - uses completely fair scheduler approach
 static RBTree *sched_tree;
 static Mutex sched_lock = MUTEX_UNLOCKED;
 
-static Process *idle_process, *current_process;
+static Process *idle_process = NULL, *current_process = NULL;
 
 void sbi_print(char *c) {
     while (*c != '\0') {
@@ -56,7 +56,7 @@ void idle_process_main() {
         #ifdef DEBUG_SCHED
         sbi_print("Idle woke up!\n");
         #endif
-        infof("Idle woke up!\n");
+        // infof("Idle woke up!\n");
         WFI();
     }
 }
@@ -336,7 +336,7 @@ Process *sched_get_next() {
 // Function to handle the timer interrupt for context switching
 void sched_handle_timer_interrupt(int hart) {
     if (!is_init) {
-        fatalf("sched_handle_timer_interrupt: Scheduler not initialized\n");
+        warnf("sched_handle_timer_interrupt: Scheduler not initialized\n");
         return;
     }
 
@@ -390,7 +390,6 @@ void sched_handle_timer_interrupt(int hart) {
         debugf("sched_handle_timer_interrupt: No Process to run\n");
         next_process = sched_get_idle_process();
     }
-
 
     if (next_process == sched_get_idle_process()) {
         next_process->frame->sepc = (uint64_t) idle_process_main;
@@ -497,6 +496,10 @@ Process *sched_get_current(void) {
 // }
 
 void set_current_process(Process *proc) {
+    if (proc == NULL) {
+        warnf("set_current_process: Process is NULL\n");
+        return;
+    }
     mutex_spinlock(&proc->lock);
     
     if (!process_map_contains(proc->pid)) {

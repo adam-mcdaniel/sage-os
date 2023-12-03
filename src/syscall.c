@@ -14,7 +14,7 @@
 #include <virtio.h>
 #include <gpu.h>
 
-// #define SYSCALL_DEBUG
+#define SYSCALL_DEBUG
 #ifdef SYSCALL_DEBUG
 #define debugf(...) debugf(__VA_ARGS__)
 #else
@@ -394,7 +394,7 @@ SYSCALL(screen_draw)
     Process *p = sched_get_current();
     // p->state = PS_WAITING;
 
-    p->sleep_until = sbi_get_time() + VIRT_TIMER_FREQ / 1000;
+    p->sleep_until = sbi_get_time() + VIRT_TIMER_FREQ / 100;
     p->state = PS_SLEEPING;
     infof("syscall.c (screen_draw): Got process %d\n", p->pid);
 
@@ -461,11 +461,11 @@ SYSCALL(screen_draw)
     // CSR_CLEAR("sie");
     infof("syscall.c (screen_draw): Flushing\n");
     gpu_transfer_to_host_2d(&screen_rect, 1, 0);
+    gpu_flush();
     infof("syscall.c (screen_draw): Flushed\n");
 
-    WFI();
+    // WFI();
     // Flush the buffer
-    gpu_flush();
     // Rectangle screen_rect;
     // screen_rect.x = 0;
     // screen_rect.y = 0;
@@ -569,9 +569,9 @@ void syscall_handle(int hart, uint64_t epc, int64_t *scratch)
 {
     // Sched invoke will save sepc, so we want it to resume
     // 4 bytes ahead, which will be the next instruction.
-    CSR_WRITE("sepc", epc + 4);
-    TrapFrame *tf = (TrapFrame *)scratch;
-    tf->sepc = epc + 4;
+    // CSR_WRITE("sepc", epc + 4);
+    // TrapFrame *tf = (TrapFrame *)scratch;
+    // tf->sepc = epc + 4;
 
     if (XREG(A7) >= NUM_SYSCALLS || SYSCALLS[XREG(A7)] == NULL) {
         // Invalid syscall

@@ -114,7 +114,7 @@ static void init_systems(void)
     CSR_WRITE("stvec", trampoline_trap_start);
     debugf("STVEC: 0x%p, 0x%p\n", stvec, trampoline_trap_start);
 
-    kernel_trap_frame = kzalloc(sizeof(Trapframe) * 10);
+    kernel_trap_frame = kzalloc(sizeof(TrapFrame) * 10);
     
     CSR_READ(kernel_trap_frame->sepc, "sepc");
     CSR_READ(kernel_trap_frame->satp, "satp");
@@ -264,8 +264,8 @@ void main(unsigned int hart)
 
     // WFI();
 
-    CSR_READ(kernel_trap_frame->sie, "sie");
-    kernel_trap_frame->sie |= SIE_SSIE | SIE_SEIE;
+    // CSR_READ(kernel_trap_frame->sie, "sie");
+    kernel_trap_frame->sie = SIE_SSIE;
     CSR_WRITE("sie", kernel_trap_frame->sie);
 
     // process_run(p, 0);
