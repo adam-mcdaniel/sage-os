@@ -36,9 +36,14 @@ typedef struct InputDevice {
 void input_device_init(VirtioDevice *device);
 void get_input_device_config(VirtioDevice *device, uint8_t select, uint8_t subsel, uint8_t size);
 void input_device_receive_buffer_init(InputDevice *input_dev);
-uint16_t input_device_get_prod_id(volatile VirtioInputConfig *config);
+uint16_t input_device_get_prod_id(volatile VirtioInputConfig *config, char *name);
 void input_device_isr(VirtioDevice *device);
 
 InputDevice *input_device_get_keyboard();
 InputDevice *input_device_get_tablet();
 bool input_device_buffer_pop(InputDevice *input_dev, VirtioInputEvent *event);
+
+
+VirtioInputEvent input_device_get_next_event(InputDevice *input_dev);
+VirtioInputEvent keyboard_get_next_event();
+VirtioInputEvent tablet_get_next_event();

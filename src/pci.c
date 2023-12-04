@@ -566,6 +566,8 @@ void pci_dispatch_irq(int irq)
             uint16_t received = virtio_receive_descriptor_chain(virtdevice, 0, descriptors, 3, true);
             debugf("Received %d descriptors\n", received);
             virtio_handle_interrupt(virtdevice, descriptors, received);
+        } else {
+            fatalf("Unknown virtio device sent interrupt!\n");
         }
     }
 

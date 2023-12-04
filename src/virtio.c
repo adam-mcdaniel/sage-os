@@ -516,7 +516,7 @@ void virtio_init(void) {
     }
     for (uint16_t i=0; i<virtio_count_saved_devices(); i++) {
         VirtioDevice *dev = virtio_get_nth_saved_device(i);
-        debugf("Found device #%u: \"%s\"\n", i, virtio_get_device_name(dev));
+        infof("Found device #%u: \"%s\"\n", i, virtio_get_device_name(dev));
     }
     debugf("virtio_init: Done initializing virtio system\n");
 }

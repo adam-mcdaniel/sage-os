@@ -100,7 +100,7 @@ void os_trap_handler(void)
 
         switch (cause) {
             case CAUSE_SSIP:
-                debugf("os_trap_handerl: Supervisor software interrupt!\n");
+                infof("os_trap_handerl: Supervisor software interrupt!\n");
                 // TODO
                 break;
             case CAUSE_STIP:
