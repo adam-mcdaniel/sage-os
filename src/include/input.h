@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <virtio.h>
 
-#define INPUT_EVENT_BUFFER_SIZE 32
+#define INPUT_EVENT_BUFFER_SIZE 16
 
 typedef enum virtio_input_config_select {
     VIRTIO_INPUT_CFG_UNSET = 0x00,

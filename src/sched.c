@@ -177,6 +177,7 @@ void sched_init() {
     // p->frame.sepc = (uint64_t) idle_process_main;
     // CSR_READ(p->frame.sstatus, "sstatus");
     
+    idle_process->runtime += CONTEXT_SWITCH_TIMER * idle_process->quantum;
     // process_map_set(p);
     set_current_process(idle_process);
     //add idle Process to scheduler tree
@@ -209,6 +210,8 @@ void sched_print_processes() {
     mutex_unlock(&sched_lock);
 }
 
+static int total_processes = 0;
+
 //adds node to scheduler tree
 void sched_add(Process *p) {  
     mutex_spinlock(&sched_lock);
@@ -219,8 +222,11 @@ void sched_add(Process *p) {
     }
 
     mutex_spinlock(&p->lock);
+    total_processes++;
     //NOTE: Process key is runtime * priority
     rb_insert_ptr(sched_tree, p->runtime * p->priority, p);
+    // process_map_set(p);
+    // pid_harts_map_set(p->hart, p->pid);
     debugf("Scheduled Process %d with runtime %d and priority %d\n", p->pid, p->runtime, p->priority);
     mutex_unlock(&p->lock);
     mutex_unlock(&sched_lock);
@@ -229,6 +235,7 @@ void sched_add(Process *p) {
 void sched_invoke(Process *p, int hart) {
     is_init = true;
     debugf("sched_invoke: Invoking scheduler on hart %d\n", hart);
+    p->hart = hart;
     sched_add(p);
     process_run(p, hart);
 }
@@ -277,6 +284,7 @@ Process *sched_get_next() {
         // If the process is dead, remove it from the tree
         if (min_process->state == PS_DEAD) {
             rb_delete(sched_tree, min_process->runtime * min_process->priority);
+            total_processes-=1;
         }
 
         if (min_process->state == PS_SLEEPING) {
@@ -380,6 +388,7 @@ void sched_handle_timer_interrupt(int hart) {
 
     if (current_proc->state != PS_DEAD) {
         debugf("sched_handle_timer_interrupt: Putting Process %d back in scheduler\n", current_proc->pid);
+        total_processes-=1;
         rb_insert_ptr(sched_tree, current_proc->runtime * current_proc->priority, current_proc);
     }
 
@@ -391,6 +400,10 @@ void sched_handle_timer_interrupt(int hart) {
         next_process = sched_get_idle_process();
     }
 
+    if (next_process == sched_get_idle_process() && total_processes > 1 && current_proc != sched_get_idle_process() && current_proc != NULL && current_proc->state != PS_DEAD) {
+        debugf("Short circuiting idle process to execute Process %d\n", current_proc->pid);
+        next_process = current_proc;
+    }
     if (next_process == sched_get_idle_process()) {
         next_process->frame->sepc = (uint64_t) idle_process_main;
         debugf("sched_handle_timer_interrupt: Next Process to run is idle\n");
