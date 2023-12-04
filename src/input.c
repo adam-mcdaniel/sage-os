@@ -42,8 +42,8 @@ void input_device_init(VirtioDevice *device) {
     case EV_KEY:
         // virtio_set_device_name(device, "Keyboard");
         input_dev = &keyboard_dev;
-        device->is_keyboard = 1;
-        device->is_tablet = 0;
+        device->is_keyboard = 0;
+        device->is_tablet = 1;
         keyboard_dev.viodev = device;
         break;
     case EV_ABS:
@@ -74,10 +74,6 @@ bool is_initialized() {
 
 // At device init, populate the driver ring with receive buffers so we can receive events
 void input_device_receive_buffer_init(InputDevice *input_dev) {
-    if (!is_initialized()) {
-        warnf("input_device_receive_buffer_init: Input device not initialized\n");
-        return;
-    }
     for (int i = 0; i < INPUT_EVENT_BUFFER_SIZE; i++) {
         VirtioDescriptor recv_buf_desc;
         recv_buf_desc.addr = kernel_mmu_translate((uintptr_t)&input_dev->event_buffer[i]);
@@ -143,19 +139,19 @@ VirtioInputEvent input_device_get_next_event(InputDevice *input_dev) {
         return event;
     }
     VirtioInputEvent event;
-    if (input_dev->buffer_count == 0) {
-        warnf("input_device_get_next_event: Input event buffer empty\n");
-        event.type = 0;
-        event.code = 0;
-        event.value = 0;
-        return event;
-    }
+    // if (input_dev->buffer_count == 0) {
+    //     warnf("input_device_get_next_event: Input event buffer empty\n");
+    //     event.type = 0;
+    //     event.code = 0;
+    //     event.value = 0;
+    //     return event;
+    // }
 
     // Get the next event from the head of the buffer
     event = input_dev->event_buffer[input_dev->buffer_head];
     input_dev->buffer_head = (input_dev->buffer_head + 1) % INPUT_EVENT_BUFFER_SIZE;
     --input_dev->buffer_count;
-    infof("input_device_buffer_pop: Popped event: type = 0x%x, code = 0x%x, value = 0x%x\n", event.type, event.code, event.value);
+    infof("input_device_buffer_pop: %.60s popped event: type = 0x%x, code = 0x%x, value = 0x%x\n", input_dev->viodev->name, event.type, event.code, event.value);
 
     return event;
 }
@@ -207,9 +203,11 @@ void handle_input(InputDevice *device) {
             // This is a key event
             // input_dev = &keyboard_dev;
             input_device_push_event(&keyboard_dev, *event_ptr);
+            // input_device_push_event(&tablet_dev, *event_ptr);
         } else {
             // This is a tablet event
             // input_dev = &tablet_dev;
+            // input_device_push_event(&keyboard_dev, *event_ptr);
             input_device_push_event(&tablet_dev, *event_ptr);
         }
 
