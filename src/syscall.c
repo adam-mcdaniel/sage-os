@@ -13,6 +13,7 @@
 #include <util.h>
 #include <virtio.h>
 #include <gpu.h>
+#include <uaccess.h>
 
 // #define SYSCALL_DEBUG
 #ifdef SYSCALL_DEBUG
@@ -433,6 +434,8 @@ SYSCALL(screen_draw)
         debugf("syscall.c (screen_draw): Rect %p found\n", (char *)rect_paddr);
     }
 
+    debugf("syscall.c (screen_draw): Drawing to %d %d %d %d\n", rect_paddr->x, rect_paddr->y, rect_paddr->width, rect_paddr->height);
+
     Console *console = gpu_get_console();
     debugf("Console at %p\n", console);
     Pixel *frame_buf = gpu_get_frame_buf();
@@ -499,8 +502,8 @@ SYSCALL(screen_draw)
             //     XREG(A0) = -EFAULT;
             //     continue;
             // }
-            debugf("syscall.c (screen_draw): Drawing pixel %d %d\n", x_ * x_scale, y_ * y_scale);
             Pixel p = *(Pixel*)mmu_translate(proc->rcb.ptable, &buf_vaddr[y_ * width + x_]);
+            // debugf("syscall.c (screen_draw): Drawing pixel %d %d = (r=%d g=%d b=%d a=%d)\n", x_ * x_scale, y_ * y_scale, p.r, p.g, p.b, p.a);
             for (unsigned sy = 0; sy < y_scale; ++sy) {
                 for (unsigned sx = 0; sx < x_scale; ++sx) {
                     uint64_t x_pos = base_x + x_ * x_scale + sx;
@@ -547,15 +550,51 @@ SYSCALL(screen_get_dims)
         debugf("syscall.c (screen_draw): Rect %p found\n", (char *)rect_paddr);
     }
     memcpy((void *)rect_paddr, gpu_get_screen_rect(), sizeof(Rectangle));
+    XREG(A0) = 0;
 
 }
 
 SYSCALL(screen_flush) {
     SYSCALL_ENTER();
-    debugf("syscall.c (screen_flush): Flushing\n");
-    gpu_transfer_to_host_2d(gpu_get_screen_rect(), 1, 0);
-    gpu_flush();
-    debugf("syscall.c (screen_flush): Flushed\n");
+    // Check to see if there's a rectangle supplied in A0
+    // If there is, flush that rectangle
+    // If there isn't, flush the whole screen
+    Process *p = sched_get_current();
+    debugf("syscall.c (screen_draw): Got process %d\n", p->pid);
+    
+    const Rectangle *rect_vaddr = (const Rectangle *)XREG(A0);
+    debugf("syscall.c (screen_flush): Got rect vaddr %p\n", rect_vaddr);
+    if (rect_vaddr) {
+        debugf("syscall.c (screen_flush): Flushing rectangle\n");
+        // Translate the buffer to a physical address
+        const Rectangle *rect_paddr = mmu_translate(p->rcb.ptable, (uintptr_t)rect_vaddr);
+        if (rect_paddr == -1UL) {
+            warnf("syscall.c (screen_flush): MMU translated to null\n");
+            // MMU translated to null
+            XREG(A0) = -EFAULT;
+            return;
+        } else {
+            debugf("syscall.c (screen_flush): Rect %p found\n", (char *)rect_paddr);
+        }
+
+        // Rectangle rect;
+        // copy_from(&rect, p->rcb.ptable, rect_vaddr, sizeof(Rectangle));
+        Rectangle rect = *rect_paddr;
+        debugf("Found rect %d %d %d %d\n", rect.x, rect.y, rect.width, rect.height);
+        gpu_transfer_to_host_2d(gpu_get_screen_rect(), 1, 0);
+        gpu_flush(rect);
+    } else {
+        debugf("syscall.c (screen_flush): Flushing screen\n");
+        Rectangle rect = *gpu_get_screen_rect();
+        gpu_transfer_to_host_2d(&rect, 1, 0);
+        gpu_flush(rect);
+        XREG(A0) = 0;
+    }
+
+    // debugf("syscall.c (screen_flush): Flushing\n");
+    // gpu_transfer_to_hosdt_2d(gpu_get_screen_rect(), 1, 0);
+    // gpu_flush();
+    // debugf("syscall.c (screen_flush): Flushed\n");
 }
 
 SYSCALL(get_keyboard_event)

@@ -151,7 +151,7 @@ bool gpu_test();
 VirtioDevice *gpu_get_device();
 Console *gpu_get_console();
 
-void gpu_flush();
+void gpu_flush(Rectangle rect);
 void gpu_transfer_to_host_2d(const Rectangle *rect, uint32_t resource_id, uint64_t offset);
 
 void gpu_device_init();

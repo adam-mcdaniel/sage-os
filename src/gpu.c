@@ -209,7 +209,7 @@ bool gpu_init(VirtioDevice *gpu_device) {
     //     // debugf("gpu_init: Flush failed with %s\n", gpu_get_resp_string(resp_hdr.type));
     //     // return false;
     // }
-    gpu_flush();
+    gpu_flush(screen_rect);
 
     return true;
 }
@@ -257,13 +257,19 @@ void gpu_transfer_to_host_2d(const Rectangle *rect, uint32_t resource_id, uint64
     // }
 }
 
-void gpu_flush() {
+void gpu_flush(Rectangle rect) {
     VirtioGpuResourceFlush *flush = (VirtioGpuResourceFlush*)kzalloc(sizeof(VirtioGpuResourceFlush));
     flush->hdr.type = VIRTIO_GPU_CMD_RESOURCE_FLUSH;
-    flush->rect.x = 0;
-    flush->rect.y = 0;
-    flush->rect.width = console.width;
-    flush->rect.height = console.height;
+    // flush->rect.x = 0;
+    // flush->rect.y = 0;
+    // flush->rect.width = console.width;
+    // flush->rect.height = console.height;
+    // flush->rect.x = rect.x;
+    // flush->rect.y = rect.y;
+    // flush->rect.width = rect.width;
+    // flush->rect.height = rect.height;
+    flush->rect = rect;
+    debugf("gpu_flush: Flushing rect (%d, %d, %d, %d)\n", flush->rect.x, flush->rect.y, flush->rect.width, flush->rect.height);
     flush->resource_id = 1;
     flush->padding = 0;
     VirtioGpuCtrlHdr *resp_hdr = (VirtioGpuCtrlHdr*)kzalloc(sizeof(VirtioGpuCtrlHdr));

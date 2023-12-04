@@ -21,6 +21,9 @@
 // From src/syscall.c
 void syscall_handle(int hart, uint64_t epc, int64_t *scratch);
 
+
+static uint64_t time_since_scheduler = 0;
+
 // Called from asm/spawn.S: _spawn_kthread
 void os_trap_handler(void)
 {
@@ -91,7 +94,6 @@ void os_trap_handler(void)
     //                 "csrs sstatus, t1\n"
     //                 "csrs sie, t1\n");
 
-
     // debugf("Is async: %d\n", SCAUSE_IS_ASYNC(cause));
 
     if (SCAUSE_IS_ASYNC(cause)) {
@@ -124,12 +126,15 @@ void os_trap_handler(void)
                 //     frame->sepc = epc;
                 // }
                 plic_handle_irq(hart);
+
+
+
                 if (frame->sstatus | SSTATUS_SPP_SUPERVISOR) {
                     debugf("External interrupt: old sepc: %p\n", frame->sepc);
                     frame->sepc = epc;
                     debugf("External interrupt: new sepc: %p\n", frame->sepc);
-                } else if (sched_get_idle_process() != NULL) {
-                    process_run(sched_get_idle_process(), hart);
+                } else if (sched_get_current() != NULL) {
+                    process_run(sched_get_current(), hart);
                 }
                 // p = sched_get_current();
                 // // If there is a current process, we should schedule it
@@ -178,15 +183,28 @@ void os_trap_handler(void)
                 // Get the process
                 p = sched_get_current();
 
+                // if (now - time_since_scheduler > CONTEXT_SWITCH_TIMER || p == sched_get_idle_process() || p->state != PS_RUNNING) {
+                //     debugf("Context switch timer expired. Scheduling next process\n");
+                //     sched_handle_timer_interrupt(hart);
+                // } else {
+                //     debugf("Context switch timer not expired. Resuming process\n");
+                //     process_run(p, hart);
+                // }
+                // return;
+                uint64_t now = sbi_get_time();
+
                 switch (p->state) {
                 case PS_RUNNING:
                     // sched_handle_timer_interrupt(hart);
                     if (p == sched_get_idle_process()) {
                         debugf("Process %d is idle. Scheduling next process\n", p->pid);
                         sched_handle_timer_interrupt(hart);
-                    }  else {
+                    } else if (now - time_since_scheduler > CONTEXT_SWITCH_TIMER) {
                         debugf("Process %d is running. Resuming process\n", p->pid);
                         process_run(p, hart);
+                    } else {
+                        debugf("Process %d is running. Scheduling next process\n", p->pid);
+                        sched_handle_timer_interrupt(hart);
                     }
                     return;
                 case PS_SLEEPING:
