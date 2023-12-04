@@ -14,7 +14,7 @@
 #include <virtio.h>
 #include <gpu.h>
 
-#define SYSCALL_DEBUG
+// #define SYSCALL_DEBUG
 #ifdef SYSCALL_DEBUG
 #define debugf(...) debugf(__VA_ARGS__)
 #else
@@ -499,7 +499,7 @@ SYSCALL(screen_draw)
             //     XREG(A0) = -EFAULT;
             //     continue;
             // }
-            // debugf("syscall.c (screen_draw): Drawing pixel %d %d\n", x + x_, y + y_);
+            debugf("syscall.c (screen_draw): Drawing pixel %d %d\n", x_ * x_scale, y_ * y_scale);
             Pixel p = *(Pixel*)mmu_translate(proc->rcb.ptable, &buf_vaddr[y_ * width + x_]);
             for (unsigned sy = 0; sy < y_scale; ++sy) {
                 for (unsigned sx = 0; sx < x_scale; ++sx) {
@@ -558,6 +558,58 @@ SYSCALL(screen_flush) {
     debugf("syscall.c (screen_flush): Flushed\n");
 }
 
+SYSCALL(get_keyboard_event)
+{
+    SYSCALL_ENTER();
+    debugf("syscall.c (get_keyboard_event): Getting keyboard event\n");
+    Process *p = sched_get_current();
+    
+    VirtioInputEvent event = keyboard_get_next_event();
+
+    // Translate the buffer to a physical address
+    const VirtioInputEvent *event_vaddr = (const VirtioInputEvent *)XREG(A0);
+    const VirtioInputEvent *event_paddr = mmu_translate(p->rcb.ptable, (uintptr_t)event_vaddr);
+
+    if (event_paddr == -1UL) {
+        warnf("syscall.c (get_keyboard_event): MMU translated to null\n");
+        // MMU translated to null
+        XREG(A0) = -EFAULT;
+        return;
+    } else {
+        debugf("syscall.c (get_keyboard_event): Event %p found\n", (char *)event_paddr);
+    }
+
+    memcpy((void *)event_paddr, &event, sizeof(VirtioInputEvent));
+
+    XREG(A0) = 0;
+}
+
+SYSCALL(get_tablet_event)
+{
+    SYSCALL_ENTER();
+    debugf("syscall.c (get_tablet_event): Getting tablet event\n");
+    Process *p = sched_get_current();
+    
+    VirtioInputEvent event = tablet_get_next_event();
+
+    // Translate the buffer to a physical address
+    const VirtioInputEvent *event_vaddr = (const VirtioInputEvent *)XREG(A0);
+    const VirtioInputEvent *event_paddr = mmu_translate(p->rcb.ptable, (uintptr_t)event_vaddr);
+
+    if (event_paddr == -1UL) {
+        warnf("syscall.c (get_tablet_event): MMU translated to null\n");
+        // MMU translated to null
+        XREG(A0) = -EFAULT;
+        return;
+    } else {
+        debugf("syscall.c (get_tablet_event): Event %p found\n", (char *)event_paddr);
+    }
+
+    memcpy((void *)event_paddr, &event, sizeof(VirtioInputEvent));
+
+    XREG(A0) = 0;
+}
+
 SYSCALL(get_time)
 {
     SYSCALL_ENTER();
@@ -599,6 +651,8 @@ static SYSCALL_RETURN_TYPE (*const SYSCALLS[])(SYSCALL_PARAM_LIST) = {
     SYSCALL_PTR(screen_get_dims), /* 13 */
     SYSCALL_PTR(get_time),   /* 14 */
     SYSCALL_PTR(screen_flush), /* 15 */
+    SYSCALL_PTR(get_keyboard_event), /* 16 */
+    SYSCALL_PTR(get_tablet_event) /* 17 */
 };
 
 static const int NUM_SYSCALLS = sizeof(SYSCALLS) / sizeof(SYSCALLS[0]);

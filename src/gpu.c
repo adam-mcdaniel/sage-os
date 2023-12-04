@@ -20,6 +20,14 @@
 #include <lock.h>
 #include "virtio.h"
 
+
+// #define GPU_DEBUG
+#ifdef GPU_DEBUG
+#define debugf(...) debugf(__VA_ARGS__)
+#else
+#define debugf(...)
+#endif
+
 static Vector *device_active_jobs;
 static VirtioDevice *gpu_device = NULL;
 static Console console; // NOTE: Figure how this is supposed to be interfaced, allocate appropriately
@@ -211,7 +219,7 @@ void gpu_handle_job(VirtioDevice *dev, Job *job) {
         warnf("gpu_handle_job: job is NULL\n");
         return;
     }
-    infof("Handling GPU device job %u\n", job->job_id);
+    debugf("Handling GPU device job %u\n", job->job_id);
     job_debug(job);
     if (job->data == NULL) {
         warnf("gpu_handle_job: job->data is NULL\n");
@@ -240,6 +248,7 @@ void gpu_transfer_to_host_2d(const Rectangle *rect, uint32_t resource_id, uint64
     resp_hdr->type = 0;
 
     gpu_send_command(gpu_device, 0, tx, sizeof(*tx), NULL, 0, resp_hdr, sizeof(*resp_hdr));
+    // kfree(tx);
     // if (resp_hdr->type == VIRTIO_GPU_RESP_OK_NODATA) {
     //     debugf("gpu_transfer_to_host_2d: Transfer OK\n");
     //     kfree(resp_hdr);
@@ -260,7 +269,7 @@ void gpu_flush() {
     VirtioGpuCtrlHdr *resp_hdr = (VirtioGpuCtrlHdr*)kzalloc(sizeof(VirtioGpuCtrlHdr));
     resp_hdr->type = 0;
     gpu_send_command(gpu_device, 0, flush, sizeof(*flush), NULL, 0, resp_hdr, sizeof(*resp_hdr));
-    
+    // kfree(flush);
     // if (resp_hdr->type == VIRTIO_GPU_RESP_OK_NODATA) {
     //     debugf("gpu_flush: Flush OK\n");
     // } else {
@@ -280,7 +289,7 @@ void gpu_send_command(VirtioDevice *gpu_device,
                       size_t resp0_size,
                       void *resp1,
                       size_t resp1_size) {
-    mutex_spinlock(&gpu_device_mutex);
+    // mutex_spinlock(&gpu_device_mutex);
     VirtioDescriptor cmd_desc;
     cmd_desc.addr = kernel_mmu_translate((uintptr_t)cmd);
     cmd_desc.len = cmd_size;
@@ -307,8 +316,8 @@ void gpu_send_command(VirtioDevice *gpu_device,
     // virtio_wait_for_descriptor(gpu_device, which_queue);
     // WFI();
     // while (gpu_device->device_idx != gpu_device->device->idx) {}
-    debugf("gpu_send_command: device_idx caught up\n");
-    mutex_unlock(&gpu_device_mutex);
+    // debugf("gpu_send_command: device_idx caught up\n");
+    // mutex_unlock(&gpu_device_mutex);
 }
 
 // Get display info and set frame buffer's info.

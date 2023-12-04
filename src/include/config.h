@@ -31,7 +31,7 @@
 #define VIRT_TIMER_FREQ           10000000
 
 // Switches per second
-#define CONTEXT_SWITCHES_PER_SEC  200
+#define CONTEXT_SWITCHES_PER_SEC  500
 
 #define CONTEXT_SWITCH_TIMER      (VIRT_TIMER_FREQ / CONTEXT_SWITCHES_PER_SEC)
 
@@ -73,11 +73,10 @@ struct os_target {
 
 // #define DISABLE_DEBUG
 // #define DISABLE_WARNINGS
+// #ifdef DISABLE_DEBUG
+// #define debugf(...)
+// #endif
 
-#ifdef DISABLE_DEBUG
-#define debugf(...)
-#endif
-
-#ifdef DISABLE_DEBUG
-#define warnf(...)
-#endif
+// #ifdef DISABLE_DEBUG
+// #define warnf(...)
+// #endif

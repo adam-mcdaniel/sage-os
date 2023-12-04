@@ -241,7 +241,7 @@ TrapFrame *trap_frame_new(bool is_user, PageTable *page_table, uint64_t pid) {
         frame->stvec = kernel_trap_frame->stvec;
         frame->trap_stack = kernel_trap_frame->trap_stack;
         // frame->sie = SIE_SEIE | SIE_SSIE | SIE_STIE;
-        frame->sie = SIE_STIE;
+        frame->sie = SIE_STIE | SIE_SSIE;
         // CSR_READ(frame->sie, "sie");
         trap_frame_set_stack_pointer(frame, USER_STACK_TOP);
         trap_frame_set_heap_pointer(frame, USER_HEAP_BOTTOM);
@@ -269,7 +269,8 @@ TrapFrame *trap_frame_new(bool is_user, PageTable *page_table, uint64_t pid) {
         frame->stvec = kernel_trap_frame->stvec;
         frame->trap_stack = kernel_trap_frame->trap_stack;
         // frame->sie = SIE_SEIE | SIE_SSIE | SIE_STIE;
-        frame->sie = SIE_STIE;
+        frame->sie = SIE_SEIE | SIE_SSIE | SIE_STIE;
+        // frame->sie = SIE_STIE;
         // frame->sstatus = SSTATUS_SPP_SUPERVISOR | SSTATUS_SPIE_BIT;
         // frame->satp = SATP_KERNEL;
         // frame->trap_satp = SATP_KERNEL;
