@@ -125,15 +125,13 @@ void os_trap_handler(void)
                 //     debugf("os_trap_handler: SPP is not set\n");
                 //     frame->sepc = epc;
                 // }
+                frame->sepc = epc;
+                CSR_WRITE("sscratch", kernel_trap_frame);
                 plic_handle_irq(hart);
+                CSR_WRITE("sscratch", frame);
 
 
-
-                if (frame->sstatus | SSTATUS_SPP_SUPERVISOR) {
-                    debugf("External interrupt: old sepc: %p\n", frame->sepc);
-                    frame->sepc = epc;
-                    debugf("External interrupt: new sepc: %p\n", frame->sepc);
-                } else if (sched_get_current() != NULL) {
+                if (!(frame->sstatus & SSTATUS_SPP_SUPERVISOR) && sched_get_current() != NULL) {
                     process_run(sched_get_current(), hart);
                 }
                 // p = sched_get_current();
