@@ -7,3 +7,6 @@
 [submodule "util"]
 	path = util
 	url = ssh://github.utk.edu/smarz1/cosc562_util.git
+[submodule "os-userspace"]
+	path = os-userspace
+	url = git@github.com:tokey-tahmid/os-userspace.git
