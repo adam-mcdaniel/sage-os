@@ -160,18 +160,22 @@ void virtio_release_device(VirtioDevice *dev) {
 }
 
 void virtio_add_job(VirtioDevice *dev, Job job) {
+    debugf("Adding job %d to device %p\n", job.job_id, dev);
     if (dev == NULL) {
         warnf("No device\n");
+        virtio_release_device(dev);
         return;
     }
     if (job.callback == NULL) {
         warnf("No callback\n");
+        virtio_release_device(dev);
         return;
     }
     debugf("Adding job %d to device %p\n", job.job_id, dev);
     Job *mem = (Job *)kzalloc(sizeof(Job));
     if (mem == NULL) {
         warnf("Could not allocate memory for job\n");
+        virtio_release_device(dev);
         return;
     }
     debugf("Allocated job %p\n", mem);
@@ -248,17 +252,14 @@ uint64_t virtio_get_next_job_id(VirtioDevice *dev) {
 }
 
 void virtio_complete_job(VirtioDevice *dev, uint64_t job_id) {
-    virtio_acquire_device(dev);
     Job *job = virtio_get_job(dev, job_id);
     if (job == NULL) {
         warnf("No job found with ID %d\n", job_id);
-        virtio_release_device(dev);
         return;
     }
 
     if (job->done) {
         warnf("Job %d already done\n", job_id);
-        virtio_release_device(dev);
         return;
     }
     virtio_callback_and_free_job(dev, job_id);
@@ -269,8 +270,6 @@ void virtio_complete_job(VirtioDevice *dev, uint64_t job_id) {
     } else {
         debugf("Job %d not done\n", job_id);
     }
-
-    virtio_release_device(dev);
 }
 
 volatile struct VirtioBlockConfig *virtio_get_block_config(VirtioDevice *device) {

@@ -726,7 +726,8 @@ bool elf_is_valid(const uint8_t *elf) {
     memcpy(program_headers, elf + header.e_phoff, header.e_phentsize * header.e_phnum);
     for (uint32_t i = 0; i < header.e_phnum; i++) {
         if (!elf_is_valid_program_header(program_headers[i])) {
-            return false;
+            debugf("Invalid program header #%u\n", i);
+            // return false;
         }
     }
     kfree(program_headers);

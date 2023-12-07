@@ -133,7 +133,7 @@ void page_init(void)
 }
 
 
-void *page_nalloc(int n)
+void *page_nalloc(uint64_t n)
 {
     if (n <= 0) {
         return NULL;
@@ -141,8 +141,8 @@ void *page_nalloc(int n)
 
     mutex_spinlock(&page_lock);
 
-    int start = 0;
-    int consecutive = 0;
+    uint64_t start = 0;
+    uint64_t consecutive = 0;
 
     for (uint64_t i = 0; i < HEAP_SIZE_IN_PAGES; i++) {
         if (!is_taken(i) && !is_last(i)) {
@@ -184,7 +184,7 @@ void *page_nalloc(int n)
     return NULL;
 }
 
-void *page_znalloc(int n)
+void *page_znalloc(uint64_t n)
 {
     if (n <= 0) {
         return NULL;
@@ -237,9 +237,9 @@ void page_free(void *p)
     mutex_unlock(&page_lock);
 }
 
-int page_count_free(void)
+uint64_t page_count_free(void)
 {
-    int ret = 0;
+    uint64_t ret = 0;
 
     /* Count free pages in the bookkeeping area */
 
@@ -259,9 +259,9 @@ int page_count_free(void)
     return ret;
 }
 
-int page_count_taken(void)
+uint64_t page_count_taken(void)
 {
-    int ret = 0;
+    uint64_t ret = 0;
 
     /* Count taken pages in the bookkeeping area */
 
