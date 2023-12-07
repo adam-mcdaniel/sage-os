@@ -797,30 +797,30 @@ int elf_create_process(Process *p, const uint8_t *elf) {
     debugf("Getting sizes of segments\n");
     #define min(a, b) ((a) < (b)? (a) : (b))
     #define max(a, b) ((a) > (b)? (a) : (b))
-    uint64_t text_size = max(ALIGN_UP_TO_PAGE(elf_is_valid_text(text_header)? text_header.p_memsz : 0), 0x1000);
+    uint64_t text_size = ALIGN_UP_TO_PAGE(elf_is_valid_text(text_header)? text_header.p_memsz : 0) + 0x1000;
     debugf("Text size: %x\n", text_size);
-    uint64_t rodata_size = max(ALIGN_UP_TO_PAGE(elf_is_valid_rodata(rodata_header)? rodata_header.p_memsz : 0), 0x1000);
+    uint64_t rodata_size = ALIGN_UP_TO_PAGE(elf_is_valid_rodata(rodata_header)? rodata_header.p_memsz : 0) + 0x1000;
     debugf("RODATA size: %x\n", rodata_size);
-    uint64_t bss_size = max(ALIGN_UP_TO_PAGE(elf_is_valid_bss(bss_header)? bss_header.p_memsz : 0), 0x1000);
+    uint64_t bss_size = ALIGN_UP_TO_PAGE(elf_is_valid_bss(bss_header)? bss_header.p_memsz : 0) + 0x1000;
     debugf("BSS size: %x\n", bss_size);
-    uint64_t data_size = max(ALIGN_UP_TO_PAGE(elf_is_valid_data(data_header) && data_header.p_vaddr != bss_header.p_vaddr? data_header.p_memsz : 0), 0x1000);
+    uint64_t data_size = ALIGN_UP_TO_PAGE(elf_is_valid_data(data_header) && data_header.p_vaddr != bss_header.p_vaddr? data_header.p_memsz : 0) + 0x1000;
     debugf("DATA size: %x\n", data_size);
 
     // p->heap_size = USER_HEAP_SIZE * 2;
     // p->stack_size = USER_STACK_SIZE * 2;
-    uint64_t total_size = text_size + rodata_size + bss_size + data_size;
+    uint64_t total_size = text_size + rodata_size + bss_size + data_size + 0x10000;
     debugf("Total size: %x\n", total_size);
     // Allocate the memory for the segments
-    uint8_t *segments = (uint8_t*)page_nalloc(ALIGN_UP_TO_PAGE(total_size) / PAGE_SIZE_4K);
-    memset(segments, 0, total_size);
+    uint8_t *segments = (uint8_t*)page_znalloc(ALIGN_UP_TO_PAGE(total_size) / PAGE_SIZE_4K);
+    // memset(segments, 0, total_size);
     p->image = segments;
     p->image_size = total_size;
 
     // Get the pointers to the segments
     uint8_t *text = segments;
-    uint8_t *rodata = text + text_size;
-    uint8_t *bss = rodata + rodata_size;
-    uint8_t *data = bss + bss_size;
+    uint8_t *rodata = text + text_size + 0x1000;
+    uint8_t *bss = rodata + rodata_size + 0x1000;
+    uint8_t *data = bss + bss_size + 0x1000;
     // p->heap = data + data_size;
     // p->stack = p->heap + p->heap_size;
     if (!text_size) text = NULL;
@@ -897,33 +897,33 @@ int elf_create_process(Process *p, const uint8_t *elf) {
         list_add_ptr(p->rcb.image_pages, segments + i * PAGE_SIZE);
     }
 
-    // Allocate stack and heap
-    if (!p->rcb.heap_pages) {
-        p->rcb.heap_pages = list_new();
-        memset(p->heap, 0, p->heap_size);
-        for (uint64_t i = 0; i < p->heap_size / PAGE_SIZE; i++) {
-            list_add_ptr(p->rcb.heap_pages, p->heap + i * PAGE_SIZE);
-            rcb_map(&p->rcb, 
-                    USER_HEAP_BOTTOM + i * PAGE_SIZE, 
-                    kernel_mmu_translate((uint64_t)p->heap + i * PAGE_SIZE), 
-                    PAGE_SIZE,
-                    permission_bits);
-        }
-    }
+    // // Allocate stack and heap
+    // if (!p->rcb.heap_pages) {
+    //     p->rcb.heap_pages = list_new();
+    //     memset(p->heap, 0, p->heap_size);
+    //     for (uint64_t i = 0; i < p->heap_size / PAGE_SIZE; i++)0x1000 {
+    //         list_add_ptr(p->rcb.heap_pages, p->heap + i * PAGE_SIZE);
+    //         rcb_map(&p->rcb, 
+    //                 USER_HEAP_BOTTOM + i * PAGE_SIZE, 
+    //                 kernel_mmu_translate((uint64_t)p->heap + i * PAGE_SIZE), 
+    //                 PAGE_SIZE,
+    //                 permission_bits);
+    //     }
+    // }
     
 
-    if (!p->rcb.stack_pages) {
-        p->rcb.stack_pages = list_new();
-        memset(p->stack, 0, p->stack_size);
-        for (uint64_t i = 0; i < p->stack_size / PAGE_SIZE; i++) {
-            list_add_ptr(p->rcb.stack_pages, p->stack + i * PAGE_SIZE);
-            rcb_map(&p->rcb, 
-                    USER_STACK_BOTTOM + i * PAGE_SIZE, 
-                    kernel_mmu_translate((uint64_t)p->stack + i * PAGE_SIZE), 
-                    PAGE_SIZE,
-                    permission_bits);
-        }
-    }
+    // if (!p->rcb.stack_pages) {
+    //     p->rcb.stack_pages = list_new();
+    //     memset(p->stack, 0, p->stack_size);
+    //     for (uint64_t i = 0; i < p->stack_size / PAGE_SIZE; i++) {
+    //         list_add_ptr(p->rcb.stack_pages, p->stack + i * PAGE_SIZE);
+    //         rcb_map(&p->rcb, 
+    //                 USER_STACK_BOTTOM + i * PAGE_SIZE, 
+    //                 kernel_mmu_translate((uint64_t)p->stack + i * PAGE_SIZE), 
+    //                 PAGE_SIZE,
+    //                 permission_bits);
+    //     }
+    // }
 
     // Create the environment
     // if (!p->rcb.environemnt) {
@@ -1027,7 +1027,7 @@ int elf_create_process(Process *p, const uint8_t *elf) {
     }
     if (bss) {
         debugf("Copying data segment\n");
-        memset(bss, 0, bss_size);
+        // memset(bss, 0, bss_size);
         memcpy(bss, elf + bss_header.p_offset, data_size);
     }
     

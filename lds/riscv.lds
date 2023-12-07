@@ -6,7 +6,7 @@ OUTPUT_ARCH( "riscv" )
 ENTRY(_start)
 MEMORY
 {
-  ram  (wxari) : ORIGIN = 0x80010000, LENGTH = 2048M
+  ram  (wxari) : ORIGIN = 0x80010000, LENGTH = 512M
 }
 
 PHDRS
