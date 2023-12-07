@@ -6,7 +6,7 @@
 #include <map.h>
 #include <list.h>
 
-// #define VFS_DEBUG
+#define VFS_DEBUG
 
 #ifdef VFS_DEBUG
 #define debugf(...) debugf(__VA_ARGS__)
@@ -252,6 +252,7 @@ void vfs_mount(VirtioDevice *block_device, const char *path) {
 }
 
 VirtioDevice *vfs_get_mounted_device(const char *path) {
+    static int i = 0;
     if (path == NULL) {
         debugf("vfs_get_mounted_device: path is NULL\n");
         return NULL;
@@ -259,6 +260,11 @@ VirtioDevice *vfs_get_mounted_device(const char *path) {
 
     if (strlen(path) == 0 || strcmp(path, "") == 0) {
         debugf("vfs_get_mounted_device: path is empty\n");
+        return NULL;
+    }
+
+    if (strcmp(path, ".") == 0 || strcmp(path, "..") == 0) {
+        debugf("vfs_get_mounted_device: path is . or ..\n");
         return NULL;
     }
 
@@ -271,6 +277,11 @@ VirtioDevice *vfs_get_mounted_device(const char *path) {
     // map_get_int(mounted_devices, 0, &block_device);
 
     if (block_device == NULL) {
+        if (i++ > 20) {
+            i = 0;
+            debugf("vfs_get_mounted_device: too many iterations\n");
+            return NULL;
+        }
         debugf("vfs_get_mounted_device: no device found for %s\n", path);
         if (strcmp(path, "/") == 0) {
             debugf("vfs_get_mounted_device: no device found for /\n");
@@ -299,6 +310,7 @@ VirtioDevice *vfs_get_mounted_device(const char *path) {
     }
 
     debugf("vfs_get_mounted_device: returning %p\n", block_device);
+    i = 0;
     return block_device;
 }
 
@@ -331,9 +343,15 @@ char *get_path_relative_to_mount_point(const char *path) {
         strcpy(result, "/");
         return result;
     } else {
-        debugf("get_path_relative_to_mount_point: path is not a mounted device\n");
+        debugf("get_path_relative_to_mount_point: path %s is not a mounted device\n", path);
         char *parent_path = get_parent_path(path);
+        int i=0;
         while (!is_mounted_device(parent_path)) {
+            if (i++ > 100) {
+                debugf("get_path_relative_to_mount_point: too many iterations\n");
+                return NULL;
+            }
+
             debugf("get_path_relative_to_mount_point: %s is not a mounted device\n", parent_path);
             char *parent_parent_path = get_parent_path(parent_path);
             kfree(parent_path);
@@ -763,3 +781,138 @@ bool vfs_link(File *dir, File *file) {
 //     return vfs_link_paths(file1->path, file2->path);
 // }
 
+
+bool vfs_exists(const char *path) {
+    // file->dev = vfs_get_mounted_device(path);
+    // path_relative_to_mount_point = get_path_relative_to_mount_point(path);
+    // file->inode = minix3_get_inode_from_path(file->dev, path_relative_to_mount_point, false);
+
+    VirtioDevice *block_device = vfs_get_mounted_device(path);
+    if (block_device == NULL) {
+        debugf("vfs_exists: could not find block device\n");
+        return false;
+    }
+    char *path_relative_to_mount_point = get_path_relative_to_mount_point(path);
+    uint32_t inode = minix3_get_inode_from_path(block_device, path_relative_to_mount_point, false);
+    if (inode == INVALID_INODE) {
+        debugf("vfs_exists: could not find inode\n");
+        return false;
+    }
+    return true;
+}
+
+bool vfs_is_dir(const char *path) {
+    debugf("vfs_is_dir: %s\n", path);
+    VirtioDevice *block_device = vfs_get_mounted_device(path);
+    debugf("vfs_is_dir: block device is %p\n", block_device);
+    if (block_device == NULL) {
+        debugf("vfs_exists: could not find block device\n");
+        return false;
+    }
+    char *path_relative_to_mount_point = get_path_relative_to_mount_point(path);
+    debugf("vfs_is_dir: path relative to mount point is %s\n", path_relative_to_mount_point);
+    uint32_t inode = minix3_get_inode_from_path(block_device, path_relative_to_mount_point, false);
+    debugf("vfs_is_dir: inode is %u\n", inode);
+    if (inode == INVALID_INODE) {
+        debugf("vfs_exists: could not find inode\n");
+        return false;
+    }
+    debugf("vfs_is_dir: inode is %u\n", inode);
+    return minix3_is_dir(block_device, inode);
+}
+
+bool vfs_is_file(const char *path) {
+    VirtioDevice *block_device = vfs_get_mounted_device(path);
+    if (block_device == NULL) {
+        debugf("vfs_exists: could not find block device\n");
+        return false;
+    }
+    char *path_relative_to_mount_point = get_path_relative_to_mount_point(path);
+    uint32_t inode = minix3_get_inode_from_path(block_device, path_relative_to_mount_point, false);
+    if (inode == INVALID_INODE) {
+        debugf("vfs_exists: could not find inode\n");
+        return false;
+    }
+    return minix3_is_file(block_device, inode);
+}
+
+// List a directory separated by newlines to a buffer
+void vfs_list_dir(const char *path, char *buf, size_t buf_size, bool return_full_path) {
+    strcpy(buf, "");
+    VirtioDevice *block_device = vfs_get_mounted_device(path);
+    if (block_device == NULL) {
+        debugf("vfs_exists: could not find block device\n");
+        return false;
+    }
+    char *path_relative_to_mount_point = get_path_relative_to_mount_point(path);
+    debugf("vfs_is_dir: path relative to mount point is %s\n", path_relative_to_mount_point);
+    uint32_t inode = minix3_get_inode_from_path(block_device, path_relative_to_mount_point, false);
+    debugf("vfs_is_dir: inode is %u\n", inode);
+
+    // if (minix3_is_dir(block_device, inode)) {
+    //     debugf("Is a directory\n");
+    // } else {
+    //     debugf("Not a directory\n");
+    //     strcpy(buf, "");
+    //     return;
+    // }
+
+    // Get the number of entries in the directory
+    uint32_t max_entries = minix3_get_zone_size(block_device) / sizeof(DirEntry);
+    DirEntry entries[max_entries];
+    uint32_t num_entries = minix3_list_dir(block_device, inode, entries, max_entries);
+
+    // List the entries
+    char entry_name[64] = {0};
+    char *entry_path = kmalloc(1024);
+    for (size_t i = 0; i < num_entries; i++) {
+        if (entries[i].inode == INVALID_INODE) {
+            continue;
+        }
+        strncpy(entry_name, entries[i].name, sizeof(entry_name));
+        if (strlen(entry_name) == 0) {
+            break;
+        }
+        // for (j=0; j<sizeof(entries[0].name) && j<sizeof(name); j++) {
+        //     if (entries[i].name[j] == 0) {
+        //         name[j] = 0;
+        //         break;
+        //     }
+        //     name[j] = entries[i].name[j];
+        // }
+        // if (strcmp(entry_name, ".") == 0 || strcmp(name, "..") == 0) {
+        //     continue;
+        // }
+
+        strcpy(entry_path, path);
+        if (strcmp(entry_path, "/") != 0) {
+            strcat(entry_path, "/");
+        }
+
+        strcat(entry_path, entry_name);
+
+        // if (!return_full_path && strlen(buf) + sizeof(entry_name) >= buf_size) {
+        //     debugf("Buffer is full\n");
+        //     break;
+        // } else if (return_full_path && strlen(buf) + sizeof(entry_path) + sizeof(entry_name) >= buf_size) {
+        //     debugf("Buffer is full\n");
+        //     break;
+        // }
+
+        if (return_full_path) {
+            if (strlen(buf) + strlen(entry_path) >= buf_size) {
+                debugf("Buffer is full\n");
+                break;
+            }
+            strcat(buf, entry_path);
+        } else {
+            if (strlen(buf) + strlen(entry_name) >= buf_size) {
+                debugf("Buffer is full\n");
+                break;
+            }
+            strcat(buf, entry_name);
+        }
+        strcat(buf, "\n");
+    }
+    infof("Listed directory\n");
+}

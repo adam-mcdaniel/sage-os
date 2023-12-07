@@ -126,7 +126,7 @@ static void init_systems(void)
     CSR_READ(kernel_trap_frame->trap_satp, "satp");
     CSR_READ(kernel_trap_frame->sstatus, "sstatus");
     // kernel_trap_frame->satp = kernel_mmu_table
-    kernel_trap_frame->trap_stack = (uint64_t)kmalloc(0x50000);
+    kernel_trap_frame->trap_stack = (uint64_t)page_znalloc(0x100);
     CSR_WRITE("sscratch", kernel_trap_frame);
     trap_frame_debug(kernel_trap_frame);
 
@@ -246,7 +246,8 @@ void main(unsigned int hart)
 
     // Read in /home/cosc562/console.elf
     // File *elf_file = vfs_open("/home/cosc562/presentation.elf", 0, O_RDONLY, VFS_TYPE_FILE);
-    File *elf_file = vfs_open("/home/cosc562/draw.elf", 0, O_RDONLY, VFS_TYPE_FILE);
+    // File *elf_file = vfs_open("/home/cosc562/draw.elf", 0, O_RDONLY, VFS_TYPE_FILE);
+    File *elf_file = vfs_open("/home/cosc562/shell.elf", 0, O_RDONLY, VFS_TYPE_FILE);
     // File *elf_file = vfs_open("/home/cosc562/console.elf", 0, O_RDONLY, VFS_TYPE_FILE);
     // File *elf_file = vfs_open("/home/cosc562/bonzai.elf", 0, O_RDONLY, VFS_TYPE_FILE);
     // File *elf_file = vfs_open("/home/cosc562/bonzai.elf", 0, O_RDONLY, VFS_TYPE_FILE);

@@ -12,7 +12,7 @@
 #include <block.h>
 #include <util.h>
 
-// #define BLOCK_DEVICE_DEBUG
+#define BLOCK_DEVICE_DEBUG
 
 #ifdef BLOCK_DEVICE_DEBUG
 #define debugf(...) debugf(__VA_ARGS__)
@@ -76,6 +76,7 @@ void block_device_handle_job(VirtioDevice *block_device, Job *job) {
 }
 
 void block_device_send_request(VirtioDevice *block_device, BlockRequestPacket *packet) {
+    debugf("Sending block request\n");
     mutex_spinlock(&block_device_mutex);
     request_count++;
 
@@ -107,14 +108,23 @@ void block_device_send_request(VirtioDevice *block_device, BlockRequestPacket *p
     chain[1] = data;
     chain[2] = status;
 
+    // IRQ_OFF();
+    debugf("Sending block device request #%u\n", request_count);
     virtio_create_job_with_data(block_device, 1, block_device_handle_job, packet);
     virtio_send_descriptor_chain(block_device, 0, chain, 3, true);
-    WFI();
+
+    // WFI();
+    while (packet->status == 0xf) {
+        debugf("Waiting for block device request #%u\n", request_count);
+        // debugf("Waiting for block device request #%u\n", request_count);
+        // WFI();
+    }
+    // IRQ_ON();
 
     debugf("Packet status after sending request #%u: %x\n", request_count, packet->status);
-    if (packet->status != 0) {
-        warnf("Block device request failed with status %x\n", packet->status);
-    }
+    // if (packet->status != 0) {
+    //     warnf("Block device request failed with status %x\n", packet->status);
+    // }
     
     mutex_unlock(&block_device_mutex);
 }
