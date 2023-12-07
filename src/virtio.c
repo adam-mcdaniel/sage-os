@@ -19,7 +19,7 @@
 #include <gpu.h>
 #include <lock.h>
 
-// #define VIRTIO_DEBUG
+#define VIRTIO_DEBUG
 
 #ifdef VIRTIO_DEBUG
 #define debugf(...) debugf(__VA_ARGS__)
@@ -148,7 +148,7 @@ bool virtio_is_device_available(VirtioDevice *dev) {
 }
 
 void virtio_acquire_device(VirtioDevice *dev) {
-    IRQ_OFF();
+    // IRQ_OFF();
     debugf("Acquiring device %p\n", dev);
     mutex_spinlock(&dev->lock);
 }
@@ -156,7 +156,7 @@ void virtio_acquire_device(VirtioDevice *dev) {
 void virtio_release_device(VirtioDevice *dev) {
     mutex_unlock(&dev->lock);
     debugf("Releasing device %p\n", dev);
-    IRQ_ON();
+    // IRQ_ON();
 }
 
 void virtio_add_job(VirtioDevice *dev, Job job) {
@@ -531,17 +531,25 @@ const char *virtio_get_device_name(VirtioDevice *dev) {
 
 // Get the notify capability for the given virtio device.
 volatile uint16_t *virtio_notify_register(VirtioDevice *device) {
+    debugf("virtio_notify_register: Getting notify register for device %s\n", device->name);
     // struct VirtioCapability *vio_cap = pci_get_virtio_capability(device->pcidev, VIRTIO_PCI_CAP_NOTIFY_CFG);
     // volatile VirtioPciNotifyCfg *notify_cap = pci_get_virtio_notify_capability(device->pcidev);
     uint8_t bar_num = device->notify_cap->cap.bar;
+    debugf("BAR number: %d\n", bar_num);
     uint64_t offset = device->notify_cap->cap.offset;
+    debugf("Offset: %d\n", offset);
     uint16_t queue_notify_off = device->common_cfg->queue_notify_off;
+    debugf("Queue notify offset: %d\n", queue_notify_off);
     uint32_t notify_off_multiplier = device->notify_cap->notify_off_multiplier;
+    debugf("Notify offset multiplier: %d\n", notify_off_multiplier);
+    debugf("PCI device: %p\n", device->pcidev);
     uint64_t bar = (uint64_t)pci_get_device_bar(device->pcidev, bar_num);
+    debugf("BAR: %p\n", bar);
     // debugf("Notify cap bar=%d offset=%x, (len=%d)\n", bar_num, offset, device->notify_cap->cap.length);
     // debugf("BAR at %x, offset=%x, queue_notify_off=%x, notify_off_mult=%x\n", bar, offset, queue_notify_off, notify_off_multiplier);
 
     uint16_t *notify = (uint16_t*)(bar + BAR_NOTIFY_CAP(offset, queue_notify_off, notify_off_multiplier));
+    debugf("Notify register at %p\n", notify);
     return notify;
 }
 
@@ -553,6 +561,12 @@ volatile uint16_t *virtio_notify_register(VirtioDevice *device) {
 void virtio_notify(VirtioDevice *viodev, uint16_t which_queue)
 {
     uint16_t num_queues = viodev->common_cfg->num_queues;
+    if (viodev == NULL) {
+        warnf("virtio_notify: Provided device is NULL\n");
+        return;
+    } else {
+        debugf("virtio_notify: Notifying device %s on queue %d\n", viodev->name, which_queue);
+    }
 
     if (which_queue >= num_queues) {
         warnf("virtio_notify: Provided queue number %d is too big (num_queues=%d) for device %s\n", which_queue, num_queues, viodev->name);
@@ -560,10 +574,13 @@ void virtio_notify(VirtioDevice *viodev, uint16_t which_queue)
     }
 
     // Select the queue we are looking at
+    debugf("Setting queue_select to %d\n", which_queue);
     viodev->common_cfg->queue_select = which_queue;
-
+    debugf("Queue size: %d\n", viodev->common_cfg->queue_size);
+    debugf("Getting notify register\n");
     volatile uint16_t *notify_register = virtio_notify_register(viodev);
     debugf("Notifying at 0x%p on instruction...\n", notify_register);
+
     *notify_register = which_queue;
     // debugf("Notified device\n\n");
 }

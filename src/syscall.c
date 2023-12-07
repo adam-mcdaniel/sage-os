@@ -15,7 +15,7 @@
 #include <gpu.h>
 #include <uaccess.h>
 
-// #define SYSCALL_DEBUG
+#define SYSCALL_DEBUG
 #ifdef SYSCALL_DEBUG
 #define debugf(...) debugf(__VA_ARGS__)
 #else
@@ -656,6 +656,132 @@ SYSCALL(get_time)
     XREG(A0) = sbi_get_time();
 }
 
+SYSCALL(path_exists)
+{
+    SYSCALL_ENTER();
+    debugf("syscall.c (path_exists): Checking if path exists\n");
+    Process *p = sched_get_current();
+
+    const char *path_vaddr = (const char *)XREG(A0);
+    if (!path_vaddr) {
+        XREG(A0) = -EINVAL;
+        return;
+    }
+
+    const char *path_paddr = mmu_translate(p->rcb.ptable, (uintptr_t)path_vaddr);
+    if (path_paddr == -1UL) {
+        XREG(A0) = -EFAULT;
+        return;
+    }
+
+    debugf("syscall.c (path_exists): Checking if path %s is dir\n", path_paddr);
+    XREG(A0) = vfs_exists(path_paddr);
+}
+
+
+SYSCALL(path_is_dir)
+{
+    SYSCALL_ENTER();
+    debugf("syscall.c (path_is_dir): Checking if path is dir\n");
+    Process *p = sched_get_current();
+
+    const char *path_vaddr = (const char *)XREG(A0);
+    if (!path_vaddr) {
+        XREG(A0) = -EINVAL;
+        return;
+    }
+
+    const char *path_paddr = mmu_translate(p->rcb.ptable, (uintptr_t)path_vaddr);
+    if (path_paddr == -1UL) {
+        XREG(A0) = -EFAULT;
+        return;
+    }
+
+    debugf("syscall.c (path_is_dir): Checking if path %s is dir\n", path_paddr);
+    XREG(A0) = vfs_is_dir(path_paddr);
+}
+
+SYSCALL(path_is_file)
+{
+    SYSCALL_ENTER();
+    debugf("syscall.c (path_is_file): Checking if path is file\n");
+    Process *p = sched_get_current();
+
+    const char *path_vaddr = (const char *)XREG(A0);
+    if (!path_vaddr) {
+        XREG(A0) = -EINVAL;
+        return;
+    }
+
+    const char *path_paddr = mmu_translate(p->rcb.ptable, (uintptr_t)path_vaddr);
+    if (path_paddr == -1UL) {
+        XREG(A0) = -EFAULT;
+        return;
+    }
+
+    debugf("syscall.c (path_is_file): Checking if path %s is file\n", path_paddr);
+    XREG(A0) = vfs_is_file(path_paddr);
+}
+
+SYSCALL(path_list_dir)
+{
+    SYSCALL_ENTER();
+    debugf("syscall.c (path_list_dir): Listing dir\n");
+    Process *p = sched_get_current();
+
+    const char *path_vaddr = (const char *)XREG(A0);
+    char *entries_buffer_vaddr = (char *)XREG(A1);
+    uint64_t entries_buffer_size = XREG(A2);
+    bool return_full_path = XREG(A3);
+
+    if (!path_vaddr) {
+        warnf("syscall.c (path_list_dir): Path is null\n");
+        XREG(A0) = -EINVAL;
+        return;
+    }
+
+    if (!entries_buffer_vaddr) {
+        warnf("syscall.c (path_list_dir): Entries buffer is null\n");
+        XREG(A0) = -EINVAL;
+        return;
+    }
+
+    const char *path_paddr = mmu_translate(p->rcb.ptable, (uintptr_t)path_vaddr);
+
+    if (path_paddr == -1UL) {
+        XREG(A0) = -EFAULT;
+        return;
+    }
+    debugf("syscall.c (path_list_dir): Got path %s\n", path_paddr);
+    
+    // if (!vfs_is_dir(path_paddr)) {
+    //     XREG(A0) = -ENOTDIR;
+    //     warnf("syscall.c (path_list_dir): Path %s is not a directory\n", path_paddr);
+    //     return;
+    // } else {
+    //     debugf("syscall.c (path_list_dir): Path %s is a directory\n", path_paddr);
+    // }
+
+
+    char *entries_buffer_paddr = mmu_translate(p->rcb.ptable, (uintptr_t)entries_buffer_vaddr);
+    if (entries_buffer_paddr == -1UL) {
+        XREG(A0) = -EFAULT;
+        return;
+    }
+    // debugf("syscall.c (path_list_dir): Got entries buffer %p\n", entries_buffer_paddr);
+
+    // debugf("syscall.c (path_list_dir): Listing dir %s\n", path_paddr);
+
+    CSR_WRITE("sscratch", p->frame->sscratch);
+    // char buf[2048] = {0};
+    vfs_list_dir(path_paddr, entries_buffer_paddr, entries_buffer_size, return_full_path);
+    // debugf("syscall.c (path_list_dir): Listed dir %s\n", buf);
+    // copy_to(entries_buffer_vaddr, p->rcb.ptable, buf, entries_buffer_size);
+    // memcpy(entries_buffer_paddr, buf, entries_buffer_size);
+    // vfs_list_dir(path_paddr, entries_buffer_paddr, entries_buffer_size, return_full_path);
+    debugf("syscall.c (path_list_dir): Listed dir %s\n", path_paddr);
+    XREG(A0) = 0;
+}
 /**
     SYS_EXIT = 0,
     SYS_PUTCHAR,
@@ -691,7 +817,11 @@ static SYSCALL_RETURN_TYPE (*const SYSCALLS[])(SYSCALL_PARAM_LIST) = {
     SYSCALL_PTR(get_time),   /* 14 */
     SYSCALL_PTR(screen_flush), /* 15 */
     SYSCALL_PTR(get_keyboard_event), /* 16 */
-    SYSCALL_PTR(get_tablet_event) /* 17 */
+    SYSCALL_PTR(get_tablet_event), /* 17 */
+    SYSCALL_PTR(path_exists), /* 18 */
+    SYSCALL_PTR(path_is_dir), /* 19 */
+    SYSCALL_PTR(path_is_file), /* 20 */
+    SYSCALL_PTR(path_list_dir), /* 21 */
 };
 
 static const int NUM_SYSCALLS = sizeof(SYSCALLS) / sizeof(SYSCALLS[0]);
@@ -716,3 +846,4 @@ void syscall_handle(int hart, uint64_t epc, int64_t *scratch)
         SYSCALL_EXEC(XREG(A7));
     }
 }
+

@@ -99,7 +99,7 @@ void os_trap_handler(void)
     if (SCAUSE_IS_ASYNC(cause)) {
         debugf("os_trap_handler: Is async!\n");
         cause = SCAUSE_NUM(cause);
-
+        TrapFrame save;
         switch (cause) {
             case CAUSE_SSIP:
                 infof("os_trap_handerl: Supervisor software interrupt!\n");
@@ -114,6 +114,7 @@ void os_trap_handler(void)
                 frame->sepc = epc;
                 debugf("Timer: new sepc: %p\n", frame->sepc);
                 // We typically invoke our scheduler if we get a timer
+                CSR_WRITE("sscratch", kernel_trap_frame);
                 sched_handle_timer_interrupt(hart);
                 break;
             case CAUSE_SEIP:
@@ -126,7 +127,7 @@ void os_trap_handler(void)
                 //     frame->sepc = epc;
                 // }
                 frame->sepc = epc;
-                CSR_WRITE("sscratch", kernel_trap_frame);
+                CSR_WRITE("sscratch", &save);
                 plic_handle_irq(hart);
                 CSR_WRITE("sscratch", frame);
 
@@ -177,6 +178,8 @@ void os_trap_handler(void)
                 frame->sepc = epc + 4;
                 debugf("Syscall (U): new sepc: %p\n", frame->sepc);
 
+                CSR_WRITE("sscratch", kernel_trap_frame);
+                IRQ_OFF();
                 syscall_handle(hart, epc, scratch);
                 // Get the process
                 p = sched_get_current();
