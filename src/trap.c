@@ -22,7 +22,7 @@
 void syscall_handle(int hart, uint64_t epc, int64_t *scratch);
 
 
-static uint64_t time_since_scheduler = 0;
+static uint64_t scheduler_time = 0;
 
 // Called from asm/spawn.S: _spawn_kthread
 void os_trap_handler(void)
@@ -95,6 +95,7 @@ void os_trap_handler(void)
     //                 "csrs sie, t1\n");
 
     // debugf("Is async: %d\n", SCAUSE_IS_ASYNC(cause));
+    uint64_t now = sbi_get_time();
 
     if (SCAUSE_IS_ASYNC(cause)) {
         debugf("os_trap_handler: Is async!\n");
@@ -133,7 +134,15 @@ void os_trap_handler(void)
 
 
                 if (!(frame->sstatus & SSTATUS_SPP_SUPERVISOR) && sched_get_current() != NULL) {
-                    process_run(sched_get_current(), hart);
+                    // process_run(sched_get_current(), hart);
+                    if (now - scheduler_time > CONTEXT_SWITCH_TIMER) {
+                        debugf("Process %d is running. Resuming process\n", p->pid);
+                        process_run(p, hart);
+                    } else {
+                        
+                        scheduler_time = now;
+                        sched_handle_timer_interrupt(hart);
+                    }
                 }
                 // p = sched_get_current();
                 // // If there is a current process, we should schedule it
@@ -192,19 +201,20 @@ void os_trap_handler(void)
                 //     process_run(p, hart);
                 // }
                 // return;
-                uint64_t now = sbi_get_time();
 
                 switch (p->state) {
                 case PS_RUNNING:
                     // sched_handle_timer_interrupt(hart);
                     if (p == sched_get_idle_process()) {
                         debugf("Process %d is idle. Scheduling next process\n", p->pid);
+                        scheduler_time = now;
                         sched_handle_timer_interrupt(hart);
-                    } else if (now - time_since_scheduler > CONTEXT_SWITCH_TIMER) {
+                    } else if (now - scheduler_time > CONTEXT_SWITCH_TIMER) {
                         debugf("Process %d is running. Resuming process\n", p->pid);
                         process_run(p, hart);
                     } else {
                         debugf("Process %d is running. Scheduling next process\n", p->pid);
+                        scheduler_time = now;
                         sched_handle_timer_interrupt(hart);
                     }
                     return;

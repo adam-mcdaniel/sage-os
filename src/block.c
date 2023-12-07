@@ -112,10 +112,11 @@ void block_device_send_request(VirtioDevice *block_device, BlockRequestPacket *p
     debugf("Sending block device request #%u\n", request_count);
     virtio_create_job_with_data(block_device, 1, block_device_handle_job, packet);
     virtio_send_descriptor_chain(block_device, 0, chain, 3, true);
+    mutex_unlock(&block_device_mutex);
 
     // WFI();
     while (packet->status == 0xf) {
-        debugf("Waiting for block device request #%u\n", request_count);
+        infof("Waiting for block device request #%u\n", request_count);
         // debugf("Waiting for block device request #%u\n", request_count);
         // WFI();
     }
@@ -126,7 +127,6 @@ void block_device_send_request(VirtioDevice *block_device, BlockRequestPacket *p
     //     warnf("Block device request failed with status %x\n", packet->status);
     // }
     
-    mutex_unlock(&block_device_mutex);
 }
 
 void block_device_read_sector(VirtioDevice *block_device, uint64_t sector, uint8_t *data) {

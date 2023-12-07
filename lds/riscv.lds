@@ -68,7 +68,7 @@ SECTIONS
   . = ALIGN(4096);
 
   PROVIDE(_stack_start = .);
-  PROVIDE(_stack_end = _stack_start + 8K * 4);
+  PROVIDE(_stack_end = _stack_start + 16K * 4);
   PROVIDE(_heap_start = _stack_end);
   PROVIDE(_heap_end = _memory_end);
 }

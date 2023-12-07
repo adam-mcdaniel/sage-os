@@ -831,13 +831,16 @@ SYSCALL(spawn_process)
     }
 
     // Read the file
+    debugf("syscall.c (spawn_process): Opening file %s\n", path_paddr);
     File *elf_file = vfs_open(path_paddr, 0, O_RDONLY, VFS_TYPE_FILE);
     Stat stat;
     vfs_stat(elf_file, &stat);
+    debugf("syscall.c (spawn_process): File %s has size %d\n", path_paddr, stat.size);
+
     uint64_t file_size = stat.size;
 
     uint8_t *file_buffer = (char*)kmalloc(file_size);
-    if (vfs_read(path_paddr, file_buffer, file_size) < 0) {
+    if (vfs_read(elf_file, file_buffer, file_size) < 0) {
         warnf("syscall.c (spawn_process): Failed to read file %s\n", path_paddr);
         XREG(A0) = -EIO;
         return;
@@ -863,11 +866,15 @@ SYSCALL(spawn_process)
     new_process->state = PS_RUNNING;
     new_process->hart = sbi_whoami();
     debugf("syscall.c (spawn_process): Scheduling new process\n");
-    sched_add(new_process);
+    // sched_add(new_process);
     debugf("syscall.c (spawn_process): Scheduled new process\n");
     // Store the PID in A0
     debugf("syscall.c (spawn_process): Child process has PID %d\n", new_process->pid);
     XREG(A0) = new_process->pid;
+
+    sched_add(new_process);
+    process_run(new_process, new_process->hart);
+
 }
 
 /**

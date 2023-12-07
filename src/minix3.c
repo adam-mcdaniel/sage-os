@@ -11,7 +11,7 @@
 #define min(a, b) ((a) < (b) ? (a) : (b))
 #define max(a, b) ((a) > (b) ? (a) : (b))
 
-// #define MINIX3_DEBUG
+#define MINIX3_DEBUG
 
 #ifdef MINIX3_DEBUG
 #define debugf(...) debugf(__VA_ARGS__)
@@ -793,7 +793,10 @@ void minix3_get_data(VirtioDevice *block_device, uint32_t inode, uint8_t *data, 
 
             for (uint32_t indirect_zone=0; indirect_zone<minix3_get_zone_size(block_device) / sizeof(uint32_t); indirect_zone++) {
                 uint32_t zone = indirect_zones[indirect_zone];
-                if (zone == 0) continue;
+                if (zone == 0) {
+                    debugf("No double indirect zone %d\n", indirect_zone);
+                    continue;
+                }
                 debugf("Reading double indirect zone %d\n", zone);
 
                 if (file_cursor + minix3_get_zone_size(block_device) < offset) {

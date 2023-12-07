@@ -34,7 +34,7 @@ QEMU_DEBUG=guest_errors,unimp -gdb unix:$(QEMU_DEBUG_PIPE),server,nowait
 QEMU_MACH=virt #,aia=aplic #,dumpdtb=dtb.dtb
 QEMU_CPU=rv64 #,h=true,v=true,vext_spec=v1.0
 QEMU_CPUS=4
-QEMU_MEM=128M
+QEMU_MEM=4096M
 QEMU_KERNEL=$(KERNEL)
 # QEMU_OPTIONS+= -trace virtio*
 QEMU_OPTIONS+= -serial mon:stdio 

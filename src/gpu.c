@@ -21,7 +21,7 @@
 #include "virtio.h"
 
 
-// #define GPU_DEBUG
+#define GPU_DEBUG
 #ifdef GPU_DEBUG
 #define debugf(...) debugf(__VA_ARGS__)
 #else
