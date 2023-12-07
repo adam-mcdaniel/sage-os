@@ -19,7 +19,7 @@ Scheduler - uses completely fair scheduler approach
 #include <compiler.h>
 #include <config.h>
 
-// #define DEBUG_SCHED
+#define DEBUG_SCHED
 #ifdef DEBUG_SCHED
 #define debugf(...) debugf(__VA_ARGS__)
 #else
@@ -147,7 +147,7 @@ void sched_init() {
     // // Map trap frame to user's page table
     // uintptr_t trans_frame = kernel_mmu_translate((uintptr_t)&p->frame);
     // mmu_map(p->rcb.ptable, (uintptr_t)&p->frame, trans_frame, MMU_LEVEL_4K, PB_READ | PB_WRITE | PB_EXECUTE | PB_USER);
-
+    rcb_map(&idle_process->rcb, idle_process_main, idle_process_main, 0x1000, PB_READ | PB_EXECUTE);
     // mmu_translate(p->rcb.ptable, p->frame.stvec);
     // CSR_READ(p->frame->sie, "sie");
     
