@@ -11,6 +11,8 @@
 #include <sched.h>
 #include <stdint.h>
 #include <util.h>
+#include <vfs.h>
+#include <elf.h>
 #include <virtio.h>
 #include <gpu.h>
 #include <uaccess.h>
@@ -782,6 +784,92 @@ SYSCALL(path_list_dir)
     debugf("syscall.c (path_list_dir): Listed dir %s\n", path_paddr);
     XREG(A0) = 0;
 }
+
+
+SYSCALL(spawn_process)
+{
+    SYSCALL_ENTER();
+    // Add a new process to the scheduler using the file path in A0,
+    // and return the PID in A0
+    debugf("syscall.c (spawn_process): Spawning process\n");
+    Process *p = sched_get_current();
+
+    const char *path_vaddr = (const char *)XREG(A0);
+    if (!path_vaddr) {
+        warnf("syscall.c (spawn_process): Path is null\n");
+        XREG(A0) = -EINVAL;
+        return;
+    }
+
+    const char *path_paddr = mmu_translate(p->rcb.ptable, (uintptr_t)path_vaddr);
+
+    if (path_paddr == -1UL) {
+        XREG(A0) = -EFAULT;
+        return;
+    } else {
+        debugf("syscall.c (spawn_process): Got path %s\n", path_paddr);
+    }
+
+    // debugf("syscall.c (spawn_process): Got path %s\n", path_paddr);
+
+    // Check to see if the path exists
+    if (!vfs_exists(path_paddr)) {
+        warnf("syscall.c (spawn_process): Path %s does not exist\n", path_paddr);
+        XREG(A0) = -ENOENT;
+        return;
+    } else {
+        debugf("syscall.c (spawn_process): Path %s exists\n", path_paddr);
+    }
+
+    // Check to see if the path is a file
+    if (!vfs_is_file(path_paddr)) {
+        warnf("syscall.c (spawn_process): Path %s is not a file\n", path_paddr);
+        XREG(A0) = -ENOTDIR;
+        return;
+    } else {
+        debugf("syscall.c (spawn_process): Path %s is a file\n", path_paddr);
+    }
+
+    // Read the file
+    File *elf_file = vfs_open(path_paddr, 0, O_RDONLY, VFS_TYPE_FILE);
+    Stat stat;
+    vfs_stat(elf_file, &stat);
+    uint64_t file_size = stat.size;
+
+    uint8_t *file_buffer = (char*)kmalloc(file_size);
+    if (vfs_read(path_paddr, file_buffer, file_size) < 0) {
+        warnf("syscall.c (spawn_process): Failed to read file %s\n", path_paddr);
+        XREG(A0) = -EIO;
+        return;
+    }
+    vfs_close(elf_file);
+
+    // Check to see if the file is an ELF
+    if (!elf_is_valid(file_buffer)) {
+        warnf("syscall.c (spawn_process): File %s is not a valid ELF\n", path_paddr);
+        XREG(A0) = -ENOEXEC;
+        return;
+    }
+
+    // Create a new process
+    debugf("syscall.c (spawn_process): Creating new process\n");
+    Process *new_process = process_new(PM_USER);
+    if (elf_create_process(new_process, file_buffer)) {
+        warnf("syscall.c (spawn_process): Failed to create process\n");
+        XREG(A0) = -ENOEXEC;
+        return;
+    }
+    debugf("syscall.c (spawn_process): Created new process\n");
+    new_process->state = PS_RUNNING;
+    new_process->hart = sbi_whoami();
+    debugf("syscall.c (spawn_process): Scheduling new process\n");
+    sched_add(new_process);
+    debugf("syscall.c (spawn_process): Scheduled new process\n");
+    // Store the PID in A0
+    debugf("syscall.c (spawn_process): Child process has PID %d\n", new_process->pid);
+    XREG(A0) = new_process->pid;
+}
+
 /**
     SYS_EXIT = 0,
     SYS_PUTCHAR,
@@ -822,6 +910,7 @@ static SYSCALL_RETURN_TYPE (*const SYSCALLS[])(SYSCALL_PARAM_LIST) = {
     SYSCALL_PTR(path_is_dir), /* 19 */
     SYSCALL_PTR(path_is_file), /* 20 */
     SYSCALL_PTR(path_list_dir), /* 21 */
+    SYSCALL_PTR(spawn_process), /* 22 */
 };
 
 static const int NUM_SYSCALLS = sizeof(SYSCALLS) / sizeof(SYSCALLS[0]);
