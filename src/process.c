@@ -262,7 +262,7 @@ TrapFrame *trap_frame_new(bool is_user, PageTable *page_table, uint64_t pid) {
     } else {
         frame = kernel_mmu_translate((TrapFrame *)kzalloc(sizeof(TrapFrame)));
         *frame = *kernel_trap_frame;
-        frame->satp = SATP_KERNEL;
+        frame->satp = SATP(kernel_mmu_translate((uintptr_t)page_table), pid % 0xffff);
         frame->sscratch = (uintptr_t)frame;
         // frame->sscratch = kernel_mmu_translate((uintptr_t)frame);
         frame->trap_satp = SATP_KERNEL;
