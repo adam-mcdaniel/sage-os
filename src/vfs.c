@@ -47,10 +47,12 @@ int vfs_read(File *file, void *buf, int count) {
 
     switch (file->type) {
     case VFS_TYPE_FILE:
+        debugf("vfs_read: reading from file\n");
         minix3_get_data(file->dev, file->inode, buf, file->offset, count);
         file->offset += count;
         return count;
     case VFS_TYPE_BLOCK:
+        debugf("vfs_read: reading from block device\n");
         block_device_read_bytes(file->dev, file->offset, buf, (uint64_t)count);
         file->offset += count;
         return count;

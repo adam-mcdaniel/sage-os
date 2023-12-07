@@ -711,6 +711,28 @@ void elf_print_symbols(Elf64_Ehdr header, Elf64_Shdr *section_headers, uint8_t *
     }
 }
 
+bool elf_is_valid(const uint8_t *elf) {
+    // Read the ELF header
+    Elf64_Ehdr header;
+    memcpy(&header, elf, sizeof(header));
+    if (!elf_is_valid_header(header)) {
+        debugf("Invalid ELF header\n");
+        return false;
+    }
+    elf_debug_header(header);
+    
+    // Read the program headers
+    Elf64_Phdr *program_headers = kmalloc(header.e_phentsize * header.e_phnum);
+    memcpy(program_headers, elf + header.e_phoff, header.e_phentsize * header.e_phnum);
+    for (uint32_t i = 0; i < header.e_phnum; i++) {
+        if (!elf_is_valid_program_header(program_headers[i])) {
+            return false;
+        }
+    }
+    kfree(program_headers);
+    return true;
+}
+
 int elf_create_process(Process *p, const uint8_t *elf) {
     if (!elf_is_valid_header(*(Elf64_Ehdr*)elf)) {
         debugf("Invalid ELF header\n");

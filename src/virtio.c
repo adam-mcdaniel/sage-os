@@ -19,7 +19,7 @@
 #include <gpu.h>
 #include <lock.h>
 
-#define VIRTIO_DEBUG
+// #define VIRTIO_DEBUG
 
 #ifdef VIRTIO_DEBUG
 #define debugf(...) debugf(__VA_ARGS__)
