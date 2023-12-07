@@ -262,7 +262,7 @@ TrapFrame *trap_frame_new(bool is_user, PageTable *page_table, uint64_t pid) {
     } else {
         frame = kernel_mmu_translate((TrapFrame *)kzalloc(sizeof(TrapFrame)));
         *frame = *kernel_trap_frame;
-        frame->satp = SATP(kernel_mmu_translate((uintptr_t)page_table), pid % 0xffff);
+        frame->satp = SATP_KERNEL;
         frame->sscratch = (uintptr_t)frame;
         // frame->sscratch = kernel_mmu_translate((uintptr_t)frame);
         frame->trap_satp = SATP_KERNEL;
@@ -525,7 +525,7 @@ Process *process_new(ProcessMode mode)
     rcb_map(&p->rcb, trampoline_thread_start, kernel_mmu_translate(trampoline_thread_start), 0x1000, PB_READ | PB_EXECUTE);
     rcb_map(&p->rcb, trampoline_trap_start, kernel_mmu_translate(trampoline_trap_start), 0x1000, PB_READ | PB_EXECUTE);
     rcb_map(&p->rcb, (uintptr_t)process_asm_run, kernel_mmu_translate((uintptr_t)process_asm_run), 0x10000, PB_READ | PB_EXECUTE);
-    rcb_map(&p->rcb, (uintptr_t)os_trap_handler, kernel_mmu_translate((uintptr_t)os_trap_handler), 0x1000, PB_READ | PB_EXECUTE);
+    rcb_map(&p->rcb, (uintptr_t)os_trap_handler, kernel_mmu_translate((uintptr_t)os_trap_handler), 0x4000, PB_READ | PB_EXECUTE);
     rcb_map(&p->rcb, (uintptr_t)p->frame, kernel_mmu_translate((uintptr_t)p->frame), 0x1000, PB_READ | PB_WRITE | PB_EXECUTE);
     // Map the kernel's text section into the user's page table.
     // rcb_map(&p->rcb, KERNEL_TEXT_START, kernel_mmu_translate(KERNEL_TEXT_START), KERNEL_TEXT_SIZE, PB_READ | PB_EXECUTE);
