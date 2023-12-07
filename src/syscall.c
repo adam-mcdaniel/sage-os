@@ -17,7 +17,7 @@
 #include <gpu.h>
 #include <uaccess.h>
 
-#define SYSCALL_DEBUG
+// #define SYSCALL_DEBUG
 #ifdef SYSCALL_DEBUG
 #define debugf(...) debugf(__VA_ARGS__)
 #else

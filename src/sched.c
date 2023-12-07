@@ -19,7 +19,7 @@ Scheduler - uses completely fair scheduler approach
 #include <compiler.h>
 #include <config.h>
 
-#define DEBUG_SCHED
+// #define DEBUG_SCHED
 #ifdef DEBUG_SCHED
 #define debugf(...) debugf(__VA_ARGS__)
 #else
