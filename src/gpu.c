@@ -17,14 +17,44 @@
 #include <stdint.h>
 #include <vector.h>
 #include <mmu.h>
+#include <lock.h>
 #include "virtio.h"
 
+
+#define GPU_DEBUG
+#ifdef GPU_DEBUG
+#define debugf(...) debugf(__VA_ARGS__)
+#else
+#define debugf(...)
+#endif
+
 static Vector *device_active_jobs;
-static VirtioDevice *gpu_device;
+static VirtioDevice *gpu_device = NULL;
 static Console console; // NOTE: Figure how this is supposed to be interfaced, allocate appropriately
+static Rectangle screen_rect;
 
 bool gpu_test() {
     return gpu_init(gpu_device);
+}
+
+uint64_t rect_area(const Rectangle *rect) {
+    return rect->width * rect->height;
+}
+
+VirtioDevice *gpu_get_device() {
+    return gpu_device;
+}
+
+Console *gpu_get_console() {
+    return &console;
+}
+
+Pixel *gpu_get_frame_buf() {
+    return console.frame_buf;
+}
+
+Rectangle *gpu_get_screen_rect() {
+    return &screen_rect;
 }
 
 void gpu_device_init() {
@@ -66,6 +96,12 @@ bool gpu_init(VirtioDevice *gpu_device) {
     // Allocate memory for frame buffer
     console.width = disp_info.displays[0].rect.width;
     console.height = disp_info.displays[0].rect.height;
+    
+    screen_rect.x = 0;
+    screen_rect.y = 0;
+    screen_rect.width = console.width;
+    screen_rect.height = console.height;
+
     console.frame_buf = kcalloc(console.width * console.height, sizeof(Pixel));
     debugf("gpu_init: Allocated frame buffer of (%d * %d) bytes at %p\n",
            sizeof(Pixel), console.width * console.height, console.frame_buf);
@@ -135,47 +171,119 @@ bool gpu_init(VirtioDevice *gpu_device) {
     fill_rect(console.width, console.height, console.frame_buf, &r1, &p1);
     stroke_rect(console.width, console.height, console.frame_buf, &r2, &p2, 10);
 
-    VirtioGpuTransferToHost2d tx;
-    tx.hdr.type = VIRTIO_GPU_CMD_TRANSFER_TO_HOST_2D;
-    tx.rect.x = 0;
-    tx.rect.y = 0;
-    tx.rect.width = console.width;
-    tx.rect.height = console.height;
-    tx.offset = 0;
-    tx.resource_id = 1;
-    tx.padding = 0;
-    resp_hdr.type = 0;
+    // VirtioGpuTransferToHost2d tx;
+    // tx.hdr.type = VIRTIO_GPU_CMD_TRANSFER_TO_HOST_2D;
+    // tx.rect.x = 0;
+    // tx.rect.y = 0;
+    // tx.rect.width = console.width;
+    // tx.rect.height = console.height;
+    // tx.offset = 0;
+    // tx.resource_id = 1;
+    // tx.padding = 0;
+    // resp_hdr.type = 0;
 
-    gpu_send_command(gpu_device, 0, &tx, sizeof(tx), NULL, 0, &resp_hdr, sizeof(resp_hdr));
+    // gpu_send_command(gpu_device, 0, &tx, sizeof(tx), NULL, 0, &resp_hdr, sizeof(resp_hdr));
     
-    if (resp_hdr.type == VIRTIO_GPU_RESP_OK_NODATA) {
-        debugf("gpu_init: Transfer OK\n");
-    } else {
-        // debugf("gpu_init: Transfer failed with %s\n", gpu_get_resp_string(resp_hdr.type));
-        // return false;
-    }
+    // if (resp_hdr.type == VIRTIO_GPU_RESP_OK_NODATA) {
+    //     debugf("gpu_init: Transfer OK\n");
+    // } else {
+    //     // debugf("gpu_init: Transfer failed with %s\n", gpu_get_resp_string(resp_hdr.type));
+    //     // return false;
+    // }
+    gpu_transfer_to_host_2d(&r1, 1, 0);
 
-    VirtioGpuResourceFlush flush;
-    flush.hdr.type = VIRTIO_GPU_CMD_RESOURCE_FLUSH;
-    flush.rect.x = 0;
-    flush.rect.y = 0;
-    flush.rect.width = console.width;
-    flush.rect.height = console.height;
-    flush.resource_id = 1;
-    flush.padding = 0;
-    resp_hdr.type = 0;
-    gpu_send_command(gpu_device, 0, &flush, sizeof(flush), NULL, 0, &resp_hdr, sizeof(resp_hdr));
+    // VirtioGpuResourceFlush flush;
+    // flush.hdr.type = VIRTIO_GPU_CMD_RESOURCE_FLUSH;
+    // flush.rect.x = 0;
+    // flush.rect.y = 0;
+    // flush.rect.width = console.width;
+    // flush.rect.height = console.height;
+    // flush.resource_id = 1;
+    // flush.padding = 0;
+    // resp_hdr.type = 0;
+    // gpu_send_command(gpu_device, 0, &flush, sizeof(flush), NULL, 0, &resp_hdr, sizeof(resp_hdr));
     
-    if (resp_hdr.type == VIRTIO_GPU_RESP_OK_NODATA) {
-        debugf("gpu_init: Flush OK\n");
-    } else {
-        // debugf("gpu_init: Flush failed with %s\n", gpu_get_resp_string(resp_hdr.type));
-        // return false;
-    }
+    // if (resp_hdr.type == VIRTIO_GPU_RESP_OK_NODATA) {
+    //     debugf("gpu_init: Flush OK\n");
+    // } else {
+    //     // debugf("gpu_init: Flush failed with %s\n", gpu_get_resp_string(resp_hdr.type));
+    //     // return false;
+    // }
+    gpu_flush(screen_rect);
 
     return true;
 }
 
+void gpu_handle_job(VirtioDevice *dev, Job *job) {
+    if (job == NULL) {
+        warnf("gpu_handle_job: job is NULL\n");
+        return;
+    }
+    debugf("Handling GPU device job %u\n", job->job_id);
+    job_debug(job);
+    if (job->data == NULL) {
+        warnf("gpu_handle_job: job->data is NULL\n");
+        return;
+    }
+    // VirtioGpuCtrlType *result = (VirtioGpuCtrlType *)job->data;
+    // debugf("Packet status in handle: %x\n", packet->status);
+
+    // infof("GPU job result: %p -> %s\n", gpu_get_resp_string(*result));
+    
+    // kfree(job->data);
+    // job->data = NULL;
+}
+
+void gpu_transfer_to_host_2d(const Rectangle *rect, uint32_t resource_id, uint64_t offset) {
+    VirtioGpuTransferToHost2d *tx = (VirtioGpuTransferToHost2d*)kzalloc(sizeof(VirtioGpuTransferToHost2d));
+    tx->hdr.type = VIRTIO_GPU_CMD_TRANSFER_TO_HOST_2D;
+    tx->rect.x = rect->x;
+    tx->rect.y = rect->y;
+    tx->rect.width = rect->width;
+    tx->rect.height = rect->height;
+    tx->offset = offset;
+    tx->resource_id = resource_id;
+    tx->padding = 0;
+    VirtioGpuCtrlHdr *resp_hdr = (VirtioGpuCtrlHdr*)kzalloc(sizeof(VirtioGpuCtrlHdr));
+    resp_hdr->type = 0;
+
+    gpu_send_command(gpu_device, 0, tx, sizeof(*tx), NULL, 0, resp_hdr, sizeof(*resp_hdr));
+    // kfree(tx);
+    // if (resp_hdr->type == VIRTIO_GPU_RESP_OK_NODATA) {
+    //     debugf("gpu_transfer_to_host_2d: Transfer OK\n");
+    //     kfree(resp_hdr);
+    // } else {
+    //     fatalf("gpu_transfer_to_host_2d: Transfer failed with %s\n", gpu_get_resp_string(resp_hdr->type));
+    // }
+}
+
+void gpu_flush(Rectangle rect) {
+    VirtioGpuResourceFlush *flush = (VirtioGpuResourceFlush*)kzalloc(sizeof(VirtioGpuResourceFlush));
+    flush->hdr.type = VIRTIO_GPU_CMD_RESOURCE_FLUSH;
+    // flush->rect.x = 0;
+    // flush->rect.y = 0;
+    // flush->rect.width = console.width;
+    // flush->rect.height = console.height;
+    // flush->rect.x = rect.x;
+    // flush->rect.y = rect.y;
+    // flush->rect.width = rect.width;
+    // flush->rect.height = rect.height;
+    flush->rect = rect;
+    debugf("gpu_flush: Flushing rect (%d, %d, %d, %d)\n", flush->rect.x, flush->rect.y, flush->rect.width, flush->rect.height);
+    flush->resource_id = 1;
+    flush->padding = 0;
+    VirtioGpuCtrlHdr *resp_hdr = (VirtioGpuCtrlHdr*)kzalloc(sizeof(VirtioGpuCtrlHdr));
+    resp_hdr->type = 0;
+    gpu_send_command(gpu_device, 0, flush, sizeof(*flush), NULL, 0, resp_hdr, sizeof(*resp_hdr));
+    // kfree(flush);
+    // if (resp_hdr->type == VIRTIO_GPU_RESP_OK_NODATA) {
+    //     debugf("gpu_flush: Flush OK\n");
+    // } else {
+    //     // debugf("gpu_flush: Flush failed with %s\n", gpu_get_resp_string(resp_hdr.type));
+    //     // return false;
+    // }
+}
+static Mutex gpu_device_mutex = MUTEX_UNLOCKED;
 // Send a command to GPU.
 // To send a command/response or a command/data pair set resp0 to NULL and resp0_size to 0.
 // To send a command/data/response chain set every argument in order.
@@ -187,6 +295,7 @@ void gpu_send_command(VirtioDevice *gpu_device,
                       size_t resp0_size,
                       void *resp1,
                       size_t resp1_size) {
+    // mutex_spinlock(&gpu_device_mutex);
     VirtioDescriptor cmd_desc;
     cmd_desc.addr = kernel_mmu_translate((uintptr_t)cmd);
     cmd_desc.len = cmd_size;
@@ -206,13 +315,15 @@ void gpu_send_command(VirtioDevice *gpu_device,
     VirtioDescriptor chain1[3] = {cmd_desc, resp0_desc, resp1_desc};
     VirtioDescriptor *chain = resp0 == NULL ? chain0 : chain1;
     unsigned num_descriptors = resp0 == NULL ? 2 : 3;
+    virtio_create_job_with_data(gpu_device, 1, gpu_handle_job, resp1);
     virtio_send_descriptor_chain(gpu_device, which_queue, chain, num_descriptors, true);
-    
     // Wait until device_idx catches up 
-    debugf("GPU WAITING\n");
-    while (gpu_device->device_idx != gpu_device->device->idx) {
-    }
-    debugf("gpu_send_command: device_idx caught up\n");
+    // debugf("GPU WAITING\n");
+    // virtio_wait_for_descriptor(gpu_device, which_queue);
+    // WFI();
+    // while (gpu_device->device_idx != gpu_device->device->idx) {}
+    // debugf("gpu_send_command: device_idx caught up\n");
+    // mutex_unlock(&gpu_device_mutex);
 }
 
 // Get display info and set frame buffer's info.
@@ -289,6 +400,10 @@ void fill_rect(uint32_t screen_width,
    }
 }
 
+void gpu_fill_rect(Rectangle rect, Pixel color) {
+    fill_rect(console.width, console.height, console.frame_buf, &rect, &color);
+}
+
 static inline void RVALS(Rectangle *r,
                          uint32_t x,
                          uint32_t y,
@@ -328,4 +443,98 @@ void stroke_rect(uint32_t screen_width,
     RVALS(&r, rect->x + rect->width, rect->y,
               line_size, rect->height + line_size);
     fill_rect(screen_width, screen_height, frame_buf, &r, line_color);
+}
+
+
+void gpu_draw_pixel(uint32_t screen_width,
+                    uint32_t screen_height,
+                    Pixel *frame_buf,
+                    uint32_t x,
+                    uint32_t y,
+                    const Pixel *color)
+{
+    if (x >= screen_width || y >= screen_height) {
+        return;
+    }
+    frame_buf[y * screen_width + x] = *color;
+}
+
+void gpu_draw_circle(uint32_t screen_width,
+                     uint32_t screen_height,
+                     Pixel *frame_buf,
+                     uint32_t x,
+                     uint32_t y,
+                     uint32_t radius,
+                     const Pixel *color)
+{
+    int32_t x1 = 0;
+    int32_t y1 = radius;
+    int32_t d = 3 - 2 * radius;
+
+    while (x1 <= y1) {
+        gpu_draw_pixel(screen_width, screen_height, frame_buf, x + x1, y + y1, color);
+        gpu_draw_pixel(screen_width, screen_height, frame_buf, x + x1, y - y1, color);
+        gpu_draw_pixel(screen_width, screen_height, frame_buf, x - x1, y + y1, color);
+        gpu_draw_pixel(screen_width, screen_height, frame_buf, x - x1, y - y1, color);
+        gpu_draw_pixel(screen_width, screen_height, frame_buf, x + y1, y + x1, color);
+        gpu_draw_pixel(screen_width, screen_height, frame_buf, x + y1, y - x1, color);
+        gpu_draw_pixel(screen_width, screen_height, frame_buf, x - y1, y + x1, color);
+        gpu_draw_pixel(screen_width, screen_height, frame_buf, x - y1, y - x1, color);
+
+        if (d < 0) {
+            d = d + 4 * x1 + 6;
+        } else {
+            d = d + 4 * (x1 - y1) + 10;
+            y1--;
+        }
+        x1++;
+    }
+}
+
+void gpu_draw_line(uint32_t screen_width,
+                   uint32_t screen_height,
+                   Pixel *frame_buf,
+                   uint32_t x0,
+                   uint32_t y0,
+                   uint32_t x1,
+                   uint32_t y1,
+                   const Pixel *color)
+{
+    int32_t dx = x1 - x0;
+    int32_t dy = y1 - y0;
+
+    for (int32_t x = x0; x <= x1; x++) {
+        int32_t y = y0 + dy * (x - x0) / dx;
+        gpu_draw_pixel(screen_width, screen_height, frame_buf, x, y, color);
+    }
+}
+
+void gpu_draw_triangle(uint32_t screen_width,
+                       uint32_t screen_height,
+                       Pixel *frame_buf,
+                       uint32_t x0,
+                       uint32_t y0,
+                       uint32_t x1,
+                       uint32_t y1,
+                       uint32_t x2,
+                       uint32_t y2,
+                       const Pixel *color)
+{
+    gpu_draw_line(screen_width, screen_height, frame_buf, x0, y0, x1, y1, color);
+    gpu_draw_line(screen_width, screen_height, frame_buf, x1, y1, x2, y2, color);
+    gpu_draw_line(screen_width, screen_height, frame_buf, x2, y2, x0, y0, color);
+}
+
+void gpu_draw_rect(uint32_t screen_width,
+                   uint32_t screen_height,
+                   Pixel *frame_buf,
+                   uint32_t x,
+                   uint32_t y,
+                   uint32_t width,
+                   uint32_t height,
+                   const Pixel *color)
+{
+    struct Rectangle r;
+    RVALS(&r, x, y, width, height);
+    fill_rect(screen_width, screen_height, frame_buf, &r, color);
 }

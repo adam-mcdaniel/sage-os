@@ -10,6 +10,8 @@
  */
 #pragma once
 
+#include <symbols.h>
+#include <stdint.h>
 
 /**
  * @brief Align value x up to the power of two value y. This returns
@@ -45,7 +47,7 @@ void page_init(void);
  * @param n The number of pages to allocate
  * @return void* A pointer to the top of the page. NULL if error.
  */
-void *page_nalloc(int n);
+void *page_nalloc(uint64_t n);
 
 /**
  * @brief Allocate and zero a single page.
@@ -61,7 +63,7 @@ void *page_nalloc(int n);
  * @param n The number of contiguous pages to allocate.
  * @return void* The page-aligned, physical address of the first page, or NULL if an error occurs.
  */
-void *page_znalloc(int n);
+void *page_znalloc(uint64_t n);
 
 /**
  * @brief Free a page back to the page allocator.
@@ -75,13 +77,18 @@ void page_free(void *p);
  *
  * @return int the number of unallocated pages.
  */
-int page_count_free(void);
+uint64_t page_count_free(void);
 
 /**
  * @brief Counts the number of taken (allocated) pages.
  *
  * @return int the number of allocated pages
  */
-int page_count_taken(void);
+uint64_t page_count_taken(void);
 
 #define PAGE_SIZE 4096
+
+#define HEAP_SIZE_IN_BYTES (uint64_t)(sym_end(heap) - sym_start(heap))
+#define HEAP_SIZE_IN_PAGES (HEAP_SIZE_IN_BYTES / PAGE_SIZE)
+#define BK_SIZE_IN_BYTES ALIGN_UP_POT(HEAP_SIZE_IN_PAGES / 4, PAGE_SIZE)
+#define BK_SIZE_IN_PAGES (BK_SIZE_IN_BYTES / PAGE_SIZE)

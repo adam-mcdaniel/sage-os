@@ -10,6 +10,7 @@
  */
 #pragma once
 
+#include "trap.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <list.h>
@@ -19,13 +20,15 @@
 #include <kmalloc.h>
 #include <lock.h>
 
+#define ENV_VARIABLE_MAX_SIZE (1024)
+
 // #define USER_STACK_TOP   0x00000000000e0000UL
 // #define USER_STACK_BOTTOM 0x00000000000d0000UL
 // Define much larger stack and heap
-#define USER_STACK_TOP    0x00000000000f0000UL
-#define USER_STACK_BOTTOM 0x0000000000060000UL
-#define USER_HEAP_TOP    0x1c0fffe000UL
-#define USER_HEAP_BOTTOM 0x1c0ffee000UL
+#define USER_STACK_TOP    0x0000000008000000UL
+#define USER_STACK_BOTTOM 0x0000000000100000UL
+#define USER_HEAP_TOP    0xfc0ffeef000UL
+#define USER_HEAP_BOTTOM 0xfc0ffee0000UL
 // #define USER_HEAP_TOP    0x00000000000a0000UL
 // #define USER_HEAP_BOTTOM 0x0000000000080000UL
 
@@ -39,7 +42,7 @@
 #define HART_NONE        (-1U)
 #define ON_HART_NONE(p)  (p->hart == HART_NONE)
 
-#define PID_LIMIT (0xFFFF) // Reserved for the kernel
+#define PID_LIMIT (0x500) // Reserved for the kernel
 
 typedef enum ProcessMode {
     PM_USER,
@@ -53,21 +56,6 @@ typedef enum ProcessState {
     PS_RUNNING
 } ProcessState;
 
-// Do NOT move or change the fields below. The
-// trampoline code expects these to be in the right
-// place.
-typedef struct TrapFrame {
-    int64_t xregs[32];
-    double fregs[32];
-    uint64_t sepc;
-    uint64_t sstatus;
-    uint64_t sie;
-    uint64_t satp;
-    uint64_t sscratch;
-    uint64_t stvec;
-    uint64_t trap_satp;
-    uint64_t trap_stack;
-} TrapFrame;
 
 void trap_frame_debug(TrapFrame *frame);
 TrapFrame *trap_frame_new(bool is_user, PageTable *page_table, uint64_t pid);
@@ -100,6 +88,8 @@ typedef struct Process {
     ProcessMode mode;
     ProcessState state;
     TrapFrame *frame;
+
+    
     
     // Process stats
     uint64_t sleep_until;
@@ -135,6 +125,8 @@ typedef struct Process {
 
 void process_debug(Process *p);
 
+const char *process_get_env(Process *p, const char *var);
+void process_put_env(Process *p, const char *var, const char *value);
 /**
  * Create a new process and return it.
  * mode - Either PM_USER or PM_SUPERVISOR to determine what mode to run in.

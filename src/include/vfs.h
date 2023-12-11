@@ -84,3 +84,7 @@ bool vfs_link_paths(const char *path1, const char *path2);
 // read
 // write
 // seek
+bool vfs_exists(const char *path);
+bool vfs_is_dir(const char *path);
+bool vfs_is_file(const char *path);
+void vfs_list_dir(const char *path, char *buf, size_t buf_size, bool return_full_path);

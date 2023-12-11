@@ -5,6 +5,7 @@
 #include <util.h>
 #include <symbols.h>
 #include <debug.h>
+#include <mmu.h>
 
 // #define PAGE_DEBUG
 #ifdef PAGE_DEBUG
@@ -18,11 +19,6 @@ Mutex page_lock;
 
 // Bookkeeping calculation
 // #define ALIGN_UP(x, a) (((x) + (a) - 1) & ~((a) - 1))
-
-#define HEAP_SIZE_IN_BYTES (uint64_t)(sym_end(heap) - sym_start(heap))
-#define HEAP_SIZE_IN_PAGES (HEAP_SIZE_IN_BYTES / PAGE_SIZE)
-#define BK_SIZE_IN_BYTES ALIGN_UP_POT(HEAP_SIZE_IN_PAGES / 4, PAGE_SIZE)
-#define BK_SIZE_IN_PAGES (BK_SIZE_IN_BYTES / PAGE_SIZE)
 
 static uint8_t *bookkeeping;  // Pointer to the bookkeeping area
 
@@ -136,7 +132,8 @@ void page_init(void)
     // logf(LOG_INFO, "  Free pages: %lu\n", page_count_free());
 }
 
-void *page_nalloc(int n)
+
+void *page_nalloc(uint64_t n)
 {
     if (n <= 0) {
         return NULL;
@@ -144,8 +141,8 @@ void *page_nalloc(int n)
 
     mutex_spinlock(&page_lock);
 
-    int start = 0;
-    int consecutive = 0;
+    uint64_t start = 0;
+    uint64_t consecutive = 0;
 
     for (uint64_t i = 0; i < HEAP_SIZE_IN_PAGES; i++) {
         if (!is_taken(i) && !is_last(i)) {
@@ -171,6 +168,10 @@ void *page_nalloc(int n)
                 void *result = (void*)((uint64_t)bookkeeping + ((uint64_t)start * PAGE_SIZE));
 
                 debugf("Found %d free pages at %p\n", n, result);
+                // Print remaining pages
+                uint64_t remaining = page_count_free();
+                debugf("Remaining pages: %lu\n", remaining);
+
                 return result;
             }
         } else {
@@ -183,7 +184,7 @@ void *page_nalloc(int n)
     return NULL;
 }
 
-void *page_znalloc(int n)
+void *page_znalloc(uint64_t n)
 {
     if (n <= 0) {
         return NULL;
@@ -236,9 +237,9 @@ void page_free(void *p)
     mutex_unlock(&page_lock);
 }
 
-int page_count_free(void)
+uint64_t page_count_free(void)
 {
-    int ret = 0;
+    uint64_t ret = 0;
 
     /* Count free pages in the bookkeeping area */
 
@@ -258,9 +259,9 @@ int page_count_free(void)
     return ret;
 }
 
-int page_count_taken(void)
+uint64_t page_count_taken(void)
 {
-    int ret = 0;
+    uint64_t ret = 0;
 
     /* Count taken pages in the bookkeeping area */
 

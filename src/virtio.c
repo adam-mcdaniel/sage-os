@@ -28,7 +28,31 @@
 #endif
 
 
-
+void job_debug(Job *job) {
+    if (job == NULL) {
+        debugf("No job\n");
+        return;
+    }
+    debugf("Job {\n");
+    debugf("  job_id: %d\n", job->job_id);
+    debugf("  pid_id: %d\n", job->pid_id);
+    debugf("  callback: %p\n", job->callback);
+    debugf("  context {\n");
+    debugf("    num_descriptors: %d\n", job->context.num_descriptors);
+    debugf("    descriptors {\n");
+    for (uint16_t i=0; i<job->context.num_descriptors; i++) {
+        debugf("      Descriptor %d {\n", i);
+        debugf("        addr: %p\n", job->context.desc[i].addr);
+        debugf("        len: %d\n", job->context.desc[i].len);
+        debugf("        flags: %d\n", job->context.desc[i].flags);
+        debugf("        next: %d\n", job->context.desc[i].next);
+        debugf("      }\n");
+    }
+    debugf("    }\n");
+    debugf("  }\n");
+    debugf("  is_done: %d\n", job->done);
+    debugf("}\n");
+}
 
 static Vector *virtio_devices = NULL;
 
@@ -43,14 +67,19 @@ void virtio_create_job_with_data(VirtioDevice *dev, uint64_t pid_id, void (*call
 }
 
 Job *virtio_get_job(VirtioDevice *dev, uint64_t job_id) {
+    debugf("Getting job from %p with ID %d\n", dev, job_id);
     for (uint64_t i=0; i<vector_size(dev->jobs); i++) {
         Job *job = NULL;
-        vector_get_ptr(dev->jobs, i, &job);
+        if (!vector_get_ptr(dev->jobs, i, &job)) {
+            debugf("Could not get job\n");
+            continue;
+        }
         if (job == NULL) {
             debugf("No job\n");
             continue;
         }
         if (job->job_id == job_id) {
+            debugf("Found job with ID %d\n", job_id);
             return job;
         }
     }
@@ -59,7 +88,12 @@ Job *virtio_get_job(VirtioDevice *dev, uint64_t job_id) {
 }
 
 Job job_create(uint64_t job_id, uint64_t pid_id, void (*callback)(struct VirtioDevice *device, struct Job *job)) {
+    debugf("Creating job %d\n", job_id);
     return job_create_with_data(job_id, pid_id, callback, NULL);
+}
+
+bool virtio_has_jobs_left(VirtioDevice *dev) {
+    return vector_size(dev->jobs) > 0;
 }
 
 Job job_create_with_data(uint64_t job_id, uint64_t pid_id, void (*callback)(struct VirtioDevice *device, struct Job *job), void *data) {
@@ -82,6 +116,7 @@ void job_set_context(Job *job, VirtioDescriptor *desc, uint16_t num_descriptors)
 }
 
 void job_destroy(Job *job) {
+    debugf("Destroying job %p\n", job);
     if (job->data != NULL) {
         debugf("About to free non-nulled Job data\n");
         kfree(job->data);
@@ -113,7 +148,7 @@ bool virtio_is_device_available(VirtioDevice *dev) {
 }
 
 void virtio_acquire_device(VirtioDevice *dev) {
-    IRQ_OFF();
+    // IRQ_OFF();
     debugf("Acquiring device %p\n", dev);
     mutex_spinlock(&dev->lock);
 }
@@ -121,12 +156,31 @@ void virtio_acquire_device(VirtioDevice *dev) {
 void virtio_release_device(VirtioDevice *dev) {
     mutex_unlock(&dev->lock);
     debugf("Releasing device %p\n", dev);
-    IRQ_ON();
+    // IRQ_ON();
 }
 
 void virtio_add_job(VirtioDevice *dev, Job job) {
+    debugf("Adding job %d to device %p\n", job.job_id, dev);
+    if (dev == NULL) {
+        warnf("No device\n");
+        virtio_release_device(dev);
+        return;
+    }
+    if (job.callback == NULL) {
+        warnf("No callback\n");
+        virtio_release_device(dev);
+        return;
+    }
+    debugf("Adding job %d to device %p\n", job.job_id, dev);
     Job *mem = (Job *)kzalloc(sizeof(Job));
+    if (mem == NULL) {
+        warnf("Could not allocate memory for job\n");
+        virtio_release_device(dev);
+        return;
+    }
+    debugf("Allocated job %p\n", mem);
     memcpy(mem, &job, sizeof(Job));
+    debugf("Copied job from %p to %p\n", &job, mem);
     vector_push_ptr(dev->jobs, mem);
 }
 
@@ -198,28 +252,24 @@ uint64_t virtio_get_next_job_id(VirtioDevice *dev) {
 }
 
 void virtio_complete_job(VirtioDevice *dev, uint64_t job_id) {
-    virtio_acquire_device(dev);
     Job *job = virtio_get_job(dev, job_id);
     if (job == NULL) {
         warnf("No job found with ID %d\n", job_id);
-        virtio_release_device(dev);
         return;
     }
 
     if (job->done) {
         warnf("Job %d already done\n", job_id);
-        virtio_release_device(dev);
         return;
     }
     virtio_callback_and_free_job(dev, job_id);
-    if (job->done) {
+    if (job->done && virtio_has_jobs_left(dev)) {
         debugf("Job %d done\n", job_id);
         vector_remove_val_ptr(dev->jobs, job);
+        debugf("Removed job %d\n", job_id);
     } else {
         debugf("Job %d not done\n", job_id);
     }
-
-    virtio_release_device(dev);
 }
 
 volatile struct VirtioBlockConfig *virtio_get_block_config(VirtioDevice *device) {
@@ -443,8 +493,8 @@ void virtio_init(void) {
             viodev.common_cfg->queue_enable = 1;
             viodev.common_cfg->device_status |= VIRTIO_F_DRIVER_OK;
             viodev.device->flags = 0;
-            viodev.lock = MUTEX_UNLOCKED;
             viodev.jobs = vector_new();
+            viodev.lock = MUTEX_UNLOCKED;
             virtio_set_device_name(&viodev, "Unknown Virtio Device");
             // Add to vector using vector_push
             virtio_save_device(viodev);
@@ -480,17 +530,25 @@ const char *virtio_get_device_name(VirtioDevice *dev) {
 
 // Get the notify capability for the given virtio device.
 volatile uint16_t *virtio_notify_register(VirtioDevice *device) {
+    debugf("virtio_notify_register: Getting notify register for device %s\n", device->name);
     // struct VirtioCapability *vio_cap = pci_get_virtio_capability(device->pcidev, VIRTIO_PCI_CAP_NOTIFY_CFG);
     // volatile VirtioPciNotifyCfg *notify_cap = pci_get_virtio_notify_capability(device->pcidev);
     uint8_t bar_num = device->notify_cap->cap.bar;
+    debugf("BAR number: %d\n", bar_num);
     uint64_t offset = device->notify_cap->cap.offset;
+    debugf("Offset: %d\n", offset);
     uint16_t queue_notify_off = device->common_cfg->queue_notify_off;
+    debugf("Queue notify offset: %d\n", queue_notify_off);
     uint32_t notify_off_multiplier = device->notify_cap->notify_off_multiplier;
+    debugf("Notify offset multiplier: %d\n", notify_off_multiplier);
+    debugf("PCI device: %p\n", device->pcidev);
     uint64_t bar = (uint64_t)pci_get_device_bar(device->pcidev, bar_num);
+    debugf("BAR: %p\n", bar);
     // debugf("Notify cap bar=%d offset=%x, (len=%d)\n", bar_num, offset, device->notify_cap->cap.length);
     // debugf("BAR at %x, offset=%x, queue_notify_off=%x, notify_off_mult=%x\n", bar, offset, queue_notify_off, notify_off_multiplier);
 
     uint16_t *notify = (uint16_t*)(bar + BAR_NOTIFY_CAP(offset, queue_notify_off, notify_off_multiplier));
+    debugf("Notify register at %p\n", notify);
     return notify;
 }
 
@@ -502,6 +560,12 @@ volatile uint16_t *virtio_notify_register(VirtioDevice *device) {
 void virtio_notify(VirtioDevice *viodev, uint16_t which_queue)
 {
     uint16_t num_queues = viodev->common_cfg->num_queues;
+    if (viodev == NULL) {
+        warnf("virtio_notify: Provided device is NULL\n");
+        return;
+    } else {
+        debugf("virtio_notify: Notifying device %s on queue %d\n", viodev->name, which_queue);
+    }
 
     if (which_queue >= num_queues) {
         warnf("virtio_notify: Provided queue number %d is too big (num_queues=%d) for device %s\n", which_queue, num_queues, viodev->name);
@@ -509,10 +573,13 @@ void virtio_notify(VirtioDevice *viodev, uint16_t which_queue)
     }
 
     // Select the queue we are looking at
+    debugf("Setting queue_select to %d\n", which_queue);
     viodev->common_cfg->queue_select = which_queue;
-
+    debugf("Queue size: %d\n", viodev->common_cfg->queue_size);
+    debugf("Getting notify register\n");
     volatile uint16_t *notify_register = virtio_notify_register(viodev);
-    // debugf("Notifying at 0x%p on instruction...\n", notify_register);
+    debugf("Notifying at 0x%p on instruction...\n", notify_register);
+
     *notify_register = which_queue;
     // debugf("Notified device\n\n");
 }
@@ -568,16 +635,17 @@ void virtio_send_descriptor_chain(VirtioDevice *device, uint16_t which_queue, Vi
         uint64_t descriptor_index = (device->desc_idx + i) % queue_size;
         // debugf("Writing descriptor %d to queue %d\n", descriptor_index, which_queue);
         VirtioDescriptor descriptor = descriptors[i];
-        descriptor.next = (descriptor_index + 1) % queue_size;
         if (i < num_descriptors - 1) {
+            descriptor.next = (descriptor_index + 1) % queue_size;
             descriptor.flags |= VIRTQ_DESC_F_NEXT;
         } else {
+            descriptor.next = 0;
             descriptor.flags &= ~VIRTQ_DESC_F_NEXT;
         }
-        // debugf("Descriptor addr: %p\n", descriptor.addr);
-        // debugf("Descriptor len: 0x%x = %d\n", descriptor.len, descriptor.len);
-        // debugf("Descriptor flags: 0x%x = %d\n", descriptor.flags, descriptor.flags);
-        // debugf("Descriptor next: 0x%x = %d\n", descriptor.next, descriptor.next);
+        debugf("Descriptor addr: %p\n", descriptor.addr);
+        debugf("Descriptor len: 0x%x = %d\n", descriptor.len, descriptor.len);
+        debugf("Descriptor flags: 0x%x = %d\n", descriptor.flags, descriptor.flags);
+        debugf("Descriptor next: 0x%x = %d\n", descriptor.next, descriptor.next);
         // Put the descriptor in the descriptor table
         device->desc[descriptor_index] = descriptor;
     }
@@ -588,8 +656,8 @@ void virtio_send_descriptor_chain(VirtioDevice *device, uint16_t which_queue, Vi
     // Update the descriptor index for our bookkeeping
     device->desc_idx = (device->desc_idx + num_descriptors) % queue_size;
 
-    // debugf("Driver index: %d\n", device->driver->idx);
-    // debugf("Descriptor index: %d\n", device->desc_idx);
+    debugf("Driver index: %d\n", device->driver->idx);
+    debugf("Descriptor index: %d\n", device->desc_idx);
     
     virtio_release_device(device);
 
@@ -620,21 +688,21 @@ uint16_t virtio_receive_descriptor_chain(VirtioDevice *device, uint16_t which_qu
     uint16_t i = 0;
     while (descriptor->flags & VIRTQ_DESC_F_NEXT) {
         received[i++] = *descriptor;
-        // debugf("Reading descriptor %d from queue %d\n", descriptor_index, which_queue);
-        // debugf("Descriptor addr: %p\n", descriptor->addr);
-        // debugf("Descriptor len: 0x%x = %d\n", descriptor->len, descriptor->len);
-        // debugf("Descriptor flags: 0x%x = %d\n", descriptor->flags, descriptor->flags);
-        // debugf("Descriptor next: 0x%x = %d\n", descriptor->next, descriptor->next);
+        debugf("Reading descriptor %d from queue %d\n", descriptor_index, which_queue);
+        debugf("Descriptor addr: %p\n", descriptor->addr);
+        debugf("Descriptor len: 0x%x = %d\n", descriptor->len, descriptor->len);
+        debugf("Descriptor flags: 0x%x = %d\n", descriptor->flags, descriptor->flags);
+        debugf("Descriptor next: 0x%x = %d\n", descriptor->next, descriptor->next);
         descriptor_index = descriptor->next;
         descriptor = (volatile VirtioDescriptor*)&device->desc[descriptor_index];
     }
 
     received[i] = *descriptor;
-    // debugf("Reading descriptor %d from queue %d\n", i, which_queue);
-    // debugf("Descriptor addr: %p\n", descriptor->addr);
-    // debugf("Descriptor len: 0x%x = %d\n", descriptor->len, descriptor->len);
-    // debugf("Descriptor flags: 0x%x = %d\n", descriptor->flags, descriptor->flags);
-    // debugf("Descriptor next: 0x%x = %d\n", descriptor->next, descriptor->next);
+    debugf("Reading descriptor %d from queue %d\n", i, which_queue);
+    debugf("Descriptor addr: %p\n", descriptor->addr);
+    debugf("Descriptor len: 0x%x = %d\n", descriptor->len, descriptor->len);
+    debugf("Descriptor flags: 0x%x = %d\n", descriptor->flags, descriptor->flags);
+    debugf("Descriptor next: 0x%x = %d\n", descriptor->next, descriptor->next);
     i++;
     // device->device_idx = device->device->idx;
     if (i > max_descriptors) {
@@ -666,5 +734,6 @@ void virtio_wait_for_descriptor(VirtioDevice *device, uint16_t which_queue) {
     while (!virtio_has_received_descriptor(device, which_queue)) {
         debugf("Blocking on descriptor\n");
         // Do nothing
+        WFI();
     }
 }

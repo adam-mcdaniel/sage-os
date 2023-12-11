@@ -32,14 +32,14 @@
 #define PB_ACCESS           (1UL << 6)
 #define PB_DIRTY            (1UL << 7)
 
-#define PB_USER_BOOL(x)     ((unsigned long)(!(x)) << 4)
+#define PB_USER_BOOL(x)     ((uint64_t)(!(x)) << 4)
 
 #define SATP_MODE_BIT       60
 #define SATP_MODE_SV39      (8UL << SATP_MODE_BIT)
 #define SATP_ASID_BIT       44
 #define SATP_PPN_BIT        0
-#define SATP_SET_PPN(x)     ((((unsigned long)(x)) >> 12) & 0xFFFFFFFFFFFUL)
-#define SATP_SET_ASID(x)    ((((unsigned long)(x)) & 0xFFFF) << SATP_ASID_BIT)
+#define SATP_SET_PPN(x)     ((((uint64_t)(x)) >> 12) & 0xFFFFFFFFFFFUL)
+#define SATP_SET_ASID(x)    ((((uint64_t)(x)) & 0xFFFF) << SATP_ASID_BIT)
 
 // The kernel's address space identifier is 0b1111_1111_1111_1111
 #define KERNEL_ASID 0xFFFFUL
@@ -49,7 +49,7 @@
 #define SATP_KERNEL       SATP(kernel_mmu_table, KERNEL_ASID)
 
 typedef struct PageTable {
-    unsigned long entries[PAGE_SIZE_4K / sizeof(unsigned long)];
+    uint64_t entries[PAGE_SIZE_4K / sizeof(uint64_t)];
 } PageTable;
 
 #define MMU_TRANSLATE_PAGE_FAULT  (-1UL)
@@ -59,12 +59,12 @@ extern PageTable *kernel_mmu_table;
 
 PageTable *mmu_table_create(void);
 
-unsigned long mmu_map_range(PageTable *tab, 
-                            unsigned long start_virt, 
-                            unsigned long end_virt, 
-                            unsigned long start_phys,
+uint64_t mmu_map_range(PageTable *tab, 
+                            uint64_t start_virt, 
+                            uint64_t end_virt, 
+                            uint64_t start_phys,
                             unsigned char lvl, 
-                            unsigned long bits);
+                            uint64_t bits);
 
 uintptr_t mmu_translate(const PageTable *tab, 
                         uintptr_t vaddr);
