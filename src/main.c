@@ -272,6 +272,7 @@ void main(unsigned int hart)
     elf_create_process(p, elfcon);
 
     p->state = PS_RUNNING;
+    p->priority = 1;
     p->hart = sbi_whoami();
     // p->frame->sstatus = SSTATUS_SPP_BIT | SSTATUS_SPIE_BIT;
     // sched_add(p);

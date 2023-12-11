@@ -19,7 +19,7 @@ Scheduler - uses completely fair scheduler approach
 #include <compiler.h>
 #include <config.h>
 
-#define DEBUG_SCHED
+// #define DEBUG_SCHED
 #ifdef DEBUG_SCHED
 #define debugf(...) debugf(__VA_ARGS__)
 #else
@@ -54,7 +54,7 @@ void idle_process_main() {
     #endif
     while (1) {
         #ifdef DEBUG_SCHED
-        // sbi_print("Idle woke up!\n");
+        sbi_print("Idle woke up!\n");
         #endif
         // infof("Idle woke up!\n");
         WFI();
@@ -80,8 +80,8 @@ void sched_init() {
     idle_process->hart = sbi_whoami();
     debugf("sched_init: Idle Process created with pid %d\n", idle_process->pid);
     idle_process->runtime = 1;
-    idle_process->quantum = 1;
-    idle_process->priority = 1;
+    idle_process->quantum = 4;
+    idle_process->priority = 20;
     // idle_process->frame->xregs
     // kfree(p->rcb.ptable);
     // p->rcb.ptable = kernel_mmu_table;
@@ -246,20 +246,14 @@ Process *sched_get_next() {
     debugf("sched_get_next: Getting next Process to run\n");
     mutex_spinlock(&sched_lock);
     Process *min_process = NULL;
-
-    if (!rb_min_val_ptr(sched_tree, &min_process)) {
-        warnf("sched_get_next: No Process to run\n");
-        mutex_unlock(&sched_lock);
-        return sched_get_idle_process();
-    }
+    bool search_success = rb_min_val_ptr(sched_tree, &min_process);
     
     //implementation of async Process freeing
     uint64_t i = 0;
-    bool search_success = rb_min_val_ptr(sched_tree, &min_process);
     while (min_process == NULL || min_process->state != PS_RUNNING) {
         if (i++ > 20) {
             // Retuning idle Process
-            warnf("sched_get_next: No Process to run\n");
+            // warnf("sched_get_next: No Process to run\n");
             mutex_unlock(&sched_lock);
             return sched_get_idle_process();
         }
@@ -277,11 +271,6 @@ Process *sched_get_next() {
                 min_process = NULL;
                 break;
             }
-        }
-        debugf("sched_get_next: Process %d is not ready to run\n", min_process->pid);
-        if (!search_success) {
-            min_process = NULL;
-            break;
         }
         // If the process is dead, remove it from the tree
         if (min_process->state == PS_DEAD) {
@@ -391,9 +380,9 @@ void sched_handle_timer_interrupt(int hart) {
 
     if (current_proc->state != PS_DEAD) {
         debugf("sched_handle_timer_interrupt: Putting Process %d back in scheduler\n", current_proc->pid);
-        total_processes-=1;
         rb_insert_ptr(sched_tree, current_proc->runtime * current_proc->priority, current_proc);
     } else {
+        total_processes-=1;
         warnf("sched_handle_timer_interrupt: Process %d is dead\n", current_proc->pid);
     }
 
@@ -409,6 +398,7 @@ void sched_handle_timer_interrupt(int hart) {
         debugf("Short circuiting idle process to execute Process %d\n", current_proc->pid);
         next_process = current_proc;
     }
+    
     if (next_process == sched_get_idle_process()) {
         next_process->frame->sepc = (uint64_t) idle_process_main;
         debugf("sched_handle_timer_interrupt: Next Process to run is idle\n");

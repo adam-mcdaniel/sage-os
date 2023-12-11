@@ -387,7 +387,7 @@ void rcb_free(RCB *rcb) {
 }
 
 void rcb_map(RCB *rcb, uint64_t vaddr, uint64_t paddr, uint64_t size, uint64_t bits) {
-    debugf("rcb_map: vaddr = 0x%08lx, paddr = 0x%08lx, size = 0x%08lx, bits = 0x%08lx\n", vaddr, paddr, size, bits);
+    // debugf("rcb_map: vaddr = 0x%08lx, paddr = 0x%08lx, size = 0x%08lx, bits = 0x%08lx\n", vaddr, paddr, size, bits);
     if (size % PAGE_SIZE_4K != 0) {
         warnf("rcb_map: size is not a multiple of PAGE_SIZE_4K\n");
         size = ALIGN_UP_POT(size, PAGE_SIZE_4K);
@@ -398,7 +398,7 @@ void rcb_map(RCB *rcb, uint64_t vaddr, uint64_t paddr, uint64_t size, uint64_t b
     // if (size < PAGE_SIZE_2M) {
     uint64_t alignment = ~(PAGE_SIZE_4K - 1);
     for (uint64_t i = 0; i < size; i += PAGE_SIZE_4K) {
-        debugf("rcb_map: Mapping 0x%08lx to 0x%08lx\n", (vaddr + i) & alignment, (paddr + i) & alignment);
+        // debugf("rcb_map: Mapping 0x%08lx to 0x%08lx\n", (vaddr + i) & alignment, (paddr + i) & alignment);
         mmu_map(rcb->ptable, (vaddr + i) & alignment, (paddr + i) & alignment, MMU_LEVEL_4K, bits);
         if (kernel_mmu_translate((paddr + i) & alignment) == MMU_TRANSLATE_PAGE_FAULT) {
             warnf("%p not mapped in kernel space\n", (paddr + i) & alignment);
@@ -576,7 +576,6 @@ Process *process_new(ProcessMode mode)
     memset(p->heap, 0, p->heap_size);
     for (uint64_t i = 0; i < p->heap_size / PAGE_SIZE; i++) {
         // list_add_ptr(p->rcb.heap_pages, p->heap + i * PAGE_SIZE);
-        debugf("Mapping heap page\n");
         if (p->heap_vaddr + i * PAGE_SIZE > USER_HEAP_TOP) {
             fatalf("process.c (process_new): Heap overflow\n");
         }
@@ -585,13 +584,11 @@ Process *process_new(ProcessMode mode)
                 kernel_mmu_translate((uint64_t)p->heap + i * PAGE_SIZE), 
                 PAGE_SIZE,
                 permission_bits);
-        debugf("Heap page mapped\n");
     }
     debugf("Wiping the stack\n");
     memset(p->stack, 0, p->stack_size);
     for (uint64_t i = 0; i < p->stack_size / PAGE_SIZE; i++) {
         // list_add_ptr(p->rcb.stack_pages, p->stack + i * PAGE_SIZE);
-        debugf("Mapping stack page\n");
         if (USER_STACK_BOTTOM + i * PAGE_SIZE > USER_STACK_TOP) {
             fatalf("process.c (process_new): Stack overflow\n");
         }
@@ -601,7 +598,6 @@ Process *process_new(ProcessMode mode)
                 kernel_mmu_translate((uint64_t)p->stack + i * PAGE_SIZE), 
                 PAGE_SIZE,
                 permission_bits);
-        debugf("Stack page mapped\n");
     }
     #ifdef DEBUG_PROCESS
     mmu_print_entries(p->rcb.ptable, MMU_LEVEL_4K);
@@ -695,7 +691,7 @@ bool process_run(Process *p, unsigned int hart)
     if (me == hart) {
         if (p->state == PS_DEAD) {
             warnf("process.c (process_run): Process is dead, running idle instead\n");
-            process_run(sched_get_idle_process(), hart);
+            return process_run(sched_get_idle_process(), hart);
         }
 
         if (!process_map_contains(p->pid)) {
