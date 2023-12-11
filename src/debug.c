@@ -55,25 +55,28 @@ int logf(log_type lt, const char *fmt, ...)
 
     return ret;
 }
-
 int debugf(const char *fmt, ...)
 {
+#ifdef ENABLE_DEBUG
     va_list va;
     va_start(va, fmt);
     int ret = vlogf(LOG_DEBUG, fmt, va);
     va_end(va);
 
     return ret;
+#endif
 }
 
 int warnf(const char *fmt, ...)
 {
+#ifdef ENABLE_WARN
     va_list va;
     va_start(va, fmt);
     int ret = vlogf(LOG_WARN, fmt, va);
     va_end(va);
 
     return ret;
+#endif
 }
 
 int textf(const char *fmt, ...)
@@ -88,12 +91,14 @@ int textf(const char *fmt, ...)
 
 int infof(const char *fmt, ...)
 {
+#ifdef ENABLE_INFO
     va_list va;
     va_start(va, fmt);
     int ret = vlogf(LOG_INFO, fmt, va);
     va_end(va);
 
     return ret;
+#endif
 }
 
 ATTR_NORET void fatalf(const char *fmt, ...)

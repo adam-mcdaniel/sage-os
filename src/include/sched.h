@@ -9,6 +9,7 @@ Scheduler header
 
 Process *sched_get_idle_process();
 void idle_process_main();
+void sched_invoke(Process *p, int hart);
 
 //initialize scheduler tree
 void sched_init();
