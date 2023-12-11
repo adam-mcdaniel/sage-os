@@ -255,12 +255,13 @@ void main(unsigned int hart)
     // Read in /home/cosc562/console.elf
     // File *elf_file = vfs_open("/home/cosc562/presentation.elf", 0, O_RDONLY, VFS_TYPE_FILE);
     // File *elf_file = vfs_open("/home/cosc562/draw.elf", 0, O_RDONLY, VFS_TYPE_FILE);
-    File *elf_file = vfs_open("/home/cosc562/shell.elf", 0, O_RDONLY, VFS_TYPE_FILE);
+    // File *elf_file = vfs_open("/home/cosc562/shell.elf", 0, O_RDONLY, VFS_TYPE_FILE);
     // File *elf_file = vfs_open("/home/cosc562/console.elf", 0, O_RDONLY, VFS_TYPE_FILE);
     // File *elf_file = vfs_open("/home/cosc562/bonzai.elf", 0, O_RDONLY, VFS_TYPE_FILE);
     // File *elf_file = vfs_open("/home/cosc562/bonzai.elf", 0, O_RDONLY, VFS_TYPE_FILE);
     // File *elf_file = vfs_open("/home/cosc562/hex_editor.elf", 0, O_RDONLY, VFS_TYPE_FILE);
     // File *elf_file = vfs_open("/home/cosc562/bonzai.elf", 0, O_RDONLY, VFS_TYPE_FILE);
+    File *elf_file = vfs_open("/home/cosc562/tetris.elf", 0, O_RDONLY, VFS_TYPE_FILE);
     Stat stat;
     vfs_stat(elf_file, &stat);
     logf(LOG_INFO, "Console file size: %lu\n", stat.size);
