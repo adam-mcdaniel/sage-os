@@ -6,6 +6,7 @@
 #include <list.h>
 #include <path.h>
 #include <map.h>
+#include <trap.h>
 
 #define min(a, b) ((a) < (b) ? (a) : (b))
 #define max(a, b) ((a) > (b) ? (a) : (b))
@@ -27,7 +28,7 @@ static uint8_t *zone_bitmap;
 
 void debug_dir_entry(DirEntry entry) {
     debugf("Entry: %u `", entry.inode);
-    for (uint8_t i=0; i<60; i++) {
+    for (uint32_t i=0; i<60; i++) {
         #ifdef minix3_DEBUG
         if (entry.name[i])
             infof("%c", entry.name[i]);
@@ -51,12 +52,14 @@ uint32_t minix3_get_inode_from_path(VirtioDevice *block_device, const char *path
     uint32_t parent = 1; // Root inode
 
     uint32_t i = 0, num_items = list_size(path_items);
+    debugf("num_items = %u\n", num_items);
     ListElem *elem;
     list_for_each(path_items, elem) {
 
         char *name = (char *)list_elem_value(elem);
         debugf("Getting inode from relative path %s, num_items = %u\n", name, num_items);
         if (strcmp(name, "/") == 0 || strcmp(name, "") == 0) {
+            debugf("Skipping root\n");
             return parent;
         }
         debugf("i = %u, num_items = %u\n", i, num_items);
@@ -64,7 +67,14 @@ uint32_t minix3_get_inode_from_path(VirtioDevice *block_device, const char *path
             debugf("Returning parent inode %u\n", parent);
             return parent;
         }
+        debugf("Getting child %s of inode %u\n", name, parent);
         uint32_t child = minix3_find_dir_entry(block_device, parent, name);
+        debugf("Got child %u\n", child);
+        
+        if (child == INVALID_INODE) {
+            warnf("minix3_get_inode_from_path: Couldn't find inode for %s\n", name);
+            return INVALID_INODE;
+        }
         parent = child;
         debugf("Got child %u\n", child);
         i++;
@@ -150,7 +160,9 @@ uint32_t minix3_get_next_free_zone(VirtioDevice *block_device) {
 }
 
 void minix3_get_zone(VirtioDevice *block_device, uint32_t zone, uint8_t *data) {
+    debugf("Getting zone %u (%x)\n", zone, zone);
     SuperBlock sb = minix3_get_superblock(block_device);
+    debugf("Zone %u (%x) is at block %u (%x)\n", zone, zone, sb.first_data_zone + zone, sb.first_data_zone + zone);
     if (zone > sb.num_zones + sb.first_data_zone) {
         warnf("Zone %u (%x) is out of bounds\n", zone, zone);
         return;
@@ -205,7 +217,7 @@ void debug_inode(VirtioDevice *block_device, uint32_t i) {
     debugf("   mtime: %d\n", inode.mtime);
     debugf("   ctime: %d\n", inode.ctime);
     debugf("   zones[]:\n");
-    for (uint8_t j=0; j<10; j++) {
+    for (uint32_t j=0; j<10; j++) {
         debugf("   zones[%d] = %x (*1024 = %x)\n", j, inode.zones[j], inode.zones[j] * 1024);
     }
 }
@@ -653,6 +665,7 @@ void minix3_get_data(VirtioDevice *block_device, uint32_t inode, uint8_t *data, 
     debugf("minix3_get_data: Getting data from inode %u, offset %u, count %u\n", inode, offset, count);
     // First, get the inode
     Inode inode_data = minix3_get_inode(block_device, inode);
+    debugf("minix3_get_data: Got inode %u\n", inode);
     
 
     uint8_t zone_data[minix3_get_zone_size(block_device)];
@@ -666,10 +679,10 @@ void minix3_get_data(VirtioDevice *block_device, uint32_t inode, uint8_t *data, 
     for (uint32_t direct_zone=0; direct_zone<7; direct_zone++) {
         uint32_t zone = inode_data.zones[direct_zone];
         if (zone == 0) {
-            debugf("No direct zone %d\n", direct_zone);
+            debugf("No direct zone #%d = %d\n", direct_zone, zone);
             continue;
         } else {
-            debugf("Direct zone %d\n", direct_zone);
+            debugf("Direct zone #%d = %d\n", direct_zone, zone);
         }
         memset(zone_data, 0, minix3_get_zone_size(block_device));
 
@@ -682,6 +695,7 @@ void minix3_get_data(VirtioDevice *block_device, uint32_t inode, uint8_t *data, 
             // Read the zone into the buffer
             debugf("Reading first direct zone %d\n", zone);
             minix3_get_zone(block_device, zone, zone_data);
+            debugf("Read first direct zone %d\n", zone);
             // Copy the remaining data into the buffer
             size_t remaining = min(count, minix3_get_zone_size(block_device) - (offset - file_cursor));
             memcpy(data, zone_data + offset - file_cursor, remaining);
@@ -689,6 +703,7 @@ void minix3_get_data(VirtioDevice *block_device, uint32_t inode, uint8_t *data, 
             file_cursor = offset + remaining;
             continue;
         }
+        debugf("file_cursor = %u, offset = %u\n", file_cursor, offset);
 
         // Read the zone into the buffer
         minix3_get_zone(block_device, zone, zone_data);
@@ -776,9 +791,12 @@ void minix3_get_data(VirtioDevice *block_device, uint32_t inode, uint8_t *data, 
             uint32_t indirect_zones[minix3_get_zone_size(block_device) / sizeof(uint32_t)];
             minix3_get_zone(block_device, indirect_zone, (uint8_t*)indirect_zones);
 
-            for (uint8_t indirect_zone=0; indirect_zone<minix3_get_zone_size(block_device) / sizeof(uint32_t); indirect_zone++) {
+            for (uint32_t indirect_zone=0; indirect_zone<minix3_get_zone_size(block_device) / sizeof(uint32_t); indirect_zone++) {
                 uint32_t zone = indirect_zones[indirect_zone];
-                if (zone == 0) continue;
+                if (zone == 0) {
+                    debugf("No double indirect zone %d\n", indirect_zone);
+                    continue;
+                }
                 debugf("Reading double indirect zone %d\n", zone);
 
                 if (file_cursor + minix3_get_zone_size(block_device) < offset) {
@@ -895,7 +913,7 @@ void minix3_put_data(VirtioDevice *block_device, uint32_t inode, uint8_t *data, 
 
     // Now, get the data
     // The first 7 zones are direct zones
-    for (uint8_t direct_zone=0; direct_zone<7; direct_zone++) {
+    for (uint32_t direct_zone=0; direct_zone<7; direct_zone++) {
         uint32_t zone = inode_data.zones[direct_zone];
         if (zone == 0) {
             debugf("No direct zone %d\n", zone);
@@ -953,7 +971,7 @@ void minix3_put_data(VirtioDevice *block_device, uint32_t inode, uint8_t *data, 
         uint32_t indirect_zones[minix3_get_zone_size(block_device) / sizeof(uint32_t)];
         minix3_get_zone(block_device, inode_data.zones[7], (uint8_t*)indirect_zones);
 
-        for (uint8_t indirect_zone=0; indirect_zone<minix3_get_zone_size(block_device) / sizeof(uint32_t); indirect_zone++) {
+        for (uint32_t indirect_zone=0; indirect_zone<minix3_get_zone_size(block_device) / sizeof(uint32_t); indirect_zone++) {
             uint32_t zone = indirect_zones[indirect_zone];
             if (zone == 0) continue;
             debugf("Writing indirect zone %d\n", zone);
@@ -1007,14 +1025,14 @@ void minix3_put_data(VirtioDevice *block_device, uint32_t inode, uint8_t *data, 
         // We're done
         minix3_get_zone(block_device, inode_data.zones[8], (uint8_t*)double_indirect_zones);
 
-        for (uint8_t double_indirect_zone=0; double_indirect_zone<minix3_get_zone_size(block_device) / sizeof(uint32_t); double_indirect_zone++) {
+        for (uint32_t double_indirect_zone=0; double_indirect_zone<minix3_get_zone_size(block_device) / sizeof(uint32_t); double_indirect_zone++) {
             uint32_t indirect_zone = double_indirect_zones[double_indirect_zone];
             if (indirect_zone == 0) continue;
 
             uint32_t indirect_zones[minix3_get_zone_size(block_device) / sizeof(uint32_t)];
             minix3_get_zone(block_device, indirect_zone, (uint8_t*)indirect_zones);
 
-            for (uint8_t indirect_zone=0; indirect_zone<minix3_get_zone_size(block_device) / sizeof(uint32_t); indirect_zone++) {
+            for (uint32_t indirect_zone=0; indirect_zone<minix3_get_zone_size(block_device) / sizeof(uint32_t); indirect_zone++) {
                 uint32_t zone = indirect_zones[indirect_zone];
                 if (zone == 0) continue;
                 debugf("Writing double indirect zone %d\n", zone);
@@ -1067,19 +1085,19 @@ void minix3_put_data(VirtioDevice *block_device, uint32_t inode, uint8_t *data, 
         uint32_t triple_indirect_zones[minix3_get_zone_size(block_device) / sizeof(uint32_t)];
         minix3_get_zone(block_device, inode_data.zones[9], (uint8_t*)triple_indirect_zones);
 
-        for (uint8_t triple_indirect_zone=0; triple_indirect_zone<minix3_get_zone_size(block_device) / sizeof(uint32_t); triple_indirect_zone++) {
+        for (uint32_t triple_indirect_zone=0; triple_indirect_zone<minix3_get_zone_size(block_device) / sizeof(uint32_t); triple_indirect_zone++) {
             uint32_t double_indirect_zone = triple_indirect_zones[triple_indirect_zone];
             if (double_indirect_zone == 0) continue;
             uint32_t double_indirect_zones[minix3_get_zone_size(block_device) / sizeof(uint32_t)];
             minix3_get_zone(block_device, double_indirect_zone, (uint8_t*)double_indirect_zones);
 
-            for (uint8_t double_indirect_zone=0; double_indirect_zone<minix3_get_zone_size(block_device) / sizeof(uint32_t); double_indirect_zone++) {
+            for (uint32_t double_indirect_zone=0; double_indirect_zone<minix3_get_zone_size(block_device) / sizeof(uint32_t); double_indirect_zone++) {
                 uint32_t indirect_zone = double_indirect_zones[double_indirect_zone];
                 if (indirect_zone == 0) continue;
                 uint32_t indirect_zones[minix3_get_zone_size(block_device) / sizeof(uint32_t)];
                 minix3_get_zone(block_device, indirect_zone, (uint8_t*)indirect_zones);
 
-                for (uint8_t indirect_zone=0; indirect_zone<minix3_get_zone_size(block_device) / sizeof(uint32_t); indirect_zone++) {
+                for (uint32_t indirect_zone=0; indirect_zone<minix3_get_zone_size(block_device) / sizeof(uint32_t); indirect_zone++) {
                     uint32_t zone = indirect_zones[indirect_zone];
                     if (zone == 0) continue;
                     debugf("Writing triple indirect zone %d\n", zone);
@@ -1159,20 +1177,27 @@ uint32_t minix3_find_next_free_dir_entry(VirtioDevice *block_device, uint32_t in
 
 bool minix3_get_dir_entry(VirtioDevice *block_device, uint32_t inode, uint32_t entry, DirEntry *data) {
     if (!minix3_is_dir(block_device, inode)) {
-        warnf("Inode %u (%x) is not a directory\n", inode, inode);
+        warnf("minix3_get_dir_entry: Inode %u (%x) is not a directory\n", inode, inode);
         return false;
     }
+    debugf("minix3_get_dir_entry: Getting entry %u from inode %u\n", entry, inode);
     Inode inode_data = minix3_get_inode(block_device, inode);
-    debugf("Getting entry %u from inode %u\n", entry, inode);
+    debugf("minix3_get_dir_entry: Getting entry %u from inode %u\n", entry, inode);
     DirEntry tmp;
 
     uint32_t offset = entry * sizeof(DirEntry);
+    debugf("minix3_get_dir_entry: Getting entry %u from inode %u at offset %u\n", entry, inode, offset);
     minix3_get_data(block_device, inode, (uint8_t*)&tmp, offset, sizeof(DirEntry));
+    debugf("minix3_get_dir_entry: Got entry %s at offset %u from inode %u\n", tmp.name, offset, inode);
     memcpy(data, &tmp, sizeof(DirEntry));
-    debugf("Got entry %s at offset %u from inode %u\n", tmp.name, offset, inode);
+    debugf("minix3_get_dir_entry: Got entry %s at offset %u from inode %u\n", tmp.name, offset, inode);
     if (tmp.inode == 0) {
         return false;
     }
+    if (tmp.inode == INVALID_INODE) {
+        return false;
+    }
+    debugf("minix3_get_dir_entry: Got entry %s at inode %u\n", tmp.name, tmp.inode);
 
     return true;
 }
@@ -1191,36 +1216,40 @@ void minix3_put_dir_entry(VirtioDevice *block_device, uint32_t inode, uint32_t e
 
 // List all of the entries in the given directory to the given buffer.
 uint32_t minix3_list_dir(VirtioDevice *block_device, uint32_t inode, DirEntry *entries, uint32_t max_entries) {
+    debugf("minix3_list_dir: Listing directory %u\n", inode);
     if (!minix3_is_dir(block_device, inode)) {
-        warnf("Inode %u (%x) is not a directory\n", inode, inode);
+        warnf("minix3_list_dir: Inode %u (%x) is not a directory\n", inode, inode);
         return 0;
     }
     Inode inode_data = minix3_get_inode(block_device, inode);
-    debugf("Listing directory %u\n", inode);
+    debugf("minix3_list_dir: Got inode %u\n", inode);
     uint32_t entry = 0;
     DirEntry tmp;
     while (minix3_get_dir_entry(block_device, inode, entry, &tmp)) {
-        debugf("Found entry %s at inode %u\n", tmp.name, tmp.inode);
+        debugf("minix3_list_dir: Found entry %s at inode %u\n", tmp.name, tmp.inode);
         memcpy(entries + entry, &tmp, sizeof(DirEntry));
         entry++;
         if (entry >= max_entries) {
-            warnf("Too many entries in directory %u\n", inode);
+            warnf("minix3_list_dir: Too many entries in directory %u\n", inode);
             break;
         }
     }
+    debugf("minix3_list_dir: Listed directory %u\n", inode);
     return entry;
 }
 // Returns the inode number of the file with the given name in the given directory.
 // If the file does not exist, return INVALID_INODE.
 uint32_t minix3_find_dir_entry(VirtioDevice *block_device, uint32_t inode, const char *name) {
     minix3_load_device(block_device);
+    debugf("minix3_find_dir_entry: Finding entry %s in inode %u\n", name, inode);
     
     DirEntry entries[128];
     uint32_t num_entries = minix3_list_dir(block_device, inode, entries, 128);
 
     for (uint32_t i=0; i<num_entries; i++) {
         if (strcmp(entries[i].name, name) == 0) {
-            debugf("Found entry %s at inode %u\n", name, entries[i].inode);
+            debugf("minix3_find_dir_entry: Found entry %s at inode %u\n", name, entries[i].inode);
+            trap_frame_debug(kernel_trap_frame);
             return entries[i].inode;
         }
     }
