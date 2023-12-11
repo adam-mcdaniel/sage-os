@@ -1,116 +1,140 @@
 #include <stdio.h>
-#include <malloc.h>
 #include <rand.h>
 #include <ctype.h>
 #include <string.h>
-#include <stat.h>
 #include <unistd.h>
 #include <printf.h>
 #include <event.h>
+#include <graphics.h>
 #include <sage.h>
 #include <stdint.h>
 
-
-typedef int64_t suseconds_t;
-
 #define GRID_ROWS 20
-#define GRID_COLS 15
+#define GRID_COLS 10
+#define CELL_WIDTH 30
+#define CELL_HEIGHT 30
+#define MAX_SHAPE_SIZE 4
 #define TRUE 1
 #define FALSE 0
+
+void drawGameGrid(Pixel *buf, uint32_t screen_width, uint32_t screen_height) {
+    Pixel gridColor = {255, 255, 255, 0}; // White color for grid lines
+    for (int i = 0; i < GRID_ROWS; ++i) {
+        for (int j = 0; j < GRID_COLS; ++j) {
+            Rectangle cell = {
+                .x = j * CELL_WIDTH,
+                .y = i * CELL_HEIGHT,
+                .width = CELL_WIDTH,
+                .height = CELL_HEIGHT
+            };
+            draw_rect(buf, &cell, &gridColor, screen_width, screen_height);
+        }
+    }
+    // Flush the buffer to update the screen
+    Rectangle fullScreen = {0, 0, screen_width, screen_height};
+    screen_flush(&fullScreen);
+}
+
+typedef struct {
+    char array[MAX_SHAPE_SIZE][MAX_SHAPE_SIZE];
+    int width, row, col;
+} Shape;
 
 char GameGrid[GRID_ROWS][GRID_COLS] = {0};
 int gameScore = 0;
 char GameActive = TRUE;
+Shape current;
+
+typedef int64_t suseconds_t;
 suseconds_t timer = 400000;
 int decrease = 1000;
 
-typedef struct {
-    char **array;
-    int width, row, col;
-} Shape;
-Shape current;
-
-const Shape ShapesArray[7]= {
-	{(char *[]){(char []){0,1,1},(char []){1,1,0}, (char []){0,0,0}}, 3, 0, 0},    
-	{(char *[]){(char []){1,1,0},(char []){0,1,1}, (char []){0,0,0}}, 3, 0, 0},  
-	{(char *[]){(char []){0,1,0},(char []){1,1,1}, (char []){0,0,0}}, 3, 0, 0},    
-	{(char *[]){(char []){0,0,1},(char []){1,1,1}, (char []){0,0,0}}, 3, 0, 0},    
-	{(char *[]){(char []){1,0,0},(char []){1,1,1}, (char []){0,0,0}}, 3, 0, 0},  
-	{(char *[]){(char []){1,1},(char []){1,1}}, 2, 0, 0},
-	{(char *[]){(char []){0,0,0,0}, (char []){1,1,1,1}, (char []){0,0,0,0}, (char []){0,0,0,0}}, 4, 0, 0}
+Shape ShapesArray[7] = {
+    {{{0,1,1},{1,1,0},{0,0,0},{0,0,0}}, 3, 0, 0},
+    {{{1,1,0},{0,1,1},{0,0,0},{0,0,0}}, 3, 0, 0},
+    {{{0,1,0},{1,1,1},{0,0,0},{0,0,0}}, 3, 0, 0},
+    {{{0,0,1},{1,1,1},{0,0,0},{0,0,0}}, 3, 0, 0},
+    {{{1,0,0},{1,1,1},{0,0,0},{0,0,0}}, 3, 0, 0},
+    {{{1,1},{1,1},{0,0},{0,0}}, 2, 0, 0},
+    {{{0,0,0,0},{1,1,1,1},{0,0,0,0},{0,0,0,0}}, 4, 0, 0}
 };
 
-Shape CopyShape(Shape shape){
-	Shape new_shape = shape;
-	char **copyshape = shape.array;
-	new_shape.array = (char**)malloc(new_shape.width*sizeof(char*));
-    int i, j;
-    for(i = 0; i < new_shape.width; i++){
-		new_shape.array[i] = (char*)malloc(new_shape.width*sizeof(char));
-		for(j=0; j < new_shape.width; j++) {
-			new_shape.array[i][j] = copyshape[i][j];
-		}
+void drawTetrisShape(Pixel *buf, Shape *shape, Pixel *color, uint32_t screen_width, uint32_t screen_height) {
+    for (int i = 0; i < shape->width; i++) {
+        for (int j = 0; j < shape->width; j++) {
+            if (shape->array[i][j]) {
+                Rectangle cell = {
+                    .x = (shape->col + j) * CELL_WIDTH,
+                    .y = (shape->row + i) * CELL_HEIGHT,
+                    .width = CELL_WIDTH,
+                    .height = CELL_HEIGHT
+                };
+                draw_rect(buf, &cell, color, screen_width, screen_height);
+            }
+        }
     }
-    return new_shape;
 }
 
-void DelShape(Shape shape){
-    int i;
-    for(i = 0; i < shape.width; i++){
-		free(shape.array[i]);
-    }
-    free(shape.array);
+void clearScreen(Pixel *buf, Rectangle *screen_rect, uint32_t screen_width, uint32_t screen_height) {
+    Pixel backgroundColor = {0, 0, 0, 0}; // Black color for background
+    Rectangle fullScreenRect = {0, 0, screen_width, screen_height};
+    draw_rect(buf, &fullScreenRect, &backgroundColor, screen_width, screen_height);
+    screen_flush(screen_rect);
 }
 
-int CheckPos(Shape shape){
-	char **array = shape.array;
-	int i, j;
-	for(i = 0; i < shape.width;i++) {
-		for(j = 0; j < shape.width ;j++){
-			if((shape.col+j < 0 || shape.col+j >= GRID_COLS || shape.row+i >= GRID_ROWS)){
-				if(array[i][j])
-					return FALSE;
-				
-			}
-			else if(GameGrid[shape.row+i][shape.col+j] && array[i][j])
-				return FALSE;
-		}
-	}
-	return TRUE;
+void CopyShape(Shape *dest, Shape *src) {
+    dest->width = src->width;
+    dest->row = src->row;
+    dest->col = src->col;
+    for (int i = 0; i < MAX_SHAPE_SIZE; i++) {
+        for (int j = 0; j < MAX_SHAPE_SIZE; j++) {
+            dest->array[i][j] = src->array[i][j];
+        }
+    }
+}
+
+int CheckPos(Shape *shape){
+    for (int i = 0; i < shape->width; i++) {
+        for (int j = 0; j < shape->width; j++) {
+            if (shape->array[i][j]) {
+                int x = shape->col + j;
+                int y = shape->row + i;
+                if (x < 0 || x >= GRID_COLS || y >= GRID_ROWS || GameGrid[y][x])
+                    return FALSE;
+            }
+        }
+    }
+    return TRUE;
 }
 
 void SetRandShape(){
-	Shape new_shape = CopyShape(ShapesArray[rand()%7]);
-
-    new_shape.col = rand()%(GRID_COLS-new_shape.width+1);
-    new_shape.row = 0;
-    DelShape(current);
-	current = new_shape;
-	if(!CheckPos(current)){
-		GameActive = FALSE;
-	}
+    int idx = rand() % 7;
+    CopyShape(&current, &ShapesArray[idx]);
+    current.col = rand() % (GRID_COLS - current.width + 1);
+    current.row = 0;
+    if (!CheckPos(&current)) {
+        GameActive = FALSE;
+    }
 }
 
-void RotShape(Shape shape){
-	Shape temp = CopyShape(shape);
-	int i, j, k, width;
-	width = shape.width;
-	for(i = 0; i < width ; i++){
-		for(j = 0, k = width-1; j < width ; j++, k--){
-				shape.array[i][j] = temp.array[k][i];
-		}
-	}
-	DelShape(temp);
+void RotShape(Shape *shape){
+    Shape temp;
+    CopyShape(&temp, shape);
+    for (int i = 0; i < shape->width; i++) {
+        for (int j = 0, k = shape->width - 1; j < shape->width; j++, k--) {
+            shape->array[i][j] = temp.array[k][i];
+        }
+    }
 }
 
 void WriteToGameGrid(){
-	int i, j;
-	for(i = 0; i < current.width ;i++){
-		for(j = 0; j < current.width ; j++){
-			if(current.array[i][j])
-				GameGrid[current.row+i][current.col+j] = current.array[i][j];
-		}
-	}
+    for (int i = 0; i < current.width; i++) {
+        for (int j = 0; j < current.width; j++) {
+            if (current.array[i][j]) {
+                GameGrid[current.row + i][current.col + j] = current.array[i][j];
+            }
+        }
+    }
 }
 
 void UpdateGameScore(){
@@ -178,11 +202,12 @@ void ProcessInput() {
 }
 
 void UpdateCurrent(int action){
-	Shape temp = CopyShape(current);
+	Shape temp;
+    CopyShape(&temp, &current);
 	switch(action){
 		case 's':
 			temp.row++;
-			if(CheckPos(temp))
+			if(CheckPos(&temp))
 				current.row++;
 			else {
 				WriteToGameGrid();
@@ -192,27 +217,35 @@ void UpdateCurrent(int action){
 			break;
 		case 'd':
 			temp.col++;
-			if(CheckPos(temp))
+			if(CheckPos(&temp))
 				current.col++;
 			break;
 		case 'a':
 			temp.col--;
-			if(CheckPos(temp))
+			if(CheckPos(&temp))
 				current.col--;
 			break;
 		case 'w':
-			RotShape(temp); 
-			if(CheckPos(temp))
-				RotShape(current);
+			RotShape(&temp); 
+			if(CheckPos(&temp))
+				RotShape(&current);
 			break;
 	}
-	DelShape(temp);
 	PrintGameGrid();
 }
 
 int main() {
     srand(0); // Initialize random number generator
     gameScore = 0; // Reset gameScore
+    Rectangle screen_rect;
+    screen_get_dims(&screen_rect);
+
+    Pixel buf[screen_rect.width * screen_rect.height];
+    // Clear the screen
+    clearScreen(buf, &screen_rect, screen_rect.width, screen_rect.height);
+
+    drawGameGrid(buf, screen_rect.width, screen_rect.height);
+    
     SetRandShape(); // Set initial random shape
     PrintGameGrid(); // Initial print of the GameGrid
 
@@ -226,7 +259,15 @@ int main() {
         }
     }
 
-    DelShape(current); // Clean up the current shape
+    // Draw game grid
+    drawGameGrid(buf, screen_rect.width, screen_rect.height);
+
+    // Draw current Tetris shape
+    Pixel shapeColor = {255, 0, 0, 0}; // Red color for Tetris shape
+    drawTetrisShape(buf, &current, &shapeColor, screen_rect.width, screen_rect.height);
+
+    // Flush the buffer to update the screen
+    screen_flush(&screen_rect);
 
     // Final print of the game state
     int i, j;
