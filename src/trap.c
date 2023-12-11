@@ -117,7 +117,15 @@ void os_trap_handler(void)
                 // We typically invoke our scheduler if we get a timer
                 CSR_WRITE("sscratch", &save);
                 // CSR_WRITE("sscratch", kernel_trap_frame);
-                sched_handle_timer_interrupt(hart);
+                // sched_handle_timer_interrupt(hart);
+                if (now - scheduler_time > CONTEXT_SWITCH_TIMER) {
+                    debugf("Process %d is running. Resuming process\n", p->pid);
+                    process_run(sched_get_current(), hart);
+                } else {
+                    debugf("Process %d is running. Scheduling next process\n", p->pid);
+                    scheduler_time = now;
+                    sched_handle_timer_interrupt(hart);
+                }
                 break;
             case CAUSE_SEIP:
                 debugf("os_trap_handler: Supervisor external interrupt!\n");
@@ -137,14 +145,14 @@ void os_trap_handler(void)
 
 
                 if (!(frame->sstatus & SSTATUS_SPP_SUPERVISOR) && sched_get_current() != NULL) {
-                    // process_run(sched_get_current(), hart);
-                    if (now - scheduler_time < CONTEXT_SWITCH_TIMER) {
-                        debugf("Process %d is running. Resuming process\n", p->pid);
-                        process_run(p, hart);
-                    } else {
-                        scheduler_time = now;
-                        sched_handle_timer_interrupt(hart);
-                    }
+                    process_run(sched_get_current(), hart);
+                    // if (now - scheduler_time < CONTEXT_SWITCH_TIMER) {
+                    //     debugf("Process %d is running. Resuming process\n", p->pid);
+                    //     process_run(p, hart);
+                    // } else {
+                    //     scheduler_time = now;
+                    //     sched_handle_timer_interrupt(hart);
+                    // }
                 }
                 // p = sched_get_current();
                 // // If there is a current process, we should schedule it
@@ -192,7 +200,6 @@ void os_trap_handler(void)
                 syscall_handle(hart, epc, scratch);
                 // Get the process
                 p = sched_get_current();
-
                 // if (now - time_since_scheduler > CONTEXT_SWITCH_TIMER || p == sched_get_idle_process() || p->state != PS_RUNNING) {
                 //     debugf("Context switch timer expired. Scheduling next process\n");
                 //     sched_handle_timer_interrupt(hart);

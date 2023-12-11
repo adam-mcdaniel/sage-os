@@ -325,10 +325,10 @@ SYSCALL(sleep)
 
     /*
     // Commented out until we implement an IO buffer for the process
-    // debugf("syscall.c (sleep) Sleeping PID %d at %d until %d\n", p->pid, sbi_get_time(), sbi_get_time() + XREG(A0) * VIRT_TIMER_FREQ / 1000);
+    */
+    debugf("syscall.c (sleep) Sleeping PID %d at %d until %d\n", p->pid, sbi_get_time(), sbi_get_time() + XREG(A0) * VIRT_TIMER_FREQ / 1000);
     // p->sleep_until = sbi_get_time() + XREG(A0) * VIRT_TIMER_FREQ / 1000;
     // p->state = PS_SLEEPING;
-    */
 }
 
 SYSCALL(events)
@@ -590,9 +590,9 @@ SYSCALL(screen_flush) {
         Rectangle rect = *gpu_get_screen_rect();
         gpu_transfer_to_host_2d(&rect, 1, 0);
         gpu_flush(rect);
-        XREG(A0) = 0;
     }
 
+    XREG(A0) = 0;
     // debugf("syscall.c (screen_flush): Flushing\n");
     // gpu_transfer_to_hosdt_2d(gpu_get_screen_rect(), 1, 0);
     // gpu_flush();
@@ -785,6 +785,108 @@ SYSCALL(path_list_dir)
     XREG(A0) = 0;
 }
 
+SYSCALL(get_file_size)
+{
+    SYSCALL_ENTER();
+    debugf("syscall.c (get_file_size): Getting file size\n");
+    Process *p = sched_get_current();
+
+    const char *path_vaddr = (const char *)XREG(A0);
+    if (!path_vaddr) {
+        warnf("syscall.c (get_file_size): Path is null\n");
+        XREG(A0) = -EINVAL;
+        return;
+    }
+
+    const char *path_paddr = mmu_translate(p->rcb.ptable, (uintptr_t)path_vaddr);
+
+    if (path_paddr == -1UL) {
+        XREG(A0) = -EFAULT;
+        return;
+    }
+    debugf("syscall.c (get_file_size): Got path %s\n", path_paddr);
+
+    // debugf("syscall.c (get_file_size): Getting file size of %s\n", path_paddr);
+    // char buf[2048] = {0};
+    // vfs_read(path_paddr, path_paddr, buffer_size);
+    File *file = vfs_open(path_paddr, 0, O_RDONLY, VFS_TYPE_FILE);
+    Stat stat;
+    vfs_stat(file, &stat);
+    vfs_close(file);
+    debugf("syscall.c (get_file_size): File %s has size %d\n", path_paddr, stat.size);
+    XREG(A0) = stat.size;
+}
+
+SYSCALL(read_file)
+{
+    SYSCALL_ENTER();
+    debugf("syscall.c (read_file): Reading file\n");
+    Process *p = sched_get_current();
+
+    const char *path_vaddr = (const char *)XREG(A0);
+    char *buffer_vaddr = (char *)XREG(A1);
+    uint64_t buffer_size = XREG(A2);
+
+    if (!path_vaddr) {
+        warnf("syscall.c (read_file): Path is null\n");
+        XREG(A0) = -EINVAL;
+        return;
+    }
+
+    if (!buffer_vaddr) {
+        warnf("syscall.c (read_file): Buffer is null\n");
+        XREG(A0) = -EINVAL;
+        return;
+    }
+
+    const char *path_paddr = mmu_translate(p->rcb.ptable, (uintptr_t)path_vaddr);
+
+    if (path_paddr == -1UL) {
+        XREG(A0) = -EFAULT;
+        return;
+    }
+    debugf("syscall.c (read_file): Got path %s\n", path_paddr);
+
+    char *buffer_paddr = mmu_translate(p->rcb.ptable, (uintptr_t)buffer_vaddr);
+    if (buffer_paddr == -1UL) {
+        XREG(A0) = -EFAULT;
+        return;
+    }
+    debugf("syscall.c (read_file): Got buffer %p\n", buffer_paddr);
+
+    // debugf("syscall.c (read_file): Reading file %s\n", path_paddr);
+    // char buf[2048] = {0};
+    // vfs_read(path_paddr, path_paddr, buffer_size);
+    File *file = vfs_open(path_paddr, 0, O_RDONLY, VFS_TYPE_FILE);
+    Stat stat;
+    vfs_stat(file, &stat);
+    
+
+    uint64_t file_size = stat.size;
+    debugf("syscall.c (read_file): File %s has size %d\n", path_paddr, file_size);
+    #define min(a, b) ((a) < (b) ? (a) : (b))
+    #define max(a, b) ((a) > (b) ? (a) : (b))
+    char *tmp_buffer = (char*)kzalloc(max(file_size, buffer_size));
+
+    uint64_t read_bytes = vfs_read(file, tmp_buffer, min(file_size, buffer_size));
+    // uint64_t read_bytes = 0;
+    if (read_bytes < 0) {
+        warnf("syscall.c (read_file): Failed to read file %s\n", path_paddr);
+        XREG(A0) = -EIO;
+        vfs_close(file);
+        return;
+    }
+    vfs_close(file);
+    debugf("syscall.c (read_file): Read %d bytes\n", read_bytes);
+
+    for (uint64_t i = 0; i < read_bytes; ++i) {
+        *(uint8_t*)mmu_translate(p->rcb.ptable, (uintptr_t)&buffer_vaddr[i]) = tmp_buffer[i];
+    }
+    kfree(tmp_buffer);
+
+    XREG(A0) = read_bytes;
+}
+
 
 SYSCALL(spawn_process)
 {
@@ -804,6 +906,7 @@ SYSCALL(spawn_process)
     const char *path_paddr = mmu_translate(p->rcb.ptable, (uintptr_t)path_vaddr);
 
     if (path_paddr == -1UL) {
+        warnf("syscall.c (spawn_process): MMU translated to null\n");
         XREG(A0) = -EFAULT;
         return;
     } else {
@@ -918,6 +1021,8 @@ static SYSCALL_RETURN_TYPE (*const SYSCALLS[])(SYSCALL_PARAM_LIST) = {
     SYSCALL_PTR(path_is_file), /* 20 */
     SYSCALL_PTR(path_list_dir), /* 21 */
     SYSCALL_PTR(spawn_process), /* 22 */
+    SYSCALL_PTR(read_file), /* 23 */
+    SYSCALL_PTR(get_file_size), /* 24 */
 };
 
 static const int NUM_SYSCALLS = sizeof(SYSCALLS) / sizeof(SYSCALLS[0]);

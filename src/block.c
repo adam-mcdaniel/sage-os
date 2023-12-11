@@ -77,7 +77,7 @@ void block_device_handle_job(VirtioDevice *block_device, Job *job) {
 
 void block_device_send_request(VirtioDevice *block_device, BlockRequestPacket *packet) {
     debugf("Sending block request\n");
-    mutex_spinlock(&block_device_mutex);
+    // mutex_spinlock(&block_device_mutex);
     request_count++;
 
     debugf("Sending block request #%u\n", request_count);
@@ -112,15 +112,15 @@ void block_device_send_request(VirtioDevice *block_device, BlockRequestPacket *p
     debugf("Sending block device request #%u\n", request_count);
     virtio_create_job_with_data(block_device, 1, block_device_handle_job, packet);
     virtio_send_descriptor_chain(block_device, 0, chain, 3, true);
-    mutex_unlock(&block_device_mutex);
+    // mutex_unlock(&block_device_mutex);
 
     // WFI();
+    // IRQ_ON();
     while (packet->status == 0xf) {
         infof("Waiting for block device request #%u\n", request_count);
         // debugf("Waiting for block device request #%u\n", request_count);
         // WFI();
     }
-    // IRQ_ON();
 
     debugf("Packet status after sending request #%u: %x\n", request_count, packet->status);
     // if (packet->status != 0) {
@@ -182,8 +182,9 @@ void block_device_read_bytes(VirtioDevice *block_device, uint64_t byte, uint8_t 
     debugf("block_device_read_bytes(%d, %p, %d)\n", byte, data, bytes);
     uint64_t sectors = ALIGN_UP_POT(bytes, 512) / 512;
     uint64_t sector = byte / 512;
-    uint8_t buffer[sectors][512];
-    
+    // Declare a pointer to an array of 512 bytes
+    uint8_t (*buffer)[512] = kmalloc(sectors * 512);
+
     block_device_read_sectors(block_device, sector, (uint8_t *)buffer, sectors);
 
     uint64_t alignment_offset = byte % 512;
@@ -192,6 +193,8 @@ void block_device_read_bytes(VirtioDevice *block_device, uint64_t byte, uint8_t 
     for (uint64_t i = 0; i < bytes; i++) {
         data[i] = buffer[i / 512][(alignment_offset + i) % 512];
     }
+
+    kfree(buffer);
 }
 
 
@@ -199,7 +202,7 @@ void block_device_write_bytes(VirtioDevice *block_device, uint64_t byte, uint8_t
     debugf("block_device_write_bytes(%d, %p, %d)\n", byte, data, bytes);
     uint64_t sectors = ALIGN_UP_POT(bytes, 512) / 512;
     uint64_t sector = byte / 512;
-    uint8_t buffer[sectors][512];
+    uint8_t (*buffer)[512] = kmalloc(sectors * 512);
 
     uint64_t alignment_offset = byte % 512;
     block_device_read_sectors(block_device, sector, (uint8_t *)buffer, sectors);
@@ -209,4 +212,5 @@ void block_device_write_bytes(VirtioDevice *block_device, uint64_t byte, uint8_t
     }
 
     block_device_write_sectors(block_device, sector, (uint8_t *)buffer, sectors);
+    kfree(buffer);
 }
