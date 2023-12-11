@@ -147,6 +147,13 @@ typedef struct VirtioGpuMemEntry {
 
 /* methods */
 bool gpu_test();
+
+VirtioDevice *gpu_get_device();
+Console *gpu_get_console();
+
+void gpu_flush(Rectangle rect);
+void gpu_transfer_to_host_2d(const Rectangle *rect, uint32_t resource_id, uint64_t offset);
+
 void gpu_device_init();
 bool gpu_init(VirtioDevice *gpu_device);
 void gpu_send_command(VirtioDevice *gpu_device,
@@ -169,3 +176,8 @@ void stroke_rect(uint32_t screen_width,
                  const Rectangle *rect,
                  const Pixel *line_color,
                  uint32_t line_size);
+void gpu_fill_rect(Rectangle rect, Pixel color);
+Pixel *gpu_get_frame_buf();
+Rectangle *gpu_get_screen_rect();
+
+uint64_t rect_area(const Rectangle *rect);

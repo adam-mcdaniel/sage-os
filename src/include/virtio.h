@@ -174,6 +174,8 @@ typedef struct Job {
     void *data;
 } Job;
 
+void job_debug(Job *job);
+
 Job job_create(uint64_t job_id, uint64_t pid_id, void (*callback)(struct VirtioDevice *device, struct Job *job));
 Job job_create_with_data(uint64_t job_id, uint64_t pid_id, void (*callback)(struct VirtioDevice *device, struct Job *job), void *data);
 // void job_set_context(Job *job, VirtioDescriptor *desc, uint16_t num_descriptors);
@@ -216,10 +218,8 @@ typedef struct VirtioDevice {
     Mutex lock;
 
     // Input device identification
-    struct {
-        unsigned is_keyboard : 1;
-        unsigned is_tablet : 1;
-    };
+    unsigned is_keyboard;
+    unsigned is_tablet;
 } VirtioDevice;
 
 // Read the queue size from the common configuration.
@@ -235,7 +235,7 @@ void virtio_debug_job(VirtioDevice *dev, Job *job);
 void virtio_create_job(VirtioDevice *dev, uint64_t pid_id, void (*callback)(struct VirtioDevice *device, struct Job *job));
 // Use this to create a job with state that will be saved for when the job is called
 void virtio_create_job_with_data(VirtioDevice *dev, uint64_t pid_id, void (*callback)(struct VirtioDevice *device, struct Job *job), void *data);
-
+bool virtio_has_jobs_left(VirtioDevice *dev);
 // Performed by virtio_handle_interrupt
 void virtio_callback_and_free_job(VirtioDevice *dev, uint64_t job_id);
 
