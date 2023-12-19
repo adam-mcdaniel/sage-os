@@ -1,6 +1,6 @@
 # Work Log
 
-![OS](OS.png)
+![OS](assets/OS.png)
 
 Every week, you will need to write entries in this journal. Include brief information about:
 
