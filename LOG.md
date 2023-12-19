@@ -2,14 +2,6 @@
 
 ![OS](assets/OS.png)
 
-Every week, you will need to write entries in this journal. Include brief information about:
-
-* any complications you've encountered.
-* any interesting information you've learned.
-* any complications that you've fixed and how you did it.
-
-Sort your entries in descending order (newest entries at the top).
-
 # 27-Nov-2023
 - Jongheon Park: Added an interface to the input device driver so other parts of the kernel can interface with it. Added the event system call. Investigated why input device driver was causing an instruction page fault in `sbi_put_char` when there were too many interrupts. Turning off debugfs in the ISR helped with the problem.
 
