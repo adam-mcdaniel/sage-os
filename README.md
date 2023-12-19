@@ -2,7 +2,7 @@
 
 A RISC-V operating system that supports [the Sage programming language](https://github.com/adam-mcdaniel/sage)!
 
-![Sage OS](assets/sage-os.png)
+[![Sage OS](assets/sage-os.png)](https://adam-mcdaniel.github.io/sage)
 
 ## User Space Programs
 
