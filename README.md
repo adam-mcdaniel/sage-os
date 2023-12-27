@@ -4,6 +4,14 @@ A RISC-V operating system that supports [the Sage programming language](https://
 
 [![Sage OS](assets/sage-os.png)](https://adam-mcdaniel.github.io/sage)
 
+## Authors
+
+- Adam McDaniel (68% of lines in `src`)
+- Dr. Stephen Marz (23% of lines in `src`)
+- Jongheon Park (7% of lines in `src`)
+- Gaddy Morales (1% of lines in `src`)
+- Tokey Tahmid (<1% of lines in `src`)
+
 ## User Space Programs
 
 <!-- A center aligned div with two images side-by-side -->
@@ -34,11 +42,3 @@ Sage OS supports VirtIO drivers for the following devices connected to the QEMU 
 ### Graphics devices (GPU)
 
 ![GPU Driver](assets/gpu-driver.png)
-
-## Authors
-
-- Adam McDaniel (68% of lines in `src`)
-- Dr. Stephen Marz (23% of lines in `src`)
-- Jongheon Park (7% of lines in `src`)
-- Gaddy Morales (1% of lines in `src`)
-- Tokey Tahmid (<1% of lines in `src`)
