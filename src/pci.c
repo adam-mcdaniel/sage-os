@@ -257,6 +257,8 @@ volatile struct VirtioPciNotifyCfg *pci_get_virtio_notify_capability(PCIDevice *
 }
 
 volatile uint8_t *pci_get_device_bar(PCIDevice *device, uint8_t bar_num) {
+    debugf("Getting bar #%d from device %p\n", bar_num, device);
+    debugf("  bar #%d = %p\n", bar_num, device->ecam_header->type0.bar[bar_num]);
     return (volatile uint8_t*)(uintptr_t)(device->ecam_header->type0.bar[bar_num] & ~0xf);
 }
 

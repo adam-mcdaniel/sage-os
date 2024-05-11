@@ -32,13 +32,13 @@ PageTable *mmu_table_create(void)
 }
 
 // Check the valid bit of a page table entry.
-static inline bool is_valid(unsigned long pte)
+static inline bool is_valid(uint64_t pte)
 {
     return pte & 1UL;
 }
 
 // Check if a page table entry is a leaf, return false if it's a branch.
-static inline bool is_leaf(unsigned long pte)
+static inline bool is_leaf(uint64_t pte)
 {
     return (pte & 0xE) != 0;
 }
@@ -60,11 +60,11 @@ bool mmu_map(PageTable *tab, uint64_t vaddr, uint64_t paddr, uint8_t lvl, uint64
     const uint64_t ppn[] = {(paddr >> ADDR_0_BIT) & 0x1FF, (paddr >> ADDR_1_BIT) & 0x1FF,
                             (paddr >> ADDR_2_BIT) & 0x3FFFFFF};
 
-    int i;
+    uint64_t i;
     PageTable *pt = tab;
 
     for (i = MMU_LEVEL_1G; i > lvl; i--) {
-        unsigned long pte = pt->entries[vpn[i]];
+        uint64_t pte = pt->entries[vpn[i]];
 
         if (!is_valid(pte)) {
             debugf("mmu_map: entry %d in page table at 0x%08lx is invalid\n", vpn[i], pt);
@@ -77,7 +77,7 @@ bool mmu_map(PageTable *tab, uint64_t vaddr, uint64_t paddr, uint8_t lvl, uint64
             if (pt->entries[vpn[i]]) {
                 debugf("Warning: overwriting page table entry at 0x%08lx = %p\n", &pt->entries[vpn[i]], pt->entries[vpn[i]]);
             }
-            pt->entries[vpn[i]] = (unsigned long)new_pt >> 2 | PB_VALID;
+            pt->entries[vpn[i]] = (uint64_t)new_pt >> 2 | PB_VALID;
             debugf("mmu_map: set entry %d in page table at 0x%08lx as lvl %d branch to 0x%08lx\n", vpn[i], pt, i, new_pt);
         } else {
             debugf("mmu_map: entry %d in page table at 0x%08lx is valid\n", vpn[i], pt);
@@ -85,7 +85,7 @@ bool mmu_map(PageTable *tab, uint64_t vaddr, uint64_t paddr, uint8_t lvl, uint64
         pt = (PageTable*)((pt->entries[vpn[i]] & ~0x3FF) << 2);
     }
 
-    unsigned long ppn_leaf = ppn[2] << PTE_PPN2_BIT |
+    uint64_t ppn_leaf = ppn[2] << PTE_PPN2_BIT |
                              ppn[1] << PTE_PPN1_BIT |
                              ppn[0] << PTE_PPN0_BIT;
     
@@ -104,7 +104,7 @@ bool mmu_map(PageTable *tab, uint64_t vaddr, uint64_t paddr, uint8_t lvl, uint64
 void mmu_free(PageTable *tab) 
 { 
     uint64_t entry; 
-    int i; 
+    uint64_t i; 
 
     if (tab == NULL) { 
         return; 
@@ -143,10 +143,10 @@ uint64_t mmu_translate(const PageTable *tab, uint64_t vaddr)
 
     uint64_t lvl = MMU_LEVEL_1G;
     // Traverse the page table hierarchy using the virtual page numbers
-    for (int i = MMU_LEVEL_1G; i >= MMU_LEVEL_4K; i--) {
+    for (uint64_t i = MMU_LEVEL_1G; i >= MMU_LEVEL_4K; i--) {
         // Iterate through and print the page table entries
         debugf("mmu_translate: tab->entries == 0x%08lx\n", tab->entries);
-        for (int j = 0; j < (PAGE_SIZE / 8); j++) {
+        for (uint64_t j = 0; j < (PAGE_SIZE / 8); j++) {
             if (tab->entries[j] & PB_VALID) {
                 debugf("mmu_translate: tab->entries[%x] == 0x%0lx\n", j, tab->entries[j]);
             }

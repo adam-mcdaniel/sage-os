@@ -50,7 +50,7 @@ void idle_process_main() {
     // }
 
     #ifdef DEBUG_SCHED
-    sbi_print("Idle woke up!\n");
+    // sbi_print("Idle woke up!\n");
     #endif
     while (1) {
         #ifdef DEBUG_SCHED
@@ -79,8 +79,9 @@ void sched_init() {
     idle_process->state = PS_RUNNING;
     idle_process->hart = sbi_whoami();
     debugf("sched_init: Idle Process created with pid %d\n", idle_process->pid);
-    idle_process->runtime = 2;
-    idle_process->priority = 2;
+    idle_process->runtime = 1;
+    idle_process->quantum = 4;
+    idle_process->priority = 20;
     // idle_process->frame->xregs
     // kfree(p->rcb.ptable);
     // p->rcb.ptable = kernel_mmu_table;
@@ -146,7 +147,7 @@ void sched_init() {
     // // Map trap frame to user's page table
     // uintptr_t trans_frame = kernel_mmu_translate((uintptr_t)&p->frame);
     // mmu_map(p->rcb.ptable, (uintptr_t)&p->frame, trans_frame, MMU_LEVEL_4K, PB_READ | PB_WRITE | PB_EXECUTE | PB_USER);
-
+    rcb_map(&idle_process->rcb, idle_process_main, idle_process_main, 0x1000, PB_READ | PB_EXECUTE);
     // mmu_translate(p->rcb.ptable, p->frame.stvec);
     // CSR_READ(p->frame->sie, "sie");
     
@@ -177,7 +178,7 @@ void sched_init() {
     // p->frame.sepc = (uint64_t) idle_process_main;
     // CSR_READ(p->frame.sstatus, "sstatus");
     
-    idle_process->runtime += CONTEXT_SWITCH_TIMER * idle_process->quantum;
+    idle_process->runtime += CONTEXT_SWITCH_TIMER;
     // process_map_set(p);
     set_current_process(idle_process);
     //add idle Process to scheduler tree
@@ -216,7 +217,7 @@ static int total_processes = 0;
 void sched_add(Process *p) {  
     mutex_spinlock(&sched_lock);
     if (p->state == PS_DEAD) {
-        debugf("sched_add: Process %d is dead\n", p->pid);
+        warnf("sched_add: Process %d is dead\n", p->pid);
         mutex_unlock(&sched_lock);
         return;
     }
@@ -245,41 +246,31 @@ Process *sched_get_next() {
     debugf("sched_get_next: Getting next Process to run\n");
     mutex_spinlock(&sched_lock);
     Process *min_process = NULL;
-
-    if (!rb_min_val_ptr(sched_tree, &min_process)) {
-        debugf("sched_get_next: No Process to run\n");
-        mutex_unlock(&sched_lock);
-        return sched_get_idle_process();
-    }
+    bool search_success = rb_min_val_ptr(sched_tree, &min_process);
     
     //implementation of async Process freeing
     uint64_t i = 0;
-    while (min_process != NULL && min_process->state != PS_RUNNING) {
+    while (min_process == NULL || min_process->state != PS_RUNNING) {
         if (i++ > 20) {
             // Retuning idle Process
-            debugf("sched_get_next: No Process to run\n");
+            // warnf("sched_get_next: No Process to run\n");
             mutex_unlock(&sched_lock);
             return sched_get_idle_process();
         }
+
         debugf("Min Process is %d\n", min_process->pid);
-        bool search_success = rb_min_val_ptr(sched_tree, &min_process);
         if (!process_map_contains(min_process->pid)) {
-            debugf("sched_get_next: Process %d not found in process map\n", min_process->pid);
+            warnf("sched_get_next: Process %d not found in process map\n", min_process->pid);
             min_process = NULL;
             break;
         }
 
         if (!rb_contains(sched_tree, min_process->runtime * min_process->priority)) {
-            debugf("sched_get_next: Process %d is not in the scheduler\n", min_process->pid);
+            warnf("sched_get_next: Process %d is not in the scheduler\n", min_process->pid);
             if (!search_success) {
                 min_process = NULL;
                 break;
             }
-        }
-        debugf("sched_get_next: Process %d is not ready to run\n", min_process->pid);
-        if (!search_success) {
-            min_process = NULL;
-            break;
         }
         // If the process is dead, remove it from the tree
         if (min_process->state == PS_DEAD) {
@@ -298,6 +289,7 @@ Process *sched_get_next() {
                 debugf("sched_get_next: Process %d is not ready to run\n", min_process->pid);
             }
         }
+        search_success = rb_min_val_ptr(sched_tree, &min_process);
     }
     debugf("sched_get_next: Next Process to run is %d\n", min_process->pid);
     mutex_unlock(&sched_lock);
@@ -368,9 +360,9 @@ void sched_handle_timer_interrupt(int hart) {
     if (current_proc->state == PS_RUNNING) {
         current_proc->hart = HART_NONE;
         // Update the Process's runtime
-        sbi_add_timer(sbi_whoami(), CONTEXT_SWITCH_TIMER * current_proc->quantum);
+        sbi_add_timer(sbi_whoami(), CONTEXT_SWITCH_TIMER);
 
-        current_proc->runtime += CONTEXT_SWITCH_TIMER * current_proc->quantum;
+        current_proc->runtime += CONTEXT_SWITCH_TIMER;
         current_proc->priority = 1;
         debugf("sched_handle_timer_interrupt: Process %d quantum is now %d\n", current_proc->pid, current_proc->quantum);
         debugf("sched_handle_timer_interrupt: Process %d runtime is now %d\n", current_proc->pid, current_proc->runtime);
@@ -388,8 +380,10 @@ void sched_handle_timer_interrupt(int hart) {
 
     if (current_proc->state != PS_DEAD) {
         debugf("sched_handle_timer_interrupt: Putting Process %d back in scheduler\n", current_proc->pid);
-        total_processes-=1;
         rb_insert_ptr(sched_tree, current_proc->runtime * current_proc->priority, current_proc);
+    } else {
+        total_processes-=1;
+        warnf("sched_handle_timer_interrupt: Process %d is dead\n", current_proc->pid);
     }
 
     //get an idle Process
@@ -404,6 +398,7 @@ void sched_handle_timer_interrupt(int hart) {
         debugf("Short circuiting idle process to execute Process %d\n", current_proc->pid);
         next_process = current_proc;
     }
+    
     if (next_process == sched_get_idle_process()) {
         next_process->frame->sepc = (uint64_t) idle_process_main;
         debugf("sched_handle_timer_interrupt: Next Process to run is idle\n");
@@ -414,7 +409,7 @@ void sched_handle_timer_interrupt(int hart) {
     if (next_process != NULL) {
         set_current_process(next_process);
         //set timer
-        sbi_add_timer(hart, CONTEXT_SWITCH_TIMER * next_process->quantum);
+        sbi_add_timer(hart, CONTEXT_SWITCH_TIMER);
         // debugf("sched_handle_timer_interrupt: Running Process %d\n", next_process->pid);
         // load_state(&next_process->frame);
         process_run(next_process, hart);
@@ -518,7 +513,7 @@ void set_current_process(Process *proc) {
     if (!process_map_contains(proc->pid)) {
         fatalf("set_current_process: Process %d not found\n", proc->pid);
     } else {
-        debugf("set_current_process: Process %d found\n", proc->pid);
+        // debugf("set_current_process: Process %d found\n", proc->pid);
     }
     pid_harts_map_set(sbi_whoami(), proc->pid);
     proc->hart = sbi_whoami();

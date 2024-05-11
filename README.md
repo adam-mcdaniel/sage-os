@@ -14,8 +14,6 @@ A RISC-V operating system that supports [the Sage programming language](https://
 
 ## User Space Programs
 
-<!-- A center aligned div with two images side-by-side -->
-
 [Click here for a video demonstration of the graphical shell and powerpoint presentation app!](https://docs.google.com/file/d/1k5CjkdbnrRzwfMCuE0A5eFRi_f5it75K/preview) Both programs are written in [Sage](https://github.com/adam-mcdaniel/sage)!
 
 <div align="center">

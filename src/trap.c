@@ -22,7 +22,7 @@
 void syscall_handle(int hart, uint64_t epc, int64_t *scratch);
 
 
-static uint64_t time_since_scheduler = 0;
+static uint64_t scheduler_time = 0;
 
 // Called from asm/spawn.S: _spawn_kthread
 void os_trap_handler(void)
@@ -95,11 +95,13 @@ void os_trap_handler(void)
     //                 "csrs sie, t1\n");
 
     // debugf("Is async: %d\n", SCAUSE_IS_ASYNC(cause));
+    uint64_t now = sbi_get_time();
 
     if (SCAUSE_IS_ASYNC(cause)) {
-        debugf("os_trap_handler: Is async!\n");
+        // debugf("os_trap_handler: Is async!\n");
         cause = SCAUSE_NUM(cause);
-
+        frame->sepc = epc;
+        TrapFrame save = *frame;
         switch (cause) {
             case CAUSE_SSIP:
                 infof("os_trap_handerl: Supervisor software interrupt!\n");
@@ -111,10 +113,19 @@ void os_trap_handler(void)
                 debugf("os_trap_handler: Supervisor timer interrupt!\n");
                 sbi_ack_timer();
                 debugf("Timer: old sepc: %p\n", frame->sepc);
-                frame->sepc = epc;
                 debugf("Timer: new sepc: %p\n", frame->sepc);
                 // We typically invoke our scheduler if we get a timer
-                sched_handle_timer_interrupt(hart);
+                CSR_WRITE("sscratch", &save);
+                // CSR_WRITE("sscratch", kernel_trap_frame);
+                // sched_handle_timer_interrupt(hart);
+                if (now - scheduler_time > CONTEXT_SWITCH_TIMER) {
+                    debugf("Process %d is running. Resuming process\n", p->pid);
+                    process_run(sched_get_current(), hart);
+                } else {
+                    debugf("Process %d is running. Scheduling next process\n", p->pid);
+                    scheduler_time = now;
+                    sched_handle_timer_interrupt(hart);
+                }
                 break;
             case CAUSE_SEIP:
                 debugf("os_trap_handler: Supervisor external interrupt!\n");
@@ -125,16 +136,23 @@ void os_trap_handler(void)
                 //     debugf("os_trap_handler: SPP is not set\n");
                 //     frame->sepc = epc;
                 // }
+                CSR_WRITE("sscratch", &save);
+                IRQ_OFF();
                 plic_handle_irq(hart);
+                IRQ_OFF();
+
+                // CSR_WRITE("sscratch", frame);
 
 
-
-                if (frame->sstatus | SSTATUS_SPP_SUPERVISOR) {
-                    debugf("External interrupt: old sepc: %p\n", frame->sepc);
-                    frame->sepc = epc;
-                    debugf("External interrupt: new sepc: %p\n", frame->sepc);
-                } else if (sched_get_current() != NULL) {
+                if (!(frame->sstatus & SSTATUS_SPP_SUPERVISOR) && sched_get_current() != NULL) {
                     process_run(sched_get_current(), hart);
+                    // if (now - scheduler_time < CONTEXT_SWITCH_TIMER) {
+                    //     debugf("Process %d is running. Resuming process\n", p->pid);
+                    //     process_run(p, hart);
+                    // } else {
+                    //     scheduler_time = now;
+                    //     sched_handle_timer_interrupt(hart);
+                    // }
                 }
                 // p = sched_get_current();
                 // // If there is a current process, we should schedule it
@@ -159,7 +177,7 @@ void os_trap_handler(void)
                 break;
         }
     } else {
-        debugf("Is sync!\n");
+        // debugf("Is sync!\n");
         if (cause != CAUSE_ECALL_S_MODE && cause != CAUSE_ECALL_U_MODE) {
             debugf("ERROR!!!\n");
             trap_frame_debug(scratch);
@@ -169,20 +187,19 @@ void os_trap_handler(void)
         // } else {
         //     debugf("os_trap_handler: SPP is not set\n");
         // }
-        // frame->sepc = epc + 4;
+        frame->sepc = epc + 4;
+        TrapFrame save = *kernel_trap_frame;
         switch (cause) {
             case CAUSE_ECALL_U_MODE:  // ECALL U-Mode
                 // Forward to src/syscall.c
                 // debugf("Handling syscall\n");
                 // trap_frame_debug(scratch);
-                debugf("Syscall (U): old sepc: %p\n", frame->sepc);
-                frame->sepc = epc + 4;
-                debugf("Syscall (U): new sepc: %p\n", frame->sepc);
 
+                CSR_WRITE("sscratch", &save);
+                IRQ_OFF();
                 syscall_handle(hart, epc, scratch);
                 // Get the process
                 p = sched_get_current();
-
                 // if (now - time_since_scheduler > CONTEXT_SWITCH_TIMER || p == sched_get_idle_process() || p->state != PS_RUNNING) {
                 //     debugf("Context switch timer expired. Scheduling next process\n");
                 //     sched_handle_timer_interrupt(hart);
@@ -191,19 +208,20 @@ void os_trap_handler(void)
                 //     process_run(p, hart);
                 // }
                 // return;
-                uint64_t now = sbi_get_time();
 
                 switch (p->state) {
                 case PS_RUNNING:
                     // sched_handle_timer_interrupt(hart);
                     if (p == sched_get_idle_process()) {
                         debugf("Process %d is idle. Scheduling next process\n", p->pid);
+                        scheduler_time = now;
                         sched_handle_timer_interrupt(hart);
-                    } else if (now - time_since_scheduler > CONTEXT_SWITCH_TIMER) {
+                    } else if (now - scheduler_time > CONTEXT_SWITCH_TIMER) {
                         debugf("Process %d is running. Resuming process\n", p->pid);
                         process_run(p, hart);
                     } else {
                         debugf("Process %d is running. Scheduling next process\n", p->pid);
+                        scheduler_time = now;
                         sched_handle_timer_interrupt(hart);
                     }
                     return;
@@ -223,9 +241,6 @@ void os_trap_handler(void)
                 // We have to move beyond the ECALL instruction, which is exactly 4 bytes.
                 break;
             case CAUSE_ECALL_S_MODE:  // ECALL U-Mode
-                debugf("Syscall (S): old sepc: %p\n", frame->sepc);
-                frame->sepc = epc + 4;
-                debugf("Syscall (S): new sepc: %p\n", frame->sepc);
                 // Forward to src/syscall.c
                 // debugf("Handling supervisor syscall\n");
                 syscall_handle(hart, epc, scratch);

@@ -401,4 +401,6 @@ int elf_load_process(Process *p, const uint8_t *elf);
 
 int elf_load_file(const uint8_t *elf, uint64_t *entry_point);
 
+bool elf_is_valid(const uint8_t *elf);
+
 int elf_load_block_device(VirtioDevice *block_device, uint64_t offset, uint64_t *entry_point);

@@ -45,7 +45,14 @@ static void init_systems(void)
     debugf("Mapping kernel segments\n");
     uint64_t size_of_mem = sym_end(memory) - sym_start(memory);
     infof("Size of memory: %x\n", size_of_mem);
-    mmu_map_range(pt, sym_start(memory), sym_end(memory), sym_start(memory), MMU_LEVEL_1G,
+    // mmu_map_range(pt, sym_start(text), sym_end(text), sym_start(text), MMU_LEVEL_4K, PB_READ | PB_EXECUTE);
+    // mmu_map_range(pt, sym_start(heap), sym_end(heap), sym_start(heap), MMU_LEVEL_1G, PB_READ | PB_WRITE);
+    // mmu_map_range(pt, sym_start(rodata), sym_end(rodata), sym_start(rodata), MMU_LEVEL_4K, PB_READ);
+    // mmu_map_range(pt, sym_start(data), sym_end(data), sym_start(data), MMU_LEVEL_4K, PB_READ | PB_WRITE);
+    // mmu_map_range(pt, sym_start(bss), sym_end(bss), sym_start(bss), MMU_LEVEL_4K, PB_READ | PB_WRITE);
+    // mmu_map_range(pt, sym_start(stack), sym_end(stack), sym_start(stack), MMU_LEVEL_4K, PB_READ | PB_WRITE);
+
+    mmu_map_range(pt, sym_end(memory), sym_end(memory) + 0x1000000000UL, sym_end(memory), MMU_LEVEL_1G,
                   PB_READ | PB_WRITE | PB_EXECUTE);
     // // PLIC
     // mmu_map_range(pt, sym_start(memory) + 0x40000000, sym_end(memory), sym_start(memory) + 0x40000000, MMU_LEVEL_1G,
@@ -125,8 +132,9 @@ static void init_systems(void)
     CSR_READ(kernel_trap_frame->stvec, "stvec");
     CSR_READ(kernel_trap_frame->trap_satp, "satp");
     CSR_READ(kernel_trap_frame->sstatus, "sstatus");
+    CSR_READ(kernel_trap_frame->sie, "sie");
     // kernel_trap_frame->satp = kernel_mmu_table
-    kernel_trap_frame->trap_stack = (uint64_t)kmalloc(0x50000);
+    kernel_trap_frame->trap_stack = (uint64_t)page_znalloc(0x400);
     CSR_WRITE("sscratch", kernel_trap_frame);
     trap_frame_debug(kernel_trap_frame);
 
@@ -246,12 +254,14 @@ void main(unsigned int hart)
 
     // Read in /home/cosc562/console.elf
     // File *elf_file = vfs_open("/home/cosc562/presentation.elf", 0, O_RDONLY, VFS_TYPE_FILE);
-    File *elf_file = vfs_open("/home/cosc562/draw.elf", 0, O_RDONLY, VFS_TYPE_FILE);
+    // File *elf_file = vfs_open("/home/cosc562/draw.elf", 0, O_RDONLY, VFS_TYPE_FILE);
+    File *elf_file = vfs_open("/home/cosc562/shell.elf", 0, O_RDONLY, VFS_TYPE_FILE);
     // File *elf_file = vfs_open("/home/cosc562/console.elf", 0, O_RDONLY, VFS_TYPE_FILE);
     // File *elf_file = vfs_open("/home/cosc562/bonzai.elf", 0, O_RDONLY, VFS_TYPE_FILE);
     // File *elf_file = vfs_open("/home/cosc562/bonzai.elf", 0, O_RDONLY, VFS_TYPE_FILE);
     // File *elf_file = vfs_open("/home/cosc562/hex_editor.elf", 0, O_RDONLY, VFS_TYPE_FILE);
     // File *elf_file = vfs_open("/home/cosc562/bonzai.elf", 0, O_RDONLY, VFS_TYPE_FILE);
+    // File *elf_file = vfs_open("/home/cosc562/tetris.elf", 0, O_RDONLY, VFS_TYPE_FILE);
     Stat stat;
     vfs_stat(elf_file, &stat);
     logf(LOG_INFO, "Console file size: %lu\n", stat.size);
@@ -263,6 +273,7 @@ void main(unsigned int hart)
     elf_create_process(p, elfcon);
 
     p->state = PS_RUNNING;
+    p->priority = 1;
     p->hart = sbi_whoami();
     // p->frame->sstatus = SSTATUS_SPP_BIT | SSTATUS_SPIE_BIT;
     // sched_add(p);
