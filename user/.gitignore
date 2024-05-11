@@ -1,0 +1,5 @@
+deps/*.d
+objs/*.o
+*.elf
+*.bin
+libc/*.a
